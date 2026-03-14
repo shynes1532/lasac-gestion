@@ -1,0 +1,60 @@
+@import "tailwindcss";
+
+@theme {
+  /* Paleta FIAT / Liendo Automotores */
+  --color-primary: #1A3A5C;
+  --color-primary-light: #2a5a8c;
+  --color-primary-dark: #0f2540;
+  --color-action: #C0392B;
+  --color-action-hover: #a93226;
+  --color-success: #27AE60;
+  --color-success-light: #2ecc71;
+  --color-warning: #F39C12;
+  --color-warning-light: #f1c40f;
+  --color-danger: #E74C3C;
+  --color-danger-light: #ff6b6b;
+
+  /* Fondos */
+  --color-bg-primary: #0F172A;
+  --color-bg-secondary: #1E293B;
+  --color-bg-tertiary: #334155;
+  --color-bg-card: #1E293B;
+  --color-bg-input: #1E293B;
+
+  /* Texto */
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+
+  /* Bordes */
+  --color-border: #334155;
+  --color-border-light: #475569;
+
+  /* Tipografía */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+/* Scrollbar custom */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-bg-tertiary);
+  border-radius: 3px;
+}
