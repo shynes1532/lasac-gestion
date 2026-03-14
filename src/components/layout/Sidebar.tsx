@@ -1,10 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
-  LogOut, Bell, Menu, X
+  LogOut, Menu, X
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
+import { NotificationBell } from './NotificationBell'
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -86,9 +87,7 @@ export function Sidebar() {
           </button>
           <h1 className="text-lg font-bold text-text-primary">LASAC</h1>
         </div>
-        <button className="relative text-text-secondary cursor-pointer">
-          <Bell className="h-5 w-5" />
-        </button>
+        <NotificationBell />
       </div>
 
       {/* Mobile overlay */}

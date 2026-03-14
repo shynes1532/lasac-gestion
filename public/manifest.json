@@ -1,0 +1,18 @@
+{
+  "name": "LASAC - Liendo Automotores",
+  "short_name": "LASAC",
+  "description": "Sistema de Gestión Operativa - Liendo Automotores FIAT",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0F172A",
+  "theme_color": "#0F172A",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
