@@ -91,19 +91,24 @@ export function useCrearOperacion() {
 
   return useMutation({
     mutationFn: async (data: NuevaOperacionData) => {
+      if (!user) throw new Error('No hay sesión activa')
+
       // Insert operacion
       const { data: op, error: opErr } = await supabase
         .from('operaciones')
         .insert({
           ...data.operacion,
-          created_by: user!.id,
+          created_by: user.id,
           estado_actual: 'gestoria',
           estado_gestoria: 'ingresado',
         })
         .select()
         .single()
 
-      if (opErr) throw opErr
+      if (opErr) {
+        console.error('Error inserting operacion:', opErr)
+        throw new Error(`Error al crear operación: ${opErr.message}`)
+      }
 
       // Insert titular, unidad, gestoria in parallel
       const [titularRes, unidadRes, gestoriaRes] = await Promise.all([
@@ -112,13 +117,22 @@ export function useCrearOperacion() {
         supabase.from('gestoria_tramites').insert({
           ...data.gestoria,
           operacion_id: op.id,
-          gestor_responsable: user!.id,
+          gestor_responsable: user.id,
         }),
       ])
 
-      if (titularRes.error) throw titularRes.error
-      if (unidadRes.error) throw unidadRes.error
-      if (gestoriaRes.error) throw gestoriaRes.error
+      if (titularRes.error) {
+        console.error('Error inserting titular:', titularRes.error)
+        throw new Error(`Error en datos del titular: ${titularRes.error.message}`)
+      }
+      if (unidadRes.error) {
+        console.error('Error inserting unidad:', unidadRes.error)
+        throw new Error(`Error en datos de la unidad: ${unidadRes.error.message}`)
+      }
+      if (gestoriaRes.error) {
+        console.error('Error inserting gestoria:', gestoriaRes.error)
+        throw new Error(`Error en datos de gestoría: ${gestoriaRes.error.message}`)
+      }
 
       return op as Operacion
     },

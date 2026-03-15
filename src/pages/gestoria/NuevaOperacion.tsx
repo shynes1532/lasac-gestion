@@ -56,6 +56,24 @@ export function NuevaOperacion() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
 
+    // Validaciones antes de enviar
+    if (!formData.modelo) {
+      notify.error('Seleccioná un modelo de vehículo')
+      return
+    }
+    if (!formData.vin_chasis || formData.vin_chasis.length < 5) {
+      notify.error('Ingresá un VIN/Chasis válido')
+      return
+    }
+    if (!formData.nombre_apellido || formData.nombre_apellido.length < 3) {
+      notify.error('Ingresá el nombre del titular (mínimo 3 caracteres)')
+      return
+    }
+    if (!formData.telefono) {
+      notify.error('Ingresá el teléfono del titular')
+      return
+    }
+
     try {
       const result = await crearOperacion.mutateAsync({
         operacion: {
@@ -65,7 +83,7 @@ export function NuevaOperacion() {
         titular: {
           nombre_apellido: formData.nombre_apellido,
           dni_cuil: formData.dni_cuil,
-          domicilio: formData.domicilio,
+          domicilio: formData.domicilio || undefined,
           localidad: formData.localidad,
           telefono: formData.telefono,
           email: formData.email || undefined,
@@ -89,7 +107,9 @@ export function NuevaOperacion() {
       notify.success('Operación creada correctamente')
       navigate(`/gestoria/${result.id}`)
     } catch (err: any) {
-      notify.error(err?.message || 'Error al crear la operación')
+      console.error('Error al crear operación:', err)
+      const msg = err?.message || 'Error desconocido al crear la operación'
+      notify.error(msg)
     }
   }
 
@@ -227,6 +247,7 @@ export function NuevaOperacion() {
               onChange={(e) => update('modelo', e.target.value)}
               placeholder="Seleccionar modelo"
               options={MODELOS_FIAT.map(m => ({ label: m, value: m }))}
+              required
             />
             <Input
               label="Color"
