@@ -27,22 +27,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   const fetchPerfil = async (userId: string): Promise<Usuario | null> => {
-    const { data, error } = await supabase
-      .from('usuarios')
-      .select('*')
-      .eq('id', userId)
-      .single()
+    try {
+      const { data, error } = await supabase
+        .from('usuarios')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-    if (error || !data) return null
-    return data as Usuario
+      if (error) {
+        console.warn('Error al cargar perfil:', error.message)
+        return null
+      }
+      return data as Usuario
+    } catch (err) {
+      console.error('fetchPerfil exception:', err)
+      return null
+    }
   }
 
   useEffect(() => {
     let mounted = true
 
-    // Use onAuthStateChange as the single source of truth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const init = async () => {
+      try {
+        // 1. Get initial session
+        const { data: { session }, error } = await supabase.auth.getSession()
+
+        if (error) {
+          console.error('getSession error:', error.message)
+          if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+          return
+        }
+
+        if (session?.user) {
+          const perfil = await fetchPerfil(session.user.id)
+          if (mounted) setState({ user: session.user, session, perfil, loading: false })
+        } else {
+          if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+        }
+      } catch (err) {
+        console.error('Auth init error:', err)
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+      }
+    }
+
+    init()
+
+    // 2. Listen for auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
+      // Skip INITIAL_SESSION since we handle it above with getSession
+      if (event === 'INITIAL_SESSION') return
+
       if (session?.user) {
         const perfil = await fetchPerfil(session.user.id)
         if (mounted) setState({ user: session.user, session, perfil, loading: false })
@@ -51,12 +87,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    // Safety timeout: if auth takes too long, stop loading
+    // 3. Safety timeout
     const timeout = setTimeout(() => {
       if (mounted) {
-        setState(prev => prev.loading ? { ...prev, loading: false } : prev)
+        setState(prev => {
+          if (prev.loading) {
+            console.warn('Auth timeout: forzando fin de loading después de 4s')
+            return { ...prev, loading: false }
+          }
+          return prev
+        })
       }
-    }, 5000)
+    }, 4000)
 
     return () => {
       mounted = false

@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Navigate } from 'react-router-dom'
 import { Mail, Lock, Car } from 'lucide-react'
-import { useAuth } from '../../context/AuthContext'
+import { useAuth, getDefaultRoute } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
 import { Input } from '../../components/ui/Input'
 import { notify } from '../../components/ui/Toast'
@@ -11,19 +11,23 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [showReset, setShowReset] = useState(false)
-  const { login, resetPassword } = useAuth()
+  const { login, resetPassword, user, perfil, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+
+  // If already authenticated with profile, redirect to default route
+  if (!authLoading && user && perfil) {
+    return <Navigate to={getDefaultRoute(perfil.rol)} replace />
+  }
 
   const handleLogin = async (e: FormEvent) => {
     e.preventDefault()
     setLoading(true)
     try {
       await login(email, password)
-      // perfil se carga en AuthContext vía onAuthStateChange, esperamos un tick
+      // onAuthStateChange will update the context, wait briefly then navigate
       setTimeout(() => {
-        // Re-read perfil won't work here, redirect handled by AppLayout
         navigate('/', { replace: true })
-      }, 100)
+      }, 300)
     } catch (err: any) {
       notify.error(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos'

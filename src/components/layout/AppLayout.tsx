@@ -1,10 +1,10 @@
 import { Outlet, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { Sidebar } from './Sidebar'
-import { Loader2 } from 'lucide-react'
+import { Loader2, AlertTriangle, LogOut } from 'lucide-react'
 
 export function AppLayout() {
-  const { user, perfil, loading } = useAuth()
+  const { user, perfil, loading, logout } = useAuth()
 
   if (loading) {
     return (
@@ -14,8 +14,34 @@ export function AppLayout() {
     )
   }
 
-  if (!user || !perfil) {
+  // No session at all → login
+  if (!user) {
     return <Navigate to="/login" replace />
+  }
+
+  // Session exists but no profile in usuarios table
+  if (!perfil) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-bg-primary p-4">
+        <div className="text-center max-w-md">
+          <AlertTriangle className="h-12 w-12 text-warning mx-auto mb-4" />
+          <p className="text-xl font-semibold text-text-primary mb-2">Perfil no encontrado</p>
+          <p className="text-text-secondary mb-2">
+            Tu cuenta existe pero no tiene un perfil asignado en el sistema.
+          </p>
+          <p className="text-sm text-text-muted mb-6">
+            Pedile al director que te agregue como usuario en LASAC, o verificá que las tablas de la base de datos estén creadas.
+          </p>
+          <button
+            onClick={() => logout()}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-action text-white rounded-lg hover:bg-action-hover transition-colors cursor-pointer"
+          >
+            <LogOut className="h-4 w-4" />
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (!perfil.activo) {
