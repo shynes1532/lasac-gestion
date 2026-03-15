@@ -38,25 +38,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (session?.user) {
-        const perfil = await fetchPerfil(session.user.id)
-        setState({ user: session.user, session, perfil, loading: false })
-      } else {
-        setState({ user: null, session: null, perfil: null, loading: false })
-      }
-    })
+    let mounted = true
 
+    // Use onAuthStateChange as the single source of truth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      if (!mounted) return
       if (session?.user) {
         const perfil = await fetchPerfil(session.user.id)
-        setState({ user: session.user, session, perfil, loading: false })
+        if (mounted) setState({ user: session.user, session, perfil, loading: false })
       } else {
-        setState({ user: null, session: null, perfil: null, loading: false })
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
       }
     })
 
-    return () => subscription.unsubscribe()
+    // Safety timeout: if auth takes too long, stop loading
+    const timeout = setTimeout(() => {
+      if (mounted) {
+        setState(prev => prev.loading ? { ...prev, loading: false } : prev)
+      }
+    }, 5000)
+
+    return () => {
+      mounted = false
+      clearTimeout(timeout)
+      subscription.unsubscribe()
+    }
   }, [])
 
   const login = async (email: string, password: string) => {
