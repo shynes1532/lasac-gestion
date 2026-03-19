@@ -1115,6 +1115,7 @@ function Paso6Entrega({
   op: OperacionDetalle
   onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
 }) {
+  const { perfil } = useAuth()
   const [confirmOpen, setConfirmOpen] = useState(false)
 
   function handleEntregada(checked: boolean) {
