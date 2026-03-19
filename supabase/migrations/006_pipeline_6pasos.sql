@@ -4,31 +4,54 @@
 -- ============================================================================
 
 -- ============================================================================
+-- 0. FUNCIONES AUXILIARES (crear si no existen)
+-- ============================================================================
+
+-- update_updated_at: actualiza updated_at en cada UPDATE
+CREATE OR REPLACE FUNCTION public.update_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at := now();
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- get_user_role: devuelve el rol del usuario autenticado
+CREATE OR REPLACE FUNCTION public.get_user_role()
+RETURNS TEXT AS $$
+  SELECT rol FROM public.usuarios WHERE id = auth.uid();
+$$ LANGUAGE sql STABLE SECURITY DEFINER;
+
+-- ============================================================================
 -- 1. ACTUALIZAR estado_actual en operaciones (6 pasos + terminal)
 -- ============================================================================
 
 ALTER TABLE public.operaciones
   DROP CONSTRAINT IF EXISTS operaciones_estado_actual_check;
 
+-- Migrar datos existentes antes de agregar el nuevo constraint
+UPDATE public.operaciones SET estado_actual = 'entregado'
+  WHERE estado_actual IN ('entrega','cerrada');
+
 ALTER TABLE public.operaciones
   ADD CONSTRAINT operaciones_estado_actual_check
   CHECK (estado_actual IN ('cierre','documentacion','gestoria','alistamiento','calidad','entrega','entregado','caida'));
 
--- Migrar datos existentes
-UPDATE public.operaciones SET estado_actual = 'gestoria'   WHERE estado_actual = 'gestoria';
-UPDATE public.operaciones SET estado_actual = 'alistamiento' WHERE estado_actual = 'alistamiento';
-UPDATE public.operaciones SET estado_actual = 'entregado'  WHERE estado_actual IN ('entrega','cerrada');
-
 -- ============================================================================
--- 2. ACTUALIZAR tipo_operacion (nuevos valores)
+-- 2. ACTUALIZAR tipo_operacion (normalizar a minúsculas)
 -- ============================================================================
 
 ALTER TABLE public.operaciones
   DROP CONSTRAINT IF EXISTS operaciones_tipo_operacion_check;
 
+-- Normalizar valores existentes antes del nuevo constraint
+UPDATE public.operaciones SET tipo_operacion = '0km'        WHERE tipo_operacion = '0KM';
+UPDATE public.operaciones SET tipo_operacion = 'plan_ahorro' WHERE tipo_operacion IN ('Plan de Ahorro','plan ahorro');
+UPDATE public.operaciones SET tipo_operacion = 'usados'      WHERE tipo_operacion = 'Usado';
+
 ALTER TABLE public.operaciones
   ADD CONSTRAINT operaciones_tipo_operacion_check
-  CHECK (tipo_operacion IN ('0km','usados','plan_ahorro','0KM','Plan de Ahorro','Usado'));
+  CHECK (tipo_operacion IN ('0km','usados','plan_ahorro'));
 
 -- ============================================================================
 -- 3. AGREGAR CAMPOS A operaciones
@@ -52,7 +75,7 @@ ALTER TABLE public.operaciones
     CHECK (forma_pago IN ('contado','financiado_banco','plan_ahorro')),
   ADD COLUMN IF NOT EXISTS banco_entidad         TEXT
     CHECK (banco_entidad IN ('Santander Río','FIAT Crédito','Galicia','Otro')),
-  ADD COLUMN IF NOT EXISTS estado_prenda         TEXT DEFAULT 'pendiente'
+  ADD COLUMN IF NOT EXISTS estado_prenda         TEXT DEFAULT NULL
     CHECK (estado_prenda IN ('pendiente','enviada')),
   ADD COLUMN IF NOT EXISTS fecha_envio_prenda    DATE;
 
