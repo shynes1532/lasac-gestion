@@ -32,12 +32,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchPerfil = async (userId: string, signal?: AbortSignal): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('usuarios')
         .select('*')
         .eq('id', userId)
         .single()
-        .abortSignal(signal!)
+
+      if (signal) {
+        query = query.abortSignal(signal)
+      }
+
+      const { data, error } = await query
 
       if (error) {
         console.warn('Error al cargar perfil:', error.code, error.message, error.details)
@@ -124,8 +129,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [initCount])
 
   const login = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    const result = await Promise.race([
+      supabase.auth.signInWithPassword({ email, password }),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Tiempo de espera agotado. Verificá tu conexión a internet.')), 10000)
+      ),
+    ])
+    if (result.error) throw result.error
   }
 
   const logout = async () => {

@@ -24,15 +24,15 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      // onAuthStateChange will update the context, wait briefly then navigate
-      setTimeout(() => {
-        navigate('/', { replace: true })
-      }, 300)
+      // onAuthStateChange will update the context and trigger the redirect above
+      // Safety: if redirect doesn't happen in 8s, stop the spinner
+      setTimeout(() => setLoading(false), 8000)
     } catch (err: any) {
       notify.error(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos'
-        : err.message || 'Error al iniciar sesión')
-    } finally {
+        : err.message?.includes('Tiempo de espera')
+          ? 'No se pudo conectar con el servidor. Verificá tu conexión a internet.'
+          : err.message || 'Error al iniciar sesión')
       setLoading(false)
     }
   }
