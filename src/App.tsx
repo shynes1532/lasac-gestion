@@ -10,13 +10,16 @@ import { Loader2 } from 'lucide-react'
 // Lazy loaded pages
 const LoginPage = lazy(() => import('./pages/auth/LoginPage').then(m => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('./pages/dashboard/DashboardPage').then(m => ({ default: m.DashboardPage })))
-const ListaOperaciones = lazy(() => import('./pages/gestoria/ListaOperaciones').then(m => ({ default: m.ListaOperaciones })))
+const ListaOperaciones = lazy(() => import('./pages/operaciones/ListaOperaciones').then(m => ({ default: m.ListaOperaciones })))
 const NuevaOperacion = lazy(() => import('./pages/gestoria/NuevaOperacion').then(m => ({ default: m.NuevaOperacion })))
 const DetalleOperacion = lazy(() => import('./pages/gestoria/DetalleOperacion').then(m => ({ default: m.DetalleOperacion })))
 const ColaPDI = lazy(() => import('./pages/alistamiento/ColaPDI').then(m => ({ default: m.ColaPDI })))
 const DetallePDI = lazy(() => import('./pages/alistamiento/DetallePDI').then(m => ({ default: m.DetallePDI })))
 const ListaEntregas = lazy(() => import('./pages/entrega/ListaEntregas').then(m => ({ default: m.ListaEntregas })))
 const DetalleEntrega = lazy(() => import('./pages/entrega/DetalleEntrega').then(m => ({ default: m.DetalleEntrega })))
+const ControlPrendas = lazy(() => import('./pages/prendas/ControlPrendas').then(m => ({ default: m.ControlPrendas })))
+const CalidadPage = lazy(() => import('./pages/calidad/CalidadPage').then(m => ({ default: m.CalidadPage })))
+const EntregasProgramadas = lazy(() => import('./pages/entregas/EntregasProgramadas').then(m => ({ default: m.EntregasProgramadas })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -59,15 +62,30 @@ export default function App() {
                   <ProtectedRoute><DashboardPage /></ProtectedRoute>
                 } />
 
-                <Route path="/gestoria" element={
+                {/* Rutas nuevas */}
+                <Route path="/operaciones" element={
                   <ProtectedRoute><ListaOperaciones /></ProtectedRoute>
                 } />
-                <Route path="/gestoria/nueva" element={
+                <Route path="/operaciones/nueva" element={
                   <ProtectedRoute><NuevaOperacion /></ProtectedRoute>
                 } />
-                <Route path="/gestoria/:id" element={
+                <Route path="/operaciones/:id" element={
                   <ProtectedRoute><DetalleOperacion /></ProtectedRoute>
                 } />
+                <Route path="/prendas" element={
+                  <ProtectedRoute><ControlPrendas /></ProtectedRoute>
+                } />
+                <Route path="/calidad" element={
+                  <ProtectedRoute><CalidadPage /></ProtectedRoute>
+                } />
+                <Route path="/entregas-programadas" element={
+                  <ProtectedRoute><EntregasProgramadas /></ProtectedRoute>
+                } />
+
+                {/* Rutas legado — redirigen a nuevas */}
+                <Route path="/gestoria" element={<Navigate to="/operaciones" replace />} />
+                <Route path="/gestoria/nueva" element={<Navigate to="/operaciones/nueva" replace />} />
+                <Route path="/gestoria/:id" element={<Navigate to="/operaciones" replace />} />
 
                 <Route path="/alistamiento" element={
                   <ProtectedRoute><ColaPDI /></ProtectedRoute>

@@ -8,6 +8,7 @@ interface AuthState {
   session: Session | null
   perfil: Usuario | null
   loading: boolean
+  perfilError: string | null
 }
 
 interface AuthContextType extends AuthState {
@@ -24,9 +25,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     session: null,
     perfil: null,
     loading: true,
+    perfilError: null,
   })
 
-  const fetchPerfil = async (userId: string): Promise<Usuario | null> => {
+  const fetchPerfil = async (userId: string): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
       const { data, error } = await supabase
         .from('usuarios')
@@ -35,13 +37,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .single()
 
       if (error) {
-        console.warn('Error al cargar perfil:', error.message)
-        return null
+        console.warn('Error al cargar perfil:', error.code, error.message, error.details)
+        return { perfil: null, error: `${error.code}: ${error.message}` }
       }
-      return data as Usuario
-    } catch (err) {
+      return { perfil: data as Usuario, error: null }
+    } catch (err: any) {
       console.error('fetchPerfil exception:', err)
-      return null
+      return { perfil: null, error: err?.message || 'Error desconocido' }
     }
   }
 
@@ -60,14 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
-          const perfil = await fetchPerfil(session.user.id)
-          if (mounted) setState({ user: session.user, session, perfil, loading: false })
+          const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
+          if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
         } else {
-          if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Auth init error:', err)
-        if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: err?.message || 'Error de inicialización' })
       }
     }
 
@@ -80,10 +82,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'INITIAL_SESSION') return
 
       if (session?.user) {
-        const perfil = await fetchPerfil(session.user.id)
-        if (mounted) setState({ user: session.user, session, perfil, loading: false })
+        const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
+        if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
       } else {
-        if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
       }
     })
 
@@ -137,10 +139,14 @@ export function useAuth() {
 
 // Helper para chequear acceso por rol
 const roleAccess: Record<string, RolUsuario[]> = {
-  '/dashboard': ['director', 'calidad'],
-  '/gestoria': ['director', 'gestor'],
-  '/alistamiento': ['director', 'preparador', 'calidad'],
-  '/entrega': ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
+  '/dashboard':            ['director', 'calidad'],
+  '/operaciones':          ['director', 'gestor', 'asesor_ush', 'asesor_rg', 'calidad'],
+  '/gestoria':             ['director', 'gestor'],
+  '/alistamiento':         ['director', 'preparador', 'calidad'],
+  '/calidad':              ['director', 'calidad'],
+  '/entregas-programadas': ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
+  '/prendas':              ['director', 'gestor'],
+  '/entrega':              ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
 }
 
 export function canAccessRoute(rol: RolUsuario, path: string): boolean {

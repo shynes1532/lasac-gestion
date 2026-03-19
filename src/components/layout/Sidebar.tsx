@@ -1,17 +1,19 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
-  LogOut, Menu, X
+  LogOut, Menu, X, CreditCard, CalendarDays, ShieldCheck
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
 import { NotificationBell } from './NotificationBell'
 
 const navItems = [
-  { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/gestoria', label: 'Gestoría', icon: FileText },
-  { path: '/alistamiento', label: 'Alistamiento', icon: Wrench },
-  { path: '/entrega', label: 'Entregas', icon: Truck },
+  { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
+  { path: '/operaciones',         label: 'Operaciones',  icon: FileText },
+  { path: '/alistamiento',        label: 'PDI',          icon: Wrench },
+  { path: '/calidad',             label: 'Calidad',      icon: ShieldCheck },
+  { path: '/entregas-programadas',label: 'Entregas',     icon: Truck },
+  { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
 ]
 
 export function Sidebar() {

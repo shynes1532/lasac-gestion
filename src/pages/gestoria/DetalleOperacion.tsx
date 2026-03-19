@@ -1,263 +1,1416 @@
+// ============================================================
+// LASAC APP — DetalleOperacion
+// Pipeline 6 pasos: cierre → documentacion → gestoria → alistamiento → calidad → entrega
+// ============================================================
+
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  ArrowLeft, Edit2, Save, X, MessageCircle,
-  FileCheck, Clock, User, Car, AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Circle,
+  Clock,
+  AlertTriangle,
+  MessageCircle,
+  Flag,
+  User,
+  Car,
+  ChevronRight,
+  ExternalLink,
+  CheckCheck,
+  XCircle,
+  Calendar,
+  AlertCircle,
 } from 'lucide-react'
-import { useOperacion, useActualizarEstadoGestoria } from '../../hooks/useOperaciones'
-import {
-  Button, Input, Textarea, Card, EstadoBadge, Badge,
-  Tabs, ConfirmDialog, ProgressBar, Checkbox, notify, Skeleton,
-} from '../../components/ui'
-import { formatDate, formatDateTime } from '../../utils/formatters'
-import { generateWhatsAppLink } from '../../utils/whatsapp'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+
+import { useAuth } from '../../context/AuthContext'
 import { supabase } from '../../lib/supabase'
-import type { ChecklistDocItem, HistorialEstado, Titular, Unidad, GestoriaTramite } from '../../lib/types'
+import type {
+  Operacion,
+  Unidad,
+  Usuario,
+  ContactoCalidad,
+  AlistamientoPDI,
+  HistorialEstado,
+  EstadoActual,
+  ConfirmacionCliente,
+  Satisfaccion,
+  ResultadoO2,
+} from '../../lib/types'
+import {
+  getSemaforoCompromiso,
+  getSemaforoRegistro,
+  requierePrenda,
+  puedeAvanzarPaso2,
+} from '../../lib/types'
+import {
+  COLORES_TIPO,
+  TIPO_LABEL,
+  ESTADO_LABEL,
+  PASOS_PIPELINE,
+  SUCURSALES_CONFIG,
+  waCitacionFirmaRG,
+  waCitacionFirmaUSH,
+  waConfirmacion2dRG,
+  waConfirmacion2dUSH,
+  waRecordatorio1h,
+  waCartaFelicitaciones,
+  waSeguimientoPost,
+} from '../../lib/constants'
+import { Button } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
+import { notify } from '../../components/ui/Toast'
+import { Checkbox } from '../../components/ui/Checkbox'
 
 // ============================================================
-// DetalleOperacion - Página de detalle de operación de Gestoría
+// Tipos locales / helpers
 // ============================================================
 
-const tabs = [
-  { id: 'datos', label: 'Datos' },
-  { id: 'documentacion', label: 'Documentación' },
-  { id: 'historial', label: 'Historial' },
-  { id: 'acciones', label: 'Acciones' },
-]
-
-const estadoLabels: Record<string, string> = {
-  ingresado: 'Ingresado',
-  en_tramite: 'En trámite',
-  listo: 'Listo',
-  egresado: 'Egresado',
-  suspendido: 'Suspendido',
+interface OperacionDetalle extends Operacion {
+  unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | null
+  asesor: Pick<Usuario, 'nombre_completo'> | null
+  contactos_calidad: ContactoCalidad | null
+  alistamiento_pdi: AlistamientoPDI | null
 }
 
-export function DetalleOperacion() {
-  const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
-  const { data: operacion, isLoading, refetch } = useOperacion(id)
-  const actualizarEstado = useActualizarEstadoGestoria()
+const ESTADO_A_PASO: Record<EstadoActual, number> = {
+  cierre: 1,
+  documentacion: 2,
+  gestoria: 3,
+  alistamiento: 4,
+  calidad: 5,
+  entrega: 6,
+  entregado: 6,
+  caida: 0,
+}
 
-  const [activeTab, setActiveTab] = useState('datos')
-  const [editing, setEditing] = useState(false)
-  const [saving, setSaving] = useState(false)
+const COLORES_ESTADO_BADGE: Record<EstadoActual, BadgeColor> = {
+  cierre: 'blue',
+  documentacion: 'yellow',
+  gestoria: 'purple',
+  alistamiento: 'blue',
+  calidad: 'orange',
+  entrega: 'yellow',
+  entregado: 'green',
+  caida: 'red',
+}
 
-  // --- Editing state ---
-  const [editTitular, setEditTitular] = useState<Partial<Titular>>({})
-  const [editUnidad, setEditUnidad] = useState<Partial<Unidad>>({})
-  const [editGestoria, setEditGestoria] = useState<Partial<GestoriaTramite>>({})
+type BadgeColor = 'gray' | 'yellow' | 'green' | 'blue' | 'red' | 'orange' | 'purple'
 
-  // --- Documentacion state ---
-  const [checklistDoc, setChecklistDoc] = useState<ChecklistDocItem[]>([])
-  const [checklistInited, setChecklistInited] = useState(false)
-  const [savingChecklist, setSavingChecklist] = useState(false)
+function formatDate(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+}
 
-  // --- Acciones modals ---
-  const [confirmAction, setConfirmAction] = useState<{
-    open: boolean
-    title: string
-    message: string
-    nuevoEstado: string
-    variant: 'danger' | 'primary'
-    requireMotivo: boolean
-  }>({
-    open: false, title: '', message: '', nuevoEstado: '', variant: 'primary', requireMotivo: false,
+function formatDateTime(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString('es-AR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
   })
-  const [motivoInput, setMotivoInput] = useState('')
-  const [warningDocModal, setWarningDocModal] = useState(false)
+}
 
-  // --- Derived data ---
-  const titular = operacion?.titular as Titular | null
-  const unidad = operacion?.unidad as Unidad | null
-  const gestoria = operacion?.gestoria as GestoriaTramite | null
-  const estadoActual = operacion?.estado_gestoria || 'ingresado'
+function diasRestantes(fechaISO: string): number {
+  return Math.round((new Date(fechaISO).getTime() - Date.now()) / 86_400_000)
+}
 
-  // Init checklist when gestoria data arrives
-  if (gestoria && !checklistInited) {
-    const items = Array.isArray(gestoria.checklist_doc) ? gestoria.checklist_doc : []
-    setChecklistDoc(items)
-    setChecklistInited(true)
+function diasDesde(fechaISO: string): number {
+  return Math.round((Date.now() - new Date(fechaISO).getTime()) / 86_400_000)
+}
+
+function buildHistorialItem(
+  paso: string,
+  estadoAnterior: string,
+  estadoNuevo: string,
+  usuarioId: string,
+  usuarioNombre: string,
+  motivo?: string,
+): HistorialEstado {
+  return {
+    paso,
+    estado_anterior: estadoAnterior,
+    estado_nuevo: estadoNuevo,
+    fecha: new Date().toISOString(),
+    usuario_id: usuarioId,
+    usuario_nombre: usuarioNombre,
+    motivo: motivo ?? null,
   }
+}
 
-  // --- Handlers ---
-
-  function startEditing() {
-    setEditTitular({
-      nombre_apellido: titular?.nombre_apellido || '',
-      dni_cuil: titular?.dni_cuil || '',
-      telefono: titular?.telefono || '',
-      email: titular?.email || '',
-      domicilio: titular?.domicilio || '',
-      localidad: titular?.localidad || '',
-      es_empresa: titular?.es_empresa || false,
-      razon_social: titular?.razon_social || '',
-      cuit_empresa: titular?.cuit_empresa || '',
-    })
-    setEditUnidad({
-      marca: unidad?.marca || '',
-      modelo: unidad?.modelo || '',
-      version: unidad?.version || '',
-      color: unidad?.color || '',
-      vin_chasis: unidad?.vin_chasis || '',
-      patente_actual: unidad?.patente_actual || '',
-      patente_nueva: unidad?.patente_nueva || '',
-      anio: unidad?.anio || undefined,
-      kilometraje: unidad?.kilometraje || undefined,
-    })
-    setEditGestoria({
-      fecha_ingreso: gestoria?.fecha_ingreso || '',
-      fecha_egreso_estimada: gestoria?.fecha_egreso_estimada || '',
-      fecha_egreso_real: gestoria?.fecha_egreso_real || '',
-      gestor_responsable: gestoria?.gestor_responsable || '',
-      observaciones: gestoria?.observaciones || '',
-    })
-    setEditing(true)
+function openWA(telefono: string | null | undefined, mensaje: string) {
+  if (!telefono) {
+    notify.error('El cliente no tiene teléfono registrado')
+    return
   }
+  const num = telefono.replace(/\D/g, '')
+  const url = `https://wa.me/${num}?text=${encodeURIComponent(mensaje)}`
+  window.open(url, '_blank')
+}
 
-  function cancelEditing() {
-    setEditing(false)
-  }
+// ============================================================
+// Componentes internos reutilizables
+// ============================================================
 
-  async function saveEditing() {
-    if (!operacion || !titular || !unidad || !gestoria) return
-    setSaving(true)
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-3">
+      {children}
+    </h3>
+  )
+}
 
-    try {
-      const [titularRes, unidadRes, gestoriaRes] = await Promise.all([
-        supabase.from('titulares').update(editTitular).eq('id', titular.id),
-        supabase.from('unidades').update(editUnidad).eq('id', unidad.id),
-        supabase.from('gestoria_tramites').update({
-          fecha_egreso_estimada: editGestoria.fecha_egreso_estimada || null,
-          fecha_egreso_real: editGestoria.fecha_egreso_real || null,
-          observaciones: editGestoria.observaciones || null,
-        }).eq('id', gestoria.id),
-      ])
+function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5 border-b border-border/50 last:border-0">
+      <span className="text-xs text-text-muted shrink-0">{label}</span>
+      <span className="text-sm text-text-primary text-right">{value ?? '-'}</span>
+    </div>
+  )
+}
 
-      if (titularRes.error) throw titularRes.error
-      if (unidadRes.error) throw unidadRes.error
-      if (gestoriaRes.error) throw gestoriaRes.error
+function BlockerBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 bg-red-900/20 border border-red-700 rounded-lg p-3 text-red-400 text-sm">
+      <XCircle className="h-4 w-4 mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </div>
+  )
+}
 
-      notify.success('Datos actualizados correctamente')
-      setEditing(false)
-      refetch()
-    } catch (err: any) {
-      notify.error(err.message || 'Error al guardar')
-    } finally {
-      setSaving(false)
-    }
-  }
+function WarnBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2 bg-yellow-900/20 border border-yellow-700 rounded-lg p-3 text-yellow-400 text-sm">
+      <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </div>
+  )
+}
 
-  async function saveChecklist() {
-    if (!gestoria) return
-    setSavingChecklist(true)
+function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+  return (
+    <div className={`bg-bg-card border border-border rounded-xl p-4 ${className}`}>
+      {children}
+    </div>
+  )
+}
 
-    try {
-      const completados = checklistDoc.filter((d) => d.completado).length
-      const docCompleta = checklistDoc.length > 0 && completados === checklistDoc.length
+// ============================================================
+// QUERY: cargar operación completa
+// ============================================================
 
-      const { error } = await supabase
-        .from('gestoria_tramites')
-        .update({
-          checklist_doc: checklistDoc,
-          documentacion_completa: docCompleta,
-        })
-        .eq('id', gestoria.id)
+async function fetchOperacion(id: string): Promise<OperacionDetalle> {
+  const { data, error } = await supabase
+    .from('operaciones')
+    .select(`
+      *,
+      unidades ( modelo, vin_chasis, color, patente_nueva ),
+      asesor:usuarios!asesor_id ( nombre_completo ),
+      contactos_calidad ( * ),
+      alistamiento_pdi:alistamientos_pdi ( * )
+    `)
+    .eq('id', id)
+    .single()
 
-      if (error) throw error
-      notify.success('Checklist actualizado')
-      refetch()
-    } catch (err: any) {
-      notify.error(err.message || 'Error al guardar checklist')
-    } finally {
-      setSavingChecklist(false)
-    }
-  }
+  if (error) throw error
+  return data as unknown as OperacionDetalle
+}
 
-  function handleTransition(nuevoEstado: string) {
-    // Si va a "listo" y no tiene documentacion completa → warning
-    if (nuevoEstado === 'listo' && !gestoria?.documentacion_completa) {
-      setWarningDocModal(true)
-      return
-    }
+// ============================================================
+// BARRA DE PROGRESO PIPELINE
+// ============================================================
 
-    if (nuevoEstado === 'suspendido') {
-      setConfirmAction({
-        open: true,
-        title: 'Suspender trámite',
-        message: 'Ingresá el motivo de la suspensión:',
-        nuevoEstado: 'suspendido',
-        variant: 'danger',
-        requireMotivo: true,
-      })
-      setMotivoInput('')
-      return
-    }
-
-    const labels: Record<string, { title: string; message: string }> = {
-      en_tramite: { title: 'Iniciar trámite', message: '¿Confirmar inicio del trámite de gestoría?' },
-      listo: { title: 'Marcar listo', message: '¿Confirmar que el trámite está listo para alistar?' },
-    }
-
-    const label = labels[nuevoEstado] || { title: 'Confirmar', message: '¿Confirmar cambio de estado?' }
-    setConfirmAction({
-      open: true,
-      title: label.title,
-      message: label.message,
-      nuevoEstado,
-      variant: 'primary',
-      requireMotivo: false,
-    })
-  }
-
-  async function executeTransition(nuevoEstado: string, motivo?: string) {
-    try {
-      await actualizarEstado.mutateAsync({ id: operacion!.id, nuevoEstado, motivo })
-      notify.success(`Estado actualizado a "${estadoLabels[nuevoEstado] || nuevoEstado}"`)
-      setConfirmAction((prev) => ({ ...prev, open: false }))
-      setWarningDocModal(false)
-      refetch()
-    } catch (err: any) {
-      notify.error(err.message || 'Error al cambiar estado')
-    }
-  }
-
-  function openWhatsApp() {
-    if (!titular?.telefono) {
-      notify.error('El titular no tiene teléfono cargado')
-      return
-    }
-    const link = generateWhatsAppLink(
-      titular.telefono,
-      'Hola! Te escribimos de Liendo Automotores respecto a tu trámite.'
-    )
-    window.open(link, '_blank')
-  }
-
-  // --- Loading state ---
-  if (isLoading) {
+function BarraPipeline({ estadoActual }: { estadoActual: EstadoActual }) {
+  if (estadoActual === 'caida') {
     return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Skeleton className="h-8 w-8" />
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-6 w-24" />
-        </div>
-        <Skeleton className="h-10 w-full" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
+      <div className="flex items-center gap-2 mb-6">
+        <Badge color="red" size="md">Operación caída</Badge>
       </div>
     )
   }
 
-  if (!operacion) {
+  const pasoActual = ESTADO_A_PASO[estadoActual] ?? 0
+
+  return (
+    <div className="flex items-center gap-1 mb-6 overflow-x-auto pb-1">
+      {PASOS_PIPELINE.map((paso, idx) => {
+        const isCompleto = paso.numero < pasoActual
+        const isActivo = paso.numero === pasoActual
+        const isPendiente = paso.numero > pasoActual
+
+        return (
+          <div key={paso.key} className="flex items-center gap-1 min-w-0">
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className={`
+                  flex items-center justify-center w-7 h-7 rounded-full border-2 text-xs font-bold transition-all
+                  ${isCompleto ? 'bg-green-600 border-green-600 text-white' : ''}
+                  ${isActivo ? 'bg-action border-action text-white ring-2 ring-action/40' : ''}
+                  ${isPendiente ? 'bg-bg-tertiary border-border text-text-muted' : ''}
+                `}
+              >
+                {isCompleto ? <CheckCircle2 className="h-4 w-4" /> : paso.numero}
+              </div>
+              <span
+                className={`text-xs whitespace-nowrap hidden sm:block
+                  ${isActivo ? 'text-text-primary font-medium' : 'text-text-muted'}
+                `}
+              >
+                {paso.label}
+              </span>
+            </div>
+            {idx < PASOS_PIPELINE.length - 1 && (
+              <div
+                className={`h-px w-6 sm:w-10 shrink-0 mt-[-14px]
+                  ${paso.numero < pasoActual ? 'bg-green-600' : 'bg-border'}
+                `}
+              />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+// ============================================================
+// BANDERAS VIAJERAS
+// ============================================================
+
+function BanderasViajeras({ op }: { op: OperacionDetalle }) {
+  const semaforo = op.fecha_compromiso ? getSemaforoCompromiso(op.fecha_compromiso) : null
+  const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
+  const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
+  const necesitaPrenda = requierePrenda({ forma_pago: op.forma_pago, tipo_operacion: op.tipo_operacion })
+
+  return (
+    <div className="flex flex-wrap gap-3 mb-5 p-3 bg-bg-primary border border-border rounded-lg">
+      {/* Prenda */}
+      {necesitaPrenda && (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Flag className="h-3.5 w-3.5 text-text-muted" />
+          <span className="text-text-muted">Prenda:</span>
+          {op.estado_prenda === 'enviada' ? (
+            <span className="text-green-400 font-medium">🟢 Enviada</span>
+          ) : (
+            <span className="text-red-400 font-medium">🔴 Pendiente</span>
+          )}
+        </div>
+      )}
+
+      {/* Compromiso */}
+      {op.fecha_compromiso && semaforo && (
+        <div className="flex items-center gap-1.5 text-sm">
+          <Calendar className="h-3.5 w-3.5 text-text-muted" />
+          <span className="text-text-muted">Compromiso:</span>
+          <span className={`font-medium ${semaforoColors[semaforo]}`}>
+            {semaforoEmoji[semaforo]}{' '}
+            {(() => {
+              const d = diasRestantes(op.fecha_compromiso)
+              if (d < 0) return `${Math.abs(d)} días vencido`
+              if (d === 0) return 'Hoy'
+              return `${d} días`
+            })()}
+          </span>
+        </div>
+      )}
+
+      {/* Vendedor */}
+      <div className="flex items-center gap-1.5 text-sm">
+        <User className="h-3.5 w-3.5 text-text-muted" />
+        <span className="text-text-muted">Asesor:</span>
+        <span className="text-text-primary font-medium">
+          {op.asesor?.nombre_completo ?? 'Sin asignar'}
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// TABS
+// ============================================================
+
+function TabBar({
+  tabs,
+  active,
+  onChange,
+}: {
+  tabs: { id: string; label: string }[]
+  active: string
+  onChange: (id: string) => void
+}) {
+  return (
+    <div className="flex gap-1 border-b border-border mb-5">
+      {tabs.map((t) => (
+        <button
+          key={t.id}
+          onClick={() => onChange(t.id)}
+          className={`
+            px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px cursor-pointer
+            ${active === t.id
+              ? 'border-action text-action'
+              : 'border-transparent text-text-muted hover:text-text-primary'}
+          `}
+        >
+          {t.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 1: Cierre
+// ============================================================
+
+function Paso1Cierre({
+  op,
+  onMutate,
+}: {
+  op: OperacionDetalle
+  onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+  const puedeConfirmar =
+    op.estado_paso1 === 'creada' &&
+    (perfil?.rol === 'director' || perfil?.rol === 'asesor_ush' || perfil?.rol === 'asesor_rg')
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <SectionTitle>Información del cierre</SectionTitle>
+        <InfoRow label="N° EPOD" value={op.nro_epod} />
+        <InfoRow label="Tipo" value={TIPO_LABEL[op.tipo_operacion]} />
+        <InfoRow label="Forma de pago" value={
+          op.forma_pago === 'contado' ? 'Contado'
+          : op.forma_pago === 'financiado_banco' ? 'Financiado por banco'
+          : op.forma_pago === 'plan_ahorro' ? 'Plan de Ahorro'
+          : '-'
+        } />
+        {op.forma_pago === 'financiado_banco' && (
+          <InfoRow label="Banco / Entidad" value={op.banco_entidad} />
+        )}
+        {op.tipo_operacion === 'plan_ahorro' && (
+          <InfoRow label="N° Grupo / Orden" value={op.nro_grupo_orden} />
+        )}
+        <InfoRow label="Estado paso 1" value={op.estado_paso1} />
+      </Card>
+
+      {puedeConfirmar && (
+        <Button
+          onClick={() =>
+            onMutate(
+              { estado_actual: 'documentacion', estado_paso1: 'confirmada' },
+              buildHistorialItem(
+                'cierre',
+                'cierre',
+                'documentacion',
+                perfil!.id,
+                perfil!.nombre_completo,
+              ),
+            )
+          }
+          className="w-full"
+        >
+          <ChevronRight className="h-4 w-4" />
+          Confirmar y avanzar al Paso 2
+        </Button>
+      )}
+
+      {op.estado_paso1 === 'confirmada' && (
+        <div className="flex items-center gap-2 text-green-400 text-sm">
+          <CheckCircle2 className="h-4 w-4" />
+          Paso 1 confirmado
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 2: Documentación
+// ============================================================
+
+function Paso2Documentacion({
+  op,
+  onMutate,
+}: {
+  op: OperacionDetalle
+  onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+  const esPlan = op.tipo_operacion === 'plan_ahorro'
+  const esFinanciado = op.forma_pago === 'financiado_banco'
+
+  const puedeAvanzar = puedeAvanzarPaso2({
+    forma_pago: op.forma_pago,
+    tipo_operacion: op.tipo_operacion,
+    pago_cliente_completo: op.pago_cliente_completo,
+    pago_banco_recibido: op.pago_banco_recibido,
+    unidad_en_sucursal: op.unidad_en_sucursal,
+  })
+
+  function handleCheck(field: keyof Operacion, value: boolean) {
+    onMutate({ [field]: value } as Partial<Operacion>)
+  }
+
+  function handleWACitar() {
+    const nombre = op.cliente_nombre ?? ''
+    const modelo = op.unidades?.modelo ?? 'su vehículo'
+    const mensaje =
+      op.sucursal === 'Rio Grande'
+        ? waCitacionFirmaRG(nombre, modelo)
+        : waCitacionFirmaUSH(nombre, modelo)
+    openWA(op.cliente_telefono, mensaje)
+    if (!op.cliente_citado) {
+      onMutate({ cliente_citado: true })
+    }
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Controles financieros — bloquean avance */}
+      <Card>
+        <SectionTitle>Controles financieros — bloquean avance</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="Pago del cliente completo"
+            checked={op.pago_cliente_completo}
+            onChange={(e) => handleCheck('pago_cliente_completo', e.target.checked)}
+          />
+          {esFinanciado && (
+            <Checkbox
+              label="Pago del banco recibido"
+              checked={op.pago_banco_recibido ?? false}
+              onChange={(e) => handleCheck('pago_banco_recibido', e.target.checked)}
+            />
+          )}
+        </div>
+      </Card>
+
+      {/* Controles de carpeta */}
+      <Card>
+        <SectionTitle>Controles de carpeta</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="Carpeta OK"
+            checked={op.carpeta_ok}
+            onChange={(e) => handleCheck('carpeta_ok', e.target.checked)}
+          />
+          <Checkbox
+            label="Chasis verificado"
+            checked={op.chasis_verificado}
+            onChange={(e) => handleCheck('chasis_verificado', e.target.checked)}
+          />
+          <Checkbox
+            label="Unidad disponible"
+            checked={op.unidad_disponible}
+            onChange={(e) => handleCheck('unidad_disponible', e.target.checked)}
+          />
+          <Checkbox
+            label="Papeles preparados"
+            checked={op.papeles_preparados}
+            onChange={(e) => handleCheck('papeles_preparados', e.target.checked)}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <Checkbox
+              label="Cliente citado para firma"
+              checked={op.cliente_citado}
+              onChange={(e) => handleCheck('cliente_citado', e.target.checked)}
+            />
+            <Button
+              variant="success"
+              size="sm"
+              onClick={handleWACitar}
+              className="shrink-0 bg-green-600 hover:bg-green-700"
+            >
+              <MessageCircle className="h-3.5 w-3.5" />
+              Citar por WA
+            </Button>
+          </div>
+
+          {/* Extras plan ahorro */}
+          {esPlan && (
+            <>
+              <Checkbox
+                label="Papeles de terminal recibidos"
+                checked={op.papeles_terminal_recibidos ?? false}
+                onChange={(e) => handleCheck('papeles_terminal_recibidos', e.target.checked)}
+              />
+              <Checkbox
+                label="Firmas adelantadas"
+                checked={op.firmas_adelantadas ?? false}
+                onChange={(e) => handleCheck('firmas_adelantadas', e.target.checked)}
+              />
+              <Checkbox
+                label="Unidad en sucursal"
+                checked={op.unidad_en_sucursal ?? false}
+                onChange={(e) => handleCheck('unidad_en_sucursal', e.target.checked)}
+              />
+            </>
+          )}
+        </div>
+      </Card>
+
+      {/* Botón avanzar */}
+      {!puedeAvanzar.ok && (
+        <WarnBanner>No se puede avanzar: {puedeAvanzar.motivo}</WarnBanner>
+      )}
+
+      {op.estado_actual === 'documentacion' && (
+        <Button
+          disabled={!puedeAvanzar.ok}
+          onClick={() =>
+            onMutate(
+              { estado_actual: 'gestoria' },
+              buildHistorialItem(
+                'documentacion',
+                'documentacion',
+                'gestoria',
+                perfil!.id,
+                perfil!.nombre_completo,
+              ),
+            )
+          }
+          className="w-full"
+        >
+          <ChevronRight className="h-4 w-4" />
+          Avanzar al Paso 3 — Gestoría
+        </Button>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 3: Gestoría
+// ============================================================
+
+function Paso3Gestoria({
+  op,
+  onMutate,
+}: {
+  op: OperacionDetalle
+  onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+
+  const semaforoRegistro =
+    op.fecha_ingreso_registro ? getSemaforoRegistro(op.fecha_ingreso_registro) : null
+  const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
+  const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
+
+  const inhibido = op.resultado_o2 === 'inhibido'
+
+  const puedeAvanzarPDI =
+    op.egresado_registro &&
+    !!op.dominio_patente &&
+    !inhibido
+
+  function handle(field: keyof Operacion, value: unknown) {
+    onMutate({ [field]: value } as Partial<Operacion>)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Sub-paso 1: Carpeta registral */}
+      <Card>
+        <SectionTitle>1 · Carpeta registral</SectionTitle>
+        <Checkbox
+          label="Carpeta registral lista"
+          checked={op.carpeta_registral_lista}
+          onChange={(e) => handle('carpeta_registral_lista', e.target.checked)}
+        />
+      </Card>
+
+      {/* Sub-paso 2: Firma del cliente */}
+      <Card>
+        <SectionTitle>2 · Firma del cliente</SectionTitle>
+        <Checkbox
+          label="Cliente firmó la documentación"
+          checked={op.cliente_firmo}
+          onChange={(e) => handle('cliente_firmo', e.target.checked)}
+        />
+      </Card>
+
+      {/* Sub-paso 3: Solicitud 02 */}
+      <Card>
+        <SectionTitle>3 · Solicitud 02</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="02 solicitado"
+            checked={op.o2_solicitado}
+            onChange={(e) => handle('o2_solicitado', e.target.checked)}
+          />
+          {op.o2_solicitado && (
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Resultado del 02</label>
+              <select
+                value={op.resultado_o2 ?? ''}
+                onChange={(e) => handle('resultado_o2', e.target.value as ResultadoO2 || null)}
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+              >
+                <option value="">— Sin resultado —</option>
+                <option value="libre">Libre</option>
+                <option value="inhibido">Inhibido</option>
+              </select>
+            </div>
+          )}
+          {inhibido && (
+            <BlockerBanner>
+              BLOQUEADO: Titular inhibido en 02. Contactar al director.
+            </BlockerBanner>
+          )}
+        </div>
+      </Card>
+
+      {/* Sub-paso 4: Ingreso al registro */}
+      <Card>
+        <SectionTitle>4 · Ingreso al Registro</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="Ingresado al registro"
+            checked={op.ingresado_registro}
+            disabled={inhibido}
+            onChange={(e) => handle('ingresado_registro', e.target.checked)}
+          />
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Fecha de ingreso</label>
+            <input
+              type="date"
+              value={op.fecha_ingreso_registro ?? ''}
+              disabled={inhibido}
+              onChange={(e) => handle('fecha_ingreso_registro', e.target.value || null)}
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 disabled:opacity-50"
+            />
+          </div>
+
+          {/* Semáforo tiempo en registro */}
+          {op.fecha_ingreso_registro && semaforoRegistro && (
+            <div className={`flex items-center gap-1.5 text-sm ${semaforoColors[semaforoRegistro]}`}>
+              <Clock className="h-3.5 w-3.5" />
+              <span>
+                {semaforoEmoji[semaforoRegistro]}{' '}
+                {diasDesde(op.fecha_ingreso_registro)} días en registro
+              </span>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* Sub-paso 5: Egreso del registro */}
+      <Card>
+        <SectionTitle>5 · Egreso del Registro</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="Egresado del registro"
+            checked={op.egresado_registro}
+            onChange={(e) => handle('egresado_registro', e.target.checked)}
+          />
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Fecha de egreso</label>
+            <input
+              type="date"
+              value={op.fecha_egreso_registro ?? ''}
+              onChange={(e) => handle('fecha_egreso_registro', e.target.value || null)}
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Dominio / Patente</label>
+            <input
+              type="text"
+              placeholder="ABC 123"
+              value={op.dominio_patente ?? ''}
+              onChange={(e) => handle('dominio_patente', e.target.value || null)}
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 uppercase"
+            />
+          </div>
+        </div>
+      </Card>
+
+      {/* Avanzar */}
+      {op.estado_actual === 'gestoria' && (
+        <>
+          {!puedeAvanzarPDI && (
+            <WarnBanner>
+              Para avanzar: egreso del registro confirmado, dominio/patente cargado y 02 libre.
+            </WarnBanner>
+          )}
+          <Button
+            disabled={!puedeAvanzarPDI}
+            onClick={() =>
+              onMutate(
+                { estado_actual: 'alistamiento' },
+                buildHistorialItem(
+                  'gestoria',
+                  'gestoria',
+                  'alistamiento',
+                  perfil!.id,
+                  perfil!.nombre_completo,
+                ),
+              )
+            }
+            className="w-full"
+          >
+            <ChevronRight className="h-4 w-4" />
+            Avanzar a PDI / Alistamiento
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 4: Alistamiento PDI
+// ============================================================
+
+function Paso4Alistamiento({
+  op,
+  onMutate,
+}: {
+  op: OperacionDetalle
+  onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+  const navigate = useNavigate()
+
+  const pdi = op.alistamiento_pdi
+  const items = pdi?.checklist_pdi?.items ?? []
+  const criticos = items.filter((i) => i.es_critico)
+  const criticosOk = criticos.filter((i) => i.estado === 'OK')
+  const todosOk = criticos.length > 0 && criticosOk.length === criticos.length
+
+  return (
+    <div className="space-y-5">
+      <Card>
+        <SectionTitle>Estado del PDI</SectionTitle>
+        {pdi ? (
+          <div className="space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-bg-tertiary rounded-full h-2">
+                <div
+                  className={`h-2 rounded-full transition-all ${todosOk ? 'bg-green-500' : 'bg-action'}`}
+                  style={{ width: criticos.length > 0 ? `${(criticosOk.length / criticos.length) * 100}%` : '0%' }}
+                />
+              </div>
+              <span className="text-sm text-text-secondary shrink-0">
+                {criticosOk.length}/{criticos.length} críticos OK
+              </span>
+            </div>
+
+            {todosOk && (
+              <div className="flex items-center gap-2 text-green-400 text-sm">
+                <CheckCheck className="h-4 w-4" />
+                Todos los ítems críticos aprobados
+              </div>
+            )}
+
+            {pdi.aprobado && (
+              <Badge color="green" size="md">PDI Aprobado</Badge>
+            )}
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => navigate(`/alistamiento/${pdi.id}`)}
+            >
+              <ExternalLink className="h-4 w-4" />
+              Ver detalle del PDI
+            </Button>
+          </div>
+        ) : (
+          <p className="text-sm text-text-muted">PDI aún no iniciado.</p>
+        )}
+      </Card>
+
+      {op.estado_actual === 'alistamiento' && (
+        <>
+          {!todosOk && (
+            <WarnBanner>
+              Para avanzar todos los ítems críticos del PDI deben estar OK.
+            </WarnBanner>
+          )}
+          <Button
+            disabled={!todosOk}
+            onClick={() =>
+              onMutate(
+                { estado_actual: 'calidad' },
+                buildHistorialItem(
+                  'alistamiento',
+                  'alistamiento',
+                  'calidad',
+                  perfil!.id,
+                  perfil!.nombre_completo,
+                ),
+              )
+            }
+            className="w-full"
+          >
+            <ChevronRight className="h-4 w-4" />
+            Avanzar a Calidad
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 5: Calidad
+// ============================================================
+
+function Paso5Calidad({
+  op,
+  calidad,
+  onMutateCalidad,
+  onMutateOp,
+}: {
+  op: OperacionDetalle
+  calidad: ContactoCalidad | null
+  onMutateCalidad: (updates: Partial<ContactoCalidad>) => void
+  onMutateOp: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+
+  const nombre = op.cliente_nombre ?? ''
+  const modelo = op.unidades?.modelo ?? 'su vehículo'
+  const vendedor = op.asesor?.nombre_completo ?? ''
+
+  function handleWA2d() {
+    const fecha = calidad?.fecha_entrega_confirmada
+      ? formatDate(calidad.fecha_entrega_confirmada)
+      : '[FECHA]'
+    const hora = '[HORA]'
+    const mensaje =
+      op.sucursal === 'Rio Grande'
+        ? waConfirmacion2dRG(nombre, modelo, fecha, hora, vendedor)
+        : waConfirmacion2dUSH(nombre, modelo, fecha, hora, vendedor)
+    openWA(op.cliente_telefono, mensaje)
+  }
+
+  function handleWA1h() {
+    openWA(op.cliente_telefono, waRecordatorio1h(nombre, modelo, vendedor))
+  }
+
+  function handleWACarta() {
+    openWA(op.cliente_telefono, waCartaFelicitaciones(nombre, modelo))
+  }
+
+  function handleWAPost() {
+    openWA(op.cliente_telefono, waSeguimientoPost(nombre, modelo))
+  }
+
+  const puedeAvanzar = calidad?.carta_enviada === true
+
+  return (
+    <div className="space-y-5">
+      {/* Momento 1: 2 días antes */}
+      <Card>
+        <SectionTitle>Momento 1 — Confirmación 2 días antes</SectionTitle>
+        <div className="space-y-3">
+          <Checkbox
+            label="Contacto 2 días antes realizado"
+            checked={calidad?.contacto_2d_antes ?? false}
+            onChange={(e) => onMutateCalidad({ contacto_2d_antes: e.target.checked })}
+          />
+          <div>
+            <label className="text-xs text-text-muted block mb-1">¿Cliente confirmó?</label>
+            <select
+              value={calidad?.cliente_confirmo ?? ''}
+              onChange={(e) =>
+                onMutateCalidad({ cliente_confirmo: (e.target.value as ConfirmacionCliente) || null })
+              }
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+            >
+              <option value="">— Sin respuesta —</option>
+              <option value="si">Sí, confirma</option>
+              <option value="no">No confirma</option>
+              <option value="reprograma">Quiere reprogramar</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Fecha de entrega confirmada</label>
+            <input
+              type="date"
+              value={calidad?.fecha_entrega_confirmada ?? ''}
+              onChange={(e) => onMutateCalidad({ fecha_entrega_confirmada: e.target.value || null })}
+              className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+            />
+          </div>
+          <Button
+            variant="success"
+            size="sm"
+            onClick={handleWA2d}
+            className="bg-green-600 hover:bg-green-700"
+          >
+            <MessageCircle className="h-4 w-4" />
+            Confirmar entrega por WA
+          </Button>
+        </div>
+      </Card>
+
+      {/* Momento 2: 1 hora antes */}
+      {calidad?.cliente_confirmo === 'si' && (
+        <Card>
+          <SectionTitle>Momento 2 — Recordatorio 1 hora antes</SectionTitle>
+          <div className="space-y-3">
+            <Checkbox
+              label="Contacto 1 hora antes realizado"
+              checked={calidad?.contacto_1h_antes ?? false}
+              onChange={(e) => onMutateCalidad({ contacto_1h_antes: e.target.checked })}
+            />
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Resultado</label>
+              <select
+                value={calidad?.resultado_1h ?? ''}
+                onChange={(e) =>
+                  onMutateCalidad({ resultado_1h: (e.target.value as 'confirma' | 'reprograma') || null })
+                }
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+              >
+                <option value="">— Sin resultado —</option>
+                <option value="confirma">Confirma</option>
+                <option value="reprograma">Reprograma</option>
+              </select>
+            </div>
+            <Button
+              variant="success"
+              size="sm"
+              onClick={handleWA1h}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Recordatorio 1 hora por WA
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Momento 3: Carta */}
+      {calidad?.resultado_1h === 'confirma' && (
+        <Card>
+          <SectionTitle>Momento 3 — Carta de felicitaciones</SectionTitle>
+          <div className="space-y-3">
+            <Checkbox
+              label="Carta enviada"
+              checked={calidad?.carta_enviada ?? false}
+              onChange={(e) => onMutateCalidad({ carta_enviada: e.target.checked })}
+            />
+            <Button
+              variant="success"
+              size="sm"
+              onClick={handleWACarta}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Enviar carta por WA
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Momento 4: Post entrega */}
+      {(calidad?.estado_calidad === 'post_2d' || calidad?.estado_calidad === 'cerrado') && (
+        <Card>
+          <SectionTitle>Momento 4 — Seguimiento post entrega</SectionTitle>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Intentos de contacto (máx 3)</label>
+              <input
+                type="number"
+                min={0}
+                max={3}
+                value={calidad?.intentos_post ?? 0}
+                onChange={(e) => onMutateCalidad({ intentos_post: Number(e.target.value) })}
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+              />
+            </div>
+            <Checkbox
+              label="Contacto efectivo logrado"
+              checked={calidad?.contacto_efectivo_post ?? false}
+              onChange={(e) => onMutateCalidad({ contacto_efectivo_post: e.target.checked })}
+            />
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Satisfacción</label>
+              <select
+                value={calidad?.satisfaccion ?? ''}
+                onChange={(e) =>
+                  onMutateCalidad({ satisfaccion: (e.target.value as Satisfaccion) || null })
+                }
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+              >
+                <option value="">— Sin datos —</option>
+                <option value="satisfecho">Satisfecho</option>
+                <option value="insatisfecho">Insatisfecho</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Verbatim / comentario</label>
+              <textarea
+                value={calidad?.verbatim ?? ''}
+                onChange={(e) => onMutateCalidad({ verbatim: e.target.value || null })}
+                rows={3}
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 resize-none"
+                placeholder="Comentarios del cliente..."
+              />
+            </div>
+            {calidad?.satisfaccion === 'insatisfecho' && (
+              <BlockerBanner>
+                Cliente insatisfecho — el Gerente PV debe contactarlo telefónicamente mañana.
+              </BlockerBanner>
+            )}
+            <Button
+              variant="success"
+              size="sm"
+              onClick={handleWAPost}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <MessageCircle className="h-4 w-4" />
+              Seguimiento post entrega por WA
+            </Button>
+          </div>
+        </Card>
+      )}
+
+      {/* Avanzar a Entrega */}
+      {op.estado_actual === 'calidad' && (
+        <>
+          {!puedeAvanzar && (
+            <WarnBanner>Para avanzar: carta de felicitaciones enviada.</WarnBanner>
+          )}
+          <Button
+            disabled={!puedeAvanzar}
+            onClick={() =>
+              onMutateOp(
+                { estado_actual: 'entrega' },
+                buildHistorialItem(
+                  'calidad',
+                  'calidad',
+                  'entrega',
+                  perfil!.id,
+                  perfil!.nombre_completo,
+                ),
+              )
+            }
+            className="w-full"
+          >
+            <ChevronRight className="h-4 w-4" />
+            Avanzar a Entrega
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// PASO 6: Entrega
+// ============================================================
+
+function Paso6Entrega({
+  op,
+  onMutate,
+}: {
+  op: OperacionDetalle
+  onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
+}) {
+  const { perfil } = useAuth()
+  const [confirmOpen, setConfirmOpen] = useState(false)
+
+  const diasTotales = op.fecha_entrega_real
+    ? diasDesde(op.created_at)
+    : null
+
+  function handleEntregada(checked: boolean) {
+    if (checked) {
+      setConfirmOpen(true)
+    } else {
+      onMutate({ unidad_entregada: false, fecha_entrega_real: null })
+    }
+  }
+
+  function confirmarEntrega() {
+    const hoy = new Date().toISOString().split('T')[0]
+    const dias = diasDesde(op.created_at)
+    const diffCompromiso = op.fecha_compromiso
+      ? Math.round((new Date(op.fecha_compromiso).getTime() - new Date(hoy).getTime()) / 86_400_000)
+      : null
+
+    onMutate(
+      {
+        unidad_entregada: true,
+        fecha_entrega_real: hoy,
+        estado_actual: 'entregado',
+        dias_totales: dias,
+        diferencia_compromiso: diffCompromiso,
+      },
+      buildHistorialItem(
+        'entrega',
+        'entrega',
+        'entregado',
+        perfil!.id,
+        perfil!.nombre_completo,
+      ),
+    )
+    setConfirmOpen(false)
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Confirmación modal inline */}
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="bg-bg-card border border-border rounded-xl p-6 max-w-sm w-full space-y-4">
+            <div className="flex items-center gap-2 text-yellow-400">
+              <AlertCircle className="h-5 w-5" />
+              <h3 className="font-semibold">Confirmar entrega</h3>
+            </div>
+            <p className="text-sm text-text-secondary">
+              ¿Confirmás la entrega? Esto cierra la operación y no puede deshacerse.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button variant="ghost" size="sm" onClick={() => setConfirmOpen(false)}>
+                Cancelar
+              </Button>
+              <Button variant="primary" size="sm" onClick={confirmarEntrega}>
+                <CheckCircle2 className="h-4 w-4" />
+                Confirmar entrega
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {op.estado_actual !== 'entregado' && (
+        <Card>
+          <SectionTitle>Registro de entrega</SectionTitle>
+          <div className="space-y-3">
+            <Checkbox
+              label="Unidad entregada al cliente"
+              checked={op.unidad_entregada}
+              onChange={(e) => handleEntregada(e.target.checked)}
+            />
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Fecha de entrega real</label>
+              <input
+                type="date"
+                value={op.fecha_entrega_real ?? ''}
+                onChange={(e) => onMutate({ fecha_entrega_real: e.target.value || null })}
+                className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50"
+              />
+            </div>
+            <Checkbox
+              label="Entrega con incidente"
+              checked={op.entrega_con_incidente}
+              onChange={(e) => onMutate({ entrega_con_incidente: e.target.checked })}
+            />
+            {op.entrega_con_incidente && (
+              <div>
+                <label className="text-xs text-text-muted block mb-1">Detalle del incidente</label>
+                <textarea
+                  value={op.detalle_incidente ?? ''}
+                  onChange={(e) => onMutate({ detalle_incidente: e.target.value || null })}
+                  rows={3}
+                  className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 resize-none"
+                  placeholder="Describí el incidente..."
+                />
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
+
+      {/* Resumen de cierre (entregado) */}
+      {op.estado_actual === 'entregado' && (
+        <Card>
+          <SectionTitle>Resumen de cierre</SectionTitle>
+          <div className="space-y-3">
+            <div className="flex items-center gap-3 p-4 bg-green-900/20 border border-green-700 rounded-lg">
+              <CheckCircle2 className="h-8 w-8 text-green-400 shrink-0" />
+              <div>
+                <p className="font-semibold text-green-400">Operación cerrada exitosamente</p>
+                <p className="text-xs text-text-muted mt-0.5">
+                  Entregado el {op.fecha_entrega_real ? formatDate(op.fecha_entrega_real) : '-'}
+                </p>
+              </div>
+            </div>
+
+            <InfoRow
+              label="Días totales de la operación"
+              value={op.dias_totales != null ? `${op.dias_totales} días` : '-'}
+            />
+            <InfoRow
+              label="Diferencia vs compromiso"
+              value={
+                op.diferencia_compromiso != null ? (
+                  <span className={op.diferencia_compromiso >= 0 ? 'text-green-400' : 'text-red-400'}>
+                    {op.diferencia_compromiso >= 0
+                      ? `${op.diferencia_compromiso} días antes`
+                      : `${Math.abs(op.diferencia_compromiso)} días demorado`}
+                  </span>
+                ) : '-'
+              }
+            />
+            <InfoRow label="Dominio / Patente" value={op.dominio_patente} />
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// TIMELINE
+// ============================================================
+
+function Timeline({ historial }: { historial: HistorialEstado[] }) {
+  if (historial.length === 0) {
     return (
-      <div className="text-center py-12">
-        <p className="text-text-secondary">Operación no encontrada.</p>
-        <Button variant="ghost" className="mt-4" onClick={() => navigate('/gestoria')}>
+      <p className="text-sm text-text-muted text-center py-8">
+        No hay cambios de estado registrados.
+      </p>
+    )
+  }
+
+  return (
+    <div className="relative">
+      <div className="absolute left-3 top-2 bottom-2 w-px bg-border" />
+      <div className="space-y-4">
+        {[...historial].reverse().map((item, idx) => (
+          <div key={idx} className="flex gap-4 relative">
+            <div className="relative z-10 mt-1.5 shrink-0">
+              <div className="h-2.5 w-2.5 rounded-full bg-action border-2 border-bg-card" />
+            </div>
+            <div className="flex-1 pb-2">
+              <div className="flex items-center gap-2 flex-wrap text-xs">
+                <span className="text-text-muted capitalize">{item.paso}</span>
+                <span className="text-text-muted">·</span>
+                <span className="text-text-secondary">{item.estado_anterior}</span>
+                <span className="text-text-muted">→</span>
+                <span className="text-text-primary font-medium">{item.estado_nuevo}</span>
+              </div>
+              <p className="text-xs text-text-muted mt-0.5">{formatDateTime(item.fecha)}</p>
+              {item.usuario_nombre && (
+                <p className="text-xs text-text-muted mt-0.5">Por: {item.usuario_nombre}</p>
+              )}
+              {item.motivo && (
+                <p className="text-xs text-text-secondary mt-0.5 italic">Motivo: {item.motivo}</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ============================================================
+// COMPONENTE PRINCIPAL
+// ============================================================
+
+export function DetalleOperacion() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const { perfil } = useAuth()
+  const queryClient = useQueryClient()
+
+  const [activeTab, setActiveTab] = useState<'paso' | 'timeline'>('paso')
+
+  // --- Query ---
+  const {
+    data: op,
+    isLoading,
+    isError,
+  } = useQuery({
+    queryKey: ['operacion', id],
+    queryFn: () => fetchOperacion(id!),
+    enabled: !!id,
+  })
+
+  // --- Mutation: actualizar operacion ---
+  const mutOp = useMutation({
+    mutationFn: async ({
+      updates,
+      historial,
+    }: {
+      updates: Partial<Operacion>
+      historial?: HistorialEstado
+    }) => {
+      if (!op) throw new Error('Sin operación cargada')
+
+      const payload: Record<string, unknown> = { ...updates }
+
+      if (historial) {
+        const histActual: HistorialEstado[] = Array.isArray(op.historial_estados)
+          ? op.historial_estados
+          : []
+        payload.historial_estados = [...histActual, historial]
+      }
+
+      const { error } = await supabase
+        .from('operaciones')
+        .update(payload)
+        .eq('id', op.id)
+
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operacion', id] })
+      notify.success('Guardado correctamente')
+    },
+    onError: (err: Error) => {
+      notify.error(err.message || 'Error al guardar')
+    },
+  })
+
+  // --- Mutation: actualizar contacto_calidad ---
+  const mutCalidad = useMutation({
+    mutationFn: async (updates: Partial<ContactoCalidad>) => {
+      if (!op?.contactos_calidad?.id) throw new Error('Sin registro de calidad')
+      const { error } = await supabase
+        .from('contactos_calidad')
+        .update(updates)
+        .eq('id', op.contactos_calidad.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operacion', id] })
+      notify.success('Guardado correctamente')
+    },
+    onError: (err: Error) => {
+      notify.error(err.message || 'Error al guardar calidad')
+    },
+  })
+
+  // Helpers que disparan las mutations
+  function handleMutOp(updates: Partial<Operacion>, historial?: HistorialEstado) {
+    mutOp.mutate({ updates, historial })
+  }
+
+  function handleMutCalidad(updates: Partial<ContactoCalidad>) {
+    mutCalidad.mutate(updates)
+  }
+
+  // --- Loading / error ---
+  if (isLoading) {
+    return (
+      <div className="space-y-4 animate-pulse p-6">
+        <div className="h-8 w-64 bg-bg-tertiary rounded-lg" />
+        <div className="h-6 w-full bg-bg-tertiary rounded-lg" />
+        <div className="h-64 w-full bg-bg-tertiary rounded-xl" />
+      </div>
+    )
+  }
+
+  if (isError || !op) {
+    return (
+      <div className="text-center py-12 space-y-3">
+        <AlertTriangle className="h-8 w-8 text-red-400 mx-auto" />
+        <p className="text-text-secondary">No se pudo cargar la operación.</p>
+        <Button variant="ghost" onClick={() => navigate('/gestoria')}>
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
@@ -265,505 +1418,167 @@ export function DetalleOperacion() {
     )
   }
 
-  // --- Checklist helpers ---
-  const completados = checklistDoc.filter((d) => d.completado).length
-  const totalDocs = checklistDoc.length
-
-  // --- Historial ---
-  const historial: HistorialEstado[] = Array.isArray(gestoria?.historial_estados)
-    ? gestoria!.historial_estados
+  const historial: HistorialEstado[] = Array.isArray(op.historial_estados)
+    ? op.historial_estados
     : []
 
-  // --- Render helpers ---
+  // Colores tipo operación
+  const colorTipo = COLORES_TIPO[op.tipo_operacion]
+  const colorEstado = COLORES_ESTADO_BADGE[op.estado_actual] ?? 'gray'
 
-  function renderField(label: string, value: string | number | null | undefined) {
-    return (
-      <div className="py-1.5">
-        <dt className="text-xs text-text-muted">{label}</dt>
-        <dd className="text-sm text-text-primary mt-0.5">{value || '-'}</dd>
-      </div>
-    )
-  }
+  // Semáforo compromiso
+  const semaforo = op.fecha_compromiso ? getSemaforoCompromiso(op.fecha_compromiso) : null
+  const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
 
-  function renderEditField(
-    label: string,
-    value: string | number | undefined,
-    onChange: (val: string) => void,
-    type: string = 'text',
-  ) {
-    return (
-      <Input
-        label={label}
-        type={type}
-        value={value ?? ''}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    )
-  }
+  // Paso actual
+  const pasoActual = ESTADO_A_PASO[op.estado_actual] ?? 0
 
-  // ============================================================
-  // RENDER
-  // ============================================================
+  // Tabs disponibles
+  const tabs = [
+    { id: 'paso' as const, label: pasoActual > 0 ? `Paso ${pasoActual}` : 'Estado actual' },
+    { id: 'timeline' as const, label: `Timeline (${historial.length})` },
+  ]
+
+  // ---- RENDER ----
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen space-y-0">
       {/* ---- HEADER ---- */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-        <div className="flex items-center gap-3 flex-wrap">
-          <button
-            onClick={() => navigate('/gestoria')}
-            className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </button>
-          <h1 className="text-xl font-bold text-text-primary font-mono">
-            {operacion.numero_operacion}
-          </h1>
-          <EstadoBadge estado={estadoActual} tipo="gestoria" size="md" />
-          <Badge color="blue" size="sm">{operacion.sucursal}</Badge>
-          <Badge color="purple" size="sm">{operacion.tipo_operacion}</Badge>
-        </div>
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-5">
+        <button
+          onClick={() => navigate('/gestoria')}
+          className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0 mt-0.5"
+        >
+          <ArrowLeft className="h-5 w-5" />
+        </button>
 
-        <div className="flex items-center gap-2">
-          <Button
-            variant="success"
-            size="sm"
-            onClick={openWhatsApp}
-            className="bg-green-600 hover:bg-green-700"
-          >
-            <MessageCircle className="h-4 w-4" />
-            WhatsApp
-          </Button>
-          {!editing ? (
-            <Button variant="secondary" size="sm" onClick={startEditing}>
-              <Edit2 className="h-4 w-4" />
-              Editar
-            </Button>
-          ) : (
-            <>
-              <Button variant="primary" size="sm" onClick={saveEditing} loading={saving}>
-                <Save className="h-4 w-4" />
-                Guardar
-              </Button>
-              <Button variant="ghost" size="sm" onClick={cancelEditing}>
-                <X className="h-4 w-4" />
-                Cancelar
-              </Button>
-            </>
-          )}
+        <div className="flex-1 min-w-0">
+          <div className="flex flex-wrap items-center gap-2 mb-1">
+            <h1 className="text-xl font-bold text-text-primary font-mono">
+              {op.numero_operacion}
+            </h1>
+
+            {/* Badge tipo operación (con colores custom) */}
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-semibold border"
+              style={{
+                backgroundColor: colorTipo.bg,
+                color: colorTipo.text,
+                borderColor: colorTipo.border,
+              }}
+            >
+              {TIPO_LABEL[op.tipo_operacion]}
+            </span>
+
+            {/* Badge estado */}
+            <Badge color={colorEstado} size="sm">
+              {ESTADO_LABEL[op.estado_actual]}
+            </Badge>
+
+            {/* Semáforo compromiso */}
+            {op.fecha_compromiso && semaforo && (
+              <span className="text-sm">
+                {semaforoEmoji[semaforo]}
+                <span className="text-text-muted text-xs ml-1">
+                  {(() => {
+                    const d = diasRestantes(op.fecha_compromiso)
+                    if (d < 0) return `${Math.abs(d)}d vencido`
+                    if (d === 0) return 'Hoy'
+                    return `${d}d`
+                  })()}
+                </span>
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
+            <span className="flex items-center gap-1">
+              <User className="h-3.5 w-3.5 text-text-muted" />
+              {op.cliente_nombre ?? 'Sin nombre'}
+            </span>
+            {op.unidades?.modelo && (
+              <span className="flex items-center gap-1">
+                <Car className="h-3.5 w-3.5 text-text-muted" />
+                {op.unidades.modelo}
+                {op.unidades.color ? ` · ${op.unidades.color}` : ''}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
+      {/* ---- BARRA PIPELINE ---- */}
+      <BarraPipeline estadoActual={op.estado_actual} />
+
+      {/* ---- BANDERAS VIAJERAS ---- */}
+      <BanderasViajeras op={op} />
+
       {/* ---- TABS ---- */}
-      <Tabs tabs={tabs} activeTab={activeTab} onChange={setActiveTab} className="mb-6" />
+      <TabBar
+        tabs={tabs}
+        active={activeTab}
+        onChange={(id) => setActiveTab(id as 'paso' | 'timeline')}
+      />
 
-      {/* ---- TAB: DATOS ---- */}
-      {activeTab === 'datos' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Card Titular */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <User className="h-4 w-4 text-action" />
-              <h3 className="text-sm font-semibold text-text-primary">Titular</h3>
-            </div>
-            {!editing ? (
-              <dl className="space-y-1">
-                {renderField('Nombre / Apellido', titular?.nombre_apellido)}
-                {renderField('DNI / CUIL', titular?.dni_cuil)}
-                {renderField('Teléfono', titular?.telefono)}
-                {renderField('Email', titular?.email)}
-                {renderField('Domicilio', titular?.domicilio)}
-                {renderField('Localidad', titular?.localidad)}
-                {titular?.es_empresa && (
-                  <>
-                    {renderField('Razón Social', titular?.razon_social)}
-                    {renderField('CUIT Empresa', titular?.cuit_empresa)}
-                  </>
-                )}
-              </dl>
-            ) : (
-              <div className="space-y-3">
-                {renderEditField('Nombre / Apellido', editTitular.nombre_apellido, (v) =>
-                  setEditTitular((prev) => ({ ...prev, nombre_apellido: v }))
-                )}
-                {renderEditField('DNI / CUIL', editTitular.dni_cuil, (v) =>
-                  setEditTitular((prev) => ({ ...prev, dni_cuil: v }))
-                )}
-                {renderEditField('Teléfono', editTitular.telefono, (v) =>
-                  setEditTitular((prev) => ({ ...prev, telefono: v }))
-                )}
-                {renderEditField('Email', editTitular.email || '', (v) =>
-                  setEditTitular((prev) => ({ ...prev, email: v }))
-                , 'email')}
-                {renderEditField('Domicilio', editTitular.domicilio || '', (v) =>
-                  setEditTitular((prev) => ({ ...prev, domicilio: v }))
-                )}
-                {renderEditField('Localidad', editTitular.localidad || '', (v) =>
-                  setEditTitular((prev) => ({ ...prev, localidad: v }))
-                )}
-                <Checkbox
-                  label="Es empresa"
-                  checked={editTitular.es_empresa || false}
-                  onChange={(e) =>
-                    setEditTitular((prev) => ({ ...prev, es_empresa: (e.target as HTMLInputElement).checked }))
-                  }
-                />
-                {editTitular.es_empresa && (
-                  <>
-                    {renderEditField('Razón Social', editTitular.razon_social || '', (v) =>
-                      setEditTitular((prev) => ({ ...prev, razon_social: v }))
-                    )}
-                    {renderEditField('CUIT Empresa', editTitular.cuit_empresa || '', (v) =>
-                      setEditTitular((prev) => ({ ...prev, cuit_empresa: v }))
-                    )}
-                  </>
-                )}
+      {/* ---- CONTENIDO PASO ACTUAL ---- */}
+      {activeTab === 'paso' && (
+        <div>
+          {op.estado_actual === 'caida' && (
+            <Card>
+              <div className="flex items-center gap-3 text-red-400">
+                <XCircle className="h-6 w-6" />
+                <div>
+                  <p className="font-semibold">Operación caída</p>
+                  {op.motivo_caida && (
+                    <p className="text-sm text-text-muted mt-0.5">Motivo: {op.motivo_caida}</p>
+                  )}
+                </div>
               </div>
+            </Card>
+          )}
+
+          {(op.estado_actual === 'cierre' || op.estado_paso1 === 'creada') &&
+            op.estado_actual !== 'caida' && (
+              <Paso1Cierre op={op} onMutate={handleMutOp} />
             )}
-          </Card>
 
-          {/* Card Unidad */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <Car className="h-4 w-4 text-action" />
-              <h3 className="text-sm font-semibold text-text-primary">Unidad</h3>
-            </div>
-            {!editing ? (
-              <dl className="space-y-1">
-                {renderField('Marca', unidad?.marca)}
-                {renderField('Modelo', unidad?.modelo)}
-                {renderField('Versión', unidad?.version)}
-                {renderField('Color', unidad?.color)}
-                {renderField('VIN / Chasis', unidad?.vin_chasis)}
-                {renderField('Patente actual', unidad?.patente_actual)}
-                {renderField('Patente nueva', unidad?.patente_nueva)}
-                {renderField('Año', unidad?.anio)}
-                {renderField('Kilometraje', unidad?.kilometraje != null ? `${unidad.kilometraje} km` : null)}
-              </dl>
-            ) : (
-              <div className="space-y-3">
-                {renderEditField('Marca', editUnidad.marca, (v) =>
-                  setEditUnidad((prev) => ({ ...prev, marca: v }))
-                )}
-                {renderEditField('Modelo', editUnidad.modelo, (v) =>
-                  setEditUnidad((prev) => ({ ...prev, modelo: v }))
-                )}
-                {renderEditField('Versión', editUnidad.version || '', (v) =>
-                  setEditUnidad((prev) => ({ ...prev, version: v }))
-                )}
-                {renderEditField('Color', editUnidad.color || '', (v) =>
-                  setEditUnidad((prev) => ({ ...prev, color: v }))
-                )}
-                {renderEditField('VIN / Chasis', editUnidad.vin_chasis, (v) =>
-                  setEditUnidad((prev) => ({ ...prev, vin_chasis: v }))
-                )}
-                {renderEditField('Patente actual', editUnidad.patente_actual || '', (v) =>
-                  setEditUnidad((prev) => ({ ...prev, patente_actual: v }))
-                )}
-                {renderEditField('Patente nueva', editUnidad.patente_nueva || '', (v) =>
-                  setEditUnidad((prev) => ({ ...prev, patente_nueva: v }))
-                )}
-                {renderEditField('Año', editUnidad.anio as any, (v) =>
-                  setEditUnidad((prev) => ({ ...prev, anio: v ? Number(v) : undefined }))
-                , 'number')}
-                {renderEditField('Kilometraje', editUnidad.kilometraje as any, (v) =>
-                  setEditUnidad((prev) => ({ ...prev, kilometraje: v ? Number(v) : undefined }))
-                , 'number')}
-              </div>
-            )}
-          </Card>
+          {op.estado_actual === 'documentacion' && (
+            <Paso2Documentacion op={op} onMutate={handleMutOp} />
+          )}
 
-          {/* Card Trámite */}
-          <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <FileCheck className="h-4 w-4 text-action" />
-              <h3 className="text-sm font-semibold text-text-primary">Trámite</h3>
-            </div>
-            {!editing ? (
-              <dl className="space-y-1">
-                {renderField('Fecha ingreso', gestoria?.fecha_ingreso ? formatDate(gestoria.fecha_ingreso) : null)}
-                {renderField('Egreso estimado', gestoria?.fecha_egreso_estimada ? formatDate(gestoria.fecha_egreso_estimada) : null)}
-                {renderField('Egreso real', gestoria?.fecha_egreso_real ? formatDate(gestoria.fecha_egreso_real) : null)}
-                {renderField('Gestor responsable', gestoria?.gestor_responsable)}
-                {renderField('Observaciones', gestoria?.observaciones)}
-              </dl>
-            ) : (
-              <div className="space-y-3">
-                <Input
-                  label="Fecha ingreso"
-                  type="date"
-                  value={editGestoria.fecha_ingreso || ''}
-                  disabled
-                />
-                <Input
-                  label="Egreso estimado"
-                  type="date"
-                  value={editGestoria.fecha_egreso_estimada || ''}
-                  onChange={(e) =>
-                    setEditGestoria((prev) => ({ ...prev, fecha_egreso_estimada: e.target.value }))
-                  }
-                />
-                <Input
-                  label="Egreso real"
-                  type="date"
-                  value={editGestoria.fecha_egreso_real || ''}
-                  onChange={(e) =>
-                    setEditGestoria((prev) => ({ ...prev, fecha_egreso_real: e.target.value }))
-                  }
-                />
-                <Textarea
-                  label="Observaciones"
-                  value={editGestoria.observaciones || ''}
-                  onChange={(e) =>
-                    setEditGestoria((prev) => ({ ...prev, observaciones: e.target.value }))
-                  }
-                  rows={3}
-                />
-              </div>
-            )}
-          </Card>
-        </div>
-      )}
+          {op.estado_actual === 'gestoria' && (
+            <Paso3Gestoria op={op} onMutate={handleMutOp} />
+          )}
 
-      {/* ---- TAB: DOCUMENTACION ---- */}
-      {activeTab === 'documentacion' && (
-        <div className="space-y-4">
-          <Card>
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <FileCheck className="h-4 w-4 text-action" />
-                <h3 className="text-sm font-semibold text-text-primary">Checklist de documentación</h3>
-              </div>
-              {gestoria?.documentacion_completa && (
-                <Badge color="green" size="sm">Completa</Badge>
-              )}
-            </div>
+          {op.estado_actual === 'alistamiento' && (
+            <Paso4Alistamiento op={op} onMutate={handleMutOp} />
+          )}
 
-            <ProgressBar
-              value={completados}
-              max={totalDocs}
-              label="Progreso"
-              className="mb-5"
+          {op.estado_actual === 'calidad' && (
+            <Paso5Calidad
+              op={op}
+              calidad={op.contactos_calidad}
+              onMutateCalidad={handleMutCalidad}
+              onMutateOp={handleMutOp}
             />
+          )}
 
-            {totalDocs === 0 ? (
-              <p className="text-sm text-text-muted py-4 text-center">
-                No hay documentos en el checklist.
-              </p>
-            ) : (
-              <div className="space-y-3">
-                {checklistDoc.map((item, index) => (
-                  <div
-                    key={item.id}
-                    className="flex items-start gap-3 p-3 rounded-lg bg-bg-primary border border-border"
-                  >
-                    <Checkbox
-                      checked={item.completado}
-                      onChange={(e) => {
-                        const updated = [...checklistDoc]
-                        updated[index] = {
-                          ...updated[index],
-                          completado: (e.target as HTMLInputElement).checked,
-                        }
-                        setChecklistDoc(updated)
-                      }}
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className={`text-sm font-medium ${item.completado ? 'text-text-muted line-through' : 'text-text-primary'}`}>
-                        {item.nombre}
-                      </p>
-                      <Input
-                        placeholder="Observación..."
-                        value={item.observacion || ''}
-                        onChange={(e) => {
-                          const updated = [...checklistDoc]
-                          updated[index] = {
-                            ...updated[index],
-                            observacion: e.target.value,
-                          }
-                          setChecklistDoc(updated)
-                        }}
-                        className="mt-2 text-xs"
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {totalDocs > 0 && (
-              <div className="flex justify-end mt-4">
-                <Button onClick={saveChecklist} loading={savingChecklist} size="sm">
-                  <Save className="h-4 w-4" />
-                  Guardar checklist
-                </Button>
-              </div>
-            )}
-          </Card>
+          {(op.estado_actual === 'entrega' || op.estado_actual === 'entregado') && (
+            <Paso6Entrega op={op} onMutate={handleMutOp} />
+          )}
         </div>
       )}
 
-      {/* ---- TAB: HISTORIAL ---- */}
-      {activeTab === 'historial' && (
+      {/* ---- TIMELINE ---- */}
+      {activeTab === 'timeline' && (
         <Card>
           <div className="flex items-center gap-2 mb-4">
             <Clock className="h-4 w-4 text-action" />
             <h3 className="text-sm font-semibold text-text-primary">Historial de estados</h3>
           </div>
-
-          {historial.length === 0 ? (
-            <p className="text-sm text-text-muted py-4 text-center">
-              No hay cambios de estado registrados.
-            </p>
-          ) : (
-            <div className="relative">
-              {/* Timeline line */}
-              <div className="absolute left-3 top-2 bottom-2 w-px bg-border" />
-
-              <div className="space-y-4">
-                {[...historial].reverse().map((item, index) => (
-                  <div key={index} className="flex gap-4 relative">
-                    {/* Dot */}
-                    <div className="relative z-10 mt-1.5">
-                      <div className="h-2.5 w-2.5 rounded-full bg-action border-2 border-bg-card" />
-                    </div>
-
-                    {/* Content */}
-                    <div className="flex-1 pb-2">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <EstadoBadge estado={item.estado_anterior} tipo="gestoria" size="sm" />
-                        <span className="text-text-muted text-xs">&rarr;</span>
-                        <EstadoBadge estado={item.estado_nuevo} tipo="gestoria" size="sm" />
-                      </div>
-                      <p className="text-xs text-text-muted mt-1">
-                        {formatDateTime(item.fecha)}
-                      </p>
-                      {item.motivo && (
-                        <p className="text-xs text-text-secondary mt-1 italic">
-                          Motivo: {item.motivo}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <Timeline historial={historial} />
         </Card>
       )}
-
-      {/* ---- TAB: ACCIONES ---- */}
-      {activeTab === 'acciones' && (
-        <Card>
-          <div className="flex items-center gap-2 mb-6">
-            <AlertTriangle className="h-4 w-4 text-action" />
-            <h3 className="text-sm font-semibold text-text-primary">Acciones disponibles</h3>
-          </div>
-
-          <div className="mb-6">
-            <p className="text-xs text-text-muted mb-1">Estado actual</p>
-            <EstadoBadge estado={estadoActual} tipo="gestoria" size="md" />
-          </div>
-
-          <div className="space-y-3">
-            {/* ingresado → en_tramite */}
-            {estadoActual === 'ingresado' && (
-              <Button
-                onClick={() => handleTransition('en_tramite')}
-                loading={actualizarEstado.isPending}
-                fullWidth
-              >
-                <Clock className="h-4 w-4" />
-                Iniciar trámite
-              </Button>
-            )}
-
-            {/* en_tramite → listo */}
-            {estadoActual === 'en_tramite' && (
-              <>
-                <Button
-                  variant="success"
-                  onClick={() => handleTransition('listo')}
-                  loading={actualizarEstado.isPending}
-                  fullWidth
-                >
-                  <FileCheck className="h-4 w-4" />
-                  Marcar listo para alistar
-                </Button>
-
-                <Button
-                  variant="danger"
-                  onClick={() => handleTransition('suspendido')}
-                  loading={actualizarEstado.isPending}
-                  fullWidth
-                >
-                  <AlertTriangle className="h-4 w-4" />
-                  Suspender
-                </Button>
-              </>
-            )}
-
-            {/* suspendido → en_tramite */}
-            {estadoActual === 'suspendido' && (
-              <Button
-                onClick={() => handleTransition('en_tramite')}
-                loading={actualizarEstado.isPending}
-                fullWidth
-              >
-                <Clock className="h-4 w-4" />
-                Reactivar
-              </Button>
-            )}
-
-            {/* listo / egresado → no actions */}
-            {(estadoActual === 'listo' || estadoActual === 'egresado') && (
-              <p className="text-sm text-text-muted text-center py-4">
-                No hay acciones disponibles para el estado actual.
-              </p>
-            )}
-          </div>
-        </Card>
-      )}
-
-      {/* ---- MODALS ---- */}
-
-      {/* Confirm action (genérico) */}
-      {confirmAction.requireMotivo ? (
-        // Modal con motivo (para suspender)
-        <ConfirmDialog
-          open={confirmAction.open}
-          onClose={() => setConfirmAction((prev) => ({ ...prev, open: false }))}
-          onConfirm={() => executeTransition(confirmAction.nuevoEstado, motivoInput)}
-          title={confirmAction.title}
-          message={confirmAction.message}
-          confirmText="Confirmar"
-          variant={confirmAction.variant}
-          loading={actualizarEstado.isPending}
-        />
-      ) : (
-        <ConfirmDialog
-          open={confirmAction.open}
-          onClose={() => setConfirmAction((prev) => ({ ...prev, open: false }))}
-          onConfirm={() => executeTransition(confirmAction.nuevoEstado)}
-          title={confirmAction.title}
-          message={confirmAction.message}
-          confirmText="Confirmar"
-          variant={confirmAction.variant}
-          loading={actualizarEstado.isPending}
-        />
-      )}
-
-      {/* Warning: documentación incompleta */}
-      <ConfirmDialog
-        open={warningDocModal}
-        onClose={() => setWarningDocModal(false)}
-        onConfirm={() => executeTransition('listo')}
-        title="Documentación incompleta"
-        message="Faltan documentos en el checklist. ¿Confirmar igualmente que el trámite está listo?"
-        confirmText="Confirmar igualmente"
-        variant="danger"
-        loading={actualizarEstado.isPending}
-      />
     </div>
   )
 }

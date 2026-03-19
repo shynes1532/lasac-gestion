@@ -1,16 +1,60 @@
 // ============================================================
 // LASAC APP - Definiciones de tipos del sistema
+// Pipeline 6 pasos: cierre → doc → gestoria → PDI → calidad → entrega
 // ============================================================
 
 // --- Enums como union types ---
 
 export type Sucursal = 'Ushuaia' | 'Rio Grande'
 export type SucursalUsuario = 'Ushuaia' | 'Rio Grande' | 'Ambas'
-export type TipoOperacion = '0KM' | 'Plan de Ahorro' | 'Usado'
-export type EstadoActual = 'gestoria' | 'alistamiento' | 'entrega' | 'cerrada'
+
+export type TipoOperacion = '0km' | 'usados' | 'plan_ahorro'
+export type FormaPago = 'contado' | 'financiado_banco' | 'plan_ahorro'
+export type BancoEntidad = 'Santander Río' | 'FIAT Crédito' | 'Galicia' | 'Otro'
+export type EstadoPrenda = 'pendiente' | 'enviada'
+
+export type EstadoActual =
+  | 'cierre'
+  | 'documentacion'
+  | 'gestoria'
+  | 'alistamiento'
+  | 'calidad'
+  | 'entrega'
+  | 'entregado'
+  | 'caida'
+
+export type EstadoPaso1 = 'creada' | 'confirmada' | 'caida'
+export type MotivoCaida = 'desiste' | 'no_califica' | 'otra_marca' | 'otro'
+
+export type EstadoPaso2 =
+  | 'pagos_pendientes'
+  | 'armando_carpeta'
+  | 'cliente_citado'
+  | 'paso_3'
+  | 'papeles_terminal'
+  | 'firmas'
+  | 'esperando_unidad'
+  | 'unidad_llego'
+
+export type EstadoPaso3 =
+  | 'preparando_carpeta'
+  | 'esperando_firma'
+  | 'o2_solicitado'
+  | 'en_registro'
+  | 'patentado'
+  | 'inhibido'
+
+export type ResultadoO2 = 'libre' | 'inhibido'
+
+export type EstadoCalidad = 'citar_2d' | 'confirmar_1h' | 'entregado' | 'post_2d' | 'cerrado'
+export type ConfirmacionCliente = 'si' | 'no' | 'reprograma'
+export type Satisfaccion = 'satisfecho' | 'insatisfecho'
+
+// Estos se mantienen por compatibilidad con el PDI existente
 export type EstadoGestoria = 'ingresado' | 'en_tramite' | 'listo' | 'egresado' | 'suspendido'
 export type EstadoAlistamiento = 'pendiente' | 'en_proceso' | 'observado' | 'aprobado' | 'rechazado'
 export type EstadoEntrega = 'pendiente' | 'programada' | 'entregada' | 'cerrada'
+
 export type RolUsuario = 'director' | 'asesor_ush' | 'asesor_rg' | 'gestor' | 'preparador' | 'calidad'
 export type SeveridadNC = 'critica' | 'mayor' | 'menor'
 export type EstadoNC = 'abierta' | 'en_proceso' | 'cerrada'
@@ -24,6 +68,8 @@ export type TipoNotificacion =
   | 'entrega_manana'
   | 'nc_critica_48h'
   | 'general'
+
+export type Semaforo = 'verde' | 'amarillo' | 'rojo'
 
 // --- Tipos JSONB (embebidos) ---
 
@@ -76,10 +122,12 @@ export interface Compromiso {
 }
 
 export interface HistorialEstado {
+  paso: string
   estado_anterior: string
   estado_nuevo: string
   fecha: string
   usuario_id: string
+  usuario_nombre?: string
   motivo: string | null
 }
 
@@ -102,7 +150,61 @@ export interface Operacion {
   numero_operacion: string
   sucursal: Sucursal
   tipo_operacion: TipoOperacion
+  forma_pago: FormaPago | null
   estado_actual: EstadoActual
+
+  // Paso 1 — Cierre
+  nro_epod: string | null
+  cliente_nombre: string | null
+  cliente_telefono: string | null
+  fecha_compromiso: string | null
+  estado_paso1: EstadoPaso1
+  motivo_caida: MotivoCaida | null
+  historial_estados: HistorialEstado[]
+
+  // Financiero
+  banco_entidad: BancoEntidad | null
+  estado_prenda: EstadoPrenda
+  fecha_envio_prenda: string | null
+
+  // Plan de Ahorro
+  nro_grupo_orden: string | null
+  fecha_adjudicacion: string | null
+
+  // Paso 2 — Documentación
+  estado_paso2: EstadoPaso2
+  pago_cliente_completo: boolean
+  pago_banco_recibido: boolean | null
+  carpeta_ok: boolean
+  chasis_verificado: boolean
+  unidad_disponible: boolean
+  papeles_preparados: boolean
+  cliente_citado: boolean
+  papeles_terminal_recibidos: boolean | null
+  firmas_adelantadas: boolean | null
+  unidad_en_sucursal: boolean | null
+
+  // Paso 3 — Gestoría
+  estado_paso3: EstadoPaso3
+  carpeta_registral_lista: boolean
+  cliente_firmo: boolean
+  o2_solicitado: boolean
+  resultado_o2: ResultadoO2 | null
+  ingresado_registro: boolean
+  fecha_ingreso_registro: string | null
+  egresado_registro: boolean
+  fecha_egreso_registro: string | null
+  dominio_patente: string | null
+
+  // Paso 6 — Entrega
+  unidad_entregada: boolean
+  fecha_entrega_real: string | null
+  entrega_con_incidente: boolean
+  detalle_incidente: string | null
+  dias_totales: number | null
+  diferencia_compromiso: number | null
+
+  // Legado (compatibilidad)
   estado_gestoria: EstadoGestoria
   estado_alistamiento: EstadoAlistamiento
   estado_entrega: EstadoEntrega
@@ -189,6 +291,25 @@ export interface Entrega {
   updated_at: string
 }
 
+export interface ContactoCalidad {
+  id: string
+  operacion_id: string
+  contacto_2d_antes: boolean
+  cliente_confirmo: ConfirmacionCliente | null
+  fecha_entrega_confirmada: string | null
+  contacto_1h_antes: boolean
+  resultado_1h: 'confirma' | 'reprograma' | null
+  carta_enviada: boolean
+  intentos_post: number
+  contacto_efectivo_post: boolean
+  satisfaccion: Satisfaccion | null
+  verbatim: string | null
+  alerta_gpv: boolean
+  estado_calidad: EstadoCalidad
+  created_at: string
+  updated_at: string
+}
+
 export interface EncuestaCSI {
   id: string
   operacion_id: string
@@ -233,4 +354,65 @@ export interface OperacionCompleta extends Operacion {
   alistamiento: AlistamientoPDI | null
   entrega: Entrega | null
   encuesta: EncuestaCSI | null
+  calidad: ContactoCalidad | null
+  asesor?: Usuario | null
+}
+
+// --- Helpers de semáforo ---
+
+export function getSemaforoPaso1(createdAt: string): Semaforo {
+  const horas = (Date.now() - new Date(createdAt).getTime()) / 3_600_000
+  if (horas < 24) return 'verde'
+  if (horas < 48) return 'amarillo'
+  return 'rojo'
+}
+
+export function getSemaforoPaso2(fechaInicio: string): Semaforo {
+  const dias = (Date.now() - new Date(fechaInicio).getTime()) / 86_400_000
+  if (dias < 3) return 'verde'
+  if (dias < 5) return 'amarillo'
+  return 'rojo'
+}
+
+export function getSemaforoPaso3(fechaInicio: string): Semaforo {
+  const dias = (Date.now() - new Date(fechaInicio).getTime()) / 86_400_000
+  if (dias < 5) return 'verde'
+  if (dias < 10) return 'amarillo'
+  return 'rojo'
+}
+
+export function getSemaforoRegistro(fechaIngreso: string): Semaforo {
+  const dias = (Date.now() - new Date(fechaIngreso).getTime()) / 86_400_000
+  if (dias < 5) return 'verde'
+  if (dias < 10) return 'amarillo'
+  return 'rojo'
+}
+
+export function getSemaforoPDI(fechaInicio: string): Semaforo {
+  const dias = (Date.now() - new Date(fechaInicio).getTime()) / 86_400_000
+  if (dias < 2) return 'verde'
+  if (dias < 4) return 'amarillo'
+  return 'rojo'
+}
+
+export function getSemaforoCompromiso(fechaCompromiso: string): Semaforo {
+  const dias = (new Date(fechaCompromiso).getTime() - Date.now()) / 86_400_000
+  if (dias > 10) return 'verde'
+  if (dias > 5) return 'amarillo'
+  return 'rojo'
+}
+
+// Requiere prenda?
+export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion'>): boolean {
+  return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
+}
+
+// Puede avanzar de Paso 2 a 3?
+export function puedeAvanzarPaso2(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion' | 'pago_cliente_completo' | 'pago_banco_recibido' | 'unidad_en_sucursal'>): { ok: boolean; motivo?: string } {
+  if (!op.pago_cliente_completo) return { ok: false, motivo: 'Pago del cliente pendiente' }
+  if (op.forma_pago === 'financiado_banco' && !op.pago_banco_recibido)
+    return { ok: false, motivo: 'Pago del banco pendiente' }
+  if (op.tipo_operacion === 'plan_ahorro' && op.unidad_en_sucursal === false)
+    return { ok: false, motivo: 'La unidad aún no está en sucursal' }
+  return { ok: true }
 }
