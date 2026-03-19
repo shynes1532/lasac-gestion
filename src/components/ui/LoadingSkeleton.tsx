@@ -2,6 +2,12 @@ interface SkeletonProps {
   className?: string
 }
 
+// Alias para compatibilidad con imports existentes
+export function LoadingSkeleton({ className = '' }: SkeletonProps) {
+  return <div className={`animate-pulse bg-bg-tertiary rounded-lg ${className}`} />
+}
+
+
 export function Skeleton({ className = '' }: SkeletonProps) {
   return (
     <div className={`animate-pulse bg-bg-tertiary rounded-lg ${className}`} />

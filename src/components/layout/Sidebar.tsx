@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
-  LogOut, Menu, X, CreditCard, CalendarDays, ShieldCheck
+  LogOut, Menu, X, CreditCard, ShieldCheck
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'

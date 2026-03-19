@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error('getSession error:', error.message)
-          if (mounted) setState({ user: null, session: null, perfil: null, loading: false })
+          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
           return
         }
 
@@ -116,7 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await supabase.auth.signOut()
-    setState({ user: null, session: null, perfil: null, loading: false })
+    setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
   }
 
   const resetPassword = async (email: string) => {

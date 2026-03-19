@@ -10,7 +10,6 @@ import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton'
 
 export function EntregasProgramadas() {
   const navigate = useNavigate()
-  const [vista, setVista] = useState<'semana' | 'mes'>('semana')
   const [filtroSucursal, setFiltroSucursal] = useState('todas')
 
   const { data, isLoading } = useQuery({
@@ -57,7 +56,7 @@ export function EntregasProgramadas() {
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <LoadingSkeleton key={i} className="h-24 rounded-xl" />)}</div>
       ) : !data?.length ? (
-        <EmptyState icon={Truck} title="Sin entregas programadas" description="No hay operaciones en Paso 5 o 6 actualmente" />
+        <EmptyState icon={<Truck className="h-12 w-12" />} title="Sin entregas programadas" description="No hay operaciones en Paso 5 o 6 actualmente" />
       ) : (
         <div className="space-y-3">
           {data.map(op => {

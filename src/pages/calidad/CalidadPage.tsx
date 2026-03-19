@@ -41,7 +41,7 @@ export function CalidadPage() {
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <LoadingSkeleton key={i} className="h-24 rounded-xl" />)}</div>
       ) : !data?.length ? (
-        <EmptyState icon={ShieldCheck} title="Sin operaciones en calidad" description="No hay operaciones en Paso 5 actualmente" />
+        <EmptyState icon={<ShieldCheck className="h-12 w-12" />} title="Sin operaciones en calidad" description="No hay operaciones en Paso 5 actualmente" />
       ) : (
         <div className="space-y-3">
           {data.map(op => {

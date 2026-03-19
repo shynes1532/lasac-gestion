@@ -145,7 +145,7 @@ export function ListaOperaciones() {
         </div>
       ) : filtradas.length === 0 ? (
         <EmptyState
-          icon={Filter}
+          icon={<Filter className="h-12 w-12" />}
           title="Sin operaciones"
           description={busqueda ? 'No se encontraron resultados para tu búsqueda' : 'No hay operaciones con los filtros seleccionados'}
         />

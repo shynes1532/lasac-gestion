@@ -97,7 +97,7 @@ export function ControlPrendas() {
       {isLoading ? (
         <div className="space-y-2">{[...Array(5)].map((_, i) => <LoadingSkeleton key={i} className="h-16 rounded-xl" />)}</div>
       ) : !data?.length ? (
-        <EmptyState icon={CreditCard} title="Sin prendas" description="No hay operaciones con los filtros seleccionados" />
+        <EmptyState icon={<CreditCard className="h-12 w-12" />} title="Sin prendas" description="No hay operaciones con los filtros seleccionados" />
       ) : (
         <div className="bg-bg-secondary rounded-xl border border-border overflow-hidden">
           <table className="w-full text-sm">

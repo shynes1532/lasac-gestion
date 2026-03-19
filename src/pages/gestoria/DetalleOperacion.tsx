@@ -8,7 +8,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
   CheckCircle2,
-  Circle,
   Clock,
   AlertTriangle,
   MessageCircle,
@@ -49,7 +48,6 @@ import {
   TIPO_LABEL,
   ESTADO_LABEL,
   PASOS_PIPELINE,
-  SUCURSALES_CONFIG,
   waCitacionFirmaRG,
   waCitacionFirmaUSH,
   waConfirmacion2dRG,
@@ -1117,12 +1115,7 @@ function Paso6Entrega({
   op: OperacionDetalle
   onMutate: (updates: Partial<Operacion>, historial?: HistorialEstado) => void
 }) {
-  const { perfil } = useAuth()
   const [confirmOpen, setConfirmOpen] = useState(false)
-
-  const diasTotales = op.fecha_entrega_real
-    ? diasDesde(op.created_at)
-    : null
 
   function handleEntregada(checked: boolean) {
     if (checked) {
@@ -1314,7 +1307,6 @@ function Timeline({ historial }: { historial: HistorialEstado[] }) {
 export function DetalleOperacion() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { perfil } = useAuth()
   const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState<'paso' | 'timeline'>('paso')
