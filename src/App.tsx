@@ -40,7 +40,7 @@ function PageLoader() {
 
 function RootRedirect() {
   const { perfil, loading } = useAuth()
-  if (loading) return null
+  if (loading) return <PageLoader />
   if (!perfil) return <Navigate to="/login" replace />
   return <Navigate to={getDefaultRoute(perfil.rol)} replace />
 }

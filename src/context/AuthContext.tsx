@@ -15,6 +15,7 @@ interface AuthContextType extends AuthState {
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   resetPassword: (email: string) => Promise<void>
+  retryInit: () => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -27,14 +28,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: true,
     perfilError: null,
   })
+  const [initCount, setInitCount] = useState(0)
 
-  const fetchPerfil = async (userId: string): Promise<{ perfil: Usuario | null; error: string | null }> => {
+  const fetchPerfil = async (userId: string, signal?: AbortSignal): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
       const { data, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', userId)
         .single()
+        .abortSignal(signal!)
 
       if (error) {
         console.warn('Error al cargar perfil:', error.code, error.message, error.details)
@@ -42,13 +45,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { perfil: data as Usuario, error: null }
     } catch (err: any) {
+      if (err?.name === 'AbortError') {
+        return { perfil: null, error: 'Tiempo de espera agotado al cargar perfil' }
+      }
       console.error('fetchPerfil exception:', err)
       return { perfil: null, error: err?.message || 'Error desconocido' }
     }
   }
 
+  const retryInit = () => {
+    setState(prev => ({ ...prev, loading: true, perfilError: null }))
+    setInitCount(c => c + 1)
+  }
+
   useEffect(() => {
     let mounted = true
+    const abortController = new AbortController()
 
     const init = async () => {
       try {
@@ -57,12 +69,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (error) {
           console.error('getSession error:', error.message)
-          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: error.message })
           return
         }
 
         if (session?.user) {
-          const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
+          const { perfil, error: perfilError } = await fetchPerfil(session.user.id, abortController.signal)
           if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
         } else {
           if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
@@ -89,25 +101,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    // 3. Safety timeout
+    // 3. Safety timeout — abort hanging requests and force loading off
     const timeout = setTimeout(() => {
       if (mounted) {
+        abortController.abort()
         setState(prev => {
           if (prev.loading) {
-            console.warn('Auth timeout: forzando fin de loading después de 4s')
-            return { ...prev, loading: false }
+            console.warn('Auth timeout: forzando fin de loading después de 6s')
+            return { ...prev, loading: false, perfilError: prev.perfilError || 'Tiempo de espera agotado. Verificá tu conexión a internet.' }
           }
           return prev
         })
       }
-    }, 4000)
+    }, 6000)
 
     return () => {
       mounted = false
+      abortController.abort()
       clearTimeout(timeout)
       subscription.unsubscribe()
     }
-  }, [])
+  }, [initCount])
 
   const login = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
@@ -125,7 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, resetPassword }}>
+    <AuthContext.Provider value={{ ...state, login, logout, resetPassword, retryInit }}>
       {children}
     </AuthContext.Provider>
   )
