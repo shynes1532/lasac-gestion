@@ -69,8 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const init = async () => {
       try {
-        // 1. Get initial session
-        const { data: { session }, error } = await supabase.auth.getSession()
+        // 1. Get initial session (with 5s timeout)
+        const { data: { session }, error } = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error('getSession timeout')), 5000)
+          ),
+        ])
 
         if (error) {
           console.error('getSession error:', error.message)
@@ -113,7 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setState(prev => {
           if (prev.loading) {
             console.warn('Auth timeout: forzando fin de loading después de 6s')
-            return { ...prev, loading: false, perfilError: prev.perfilError || 'Tiempo de espera agotado. Verificá tu conexión a internet.' }
+            // Clear potentially corrupted session from storage
+            try { localStorage.removeItem('lasac-auth') } catch {}
+            return { user: null, session: null, perfil: null, loading: false, perfilError: null }
           }
           return prev
         })
