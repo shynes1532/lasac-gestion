@@ -1403,7 +1403,7 @@ export function DetalleOperacion() {
       <div className="text-center py-12 space-y-3">
         <AlertTriangle className="h-8 w-8 text-red-400 mx-auto" />
         <p className="text-text-secondary">No se pudo cargar la operación.</p>
-        <Button variant="ghost" onClick={() => navigate('/gestoria')}>
+        <Button variant="ghost" onClick={() => navigate('/operaciones')}>
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
@@ -1439,7 +1439,7 @@ export function DetalleOperacion() {
       {/* ---- HEADER ---- */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-5">
         <button
-          onClick={() => navigate('/gestoria')}
+          onClick={() => navigate('/operaciones')}
           className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0 mt-0.5"
         >
           <ArrowLeft className="h-5 w-5" />

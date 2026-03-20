@@ -162,7 +162,7 @@ export function canAccessRoute(rol: RolUsuario, path: string): boolean {
 export function getDefaultRoute(rol: RolUsuario): string {
   switch (rol) {
     case 'director': return '/dashboard'
-    case 'gestor': return '/gestoria'
+    case 'gestor': return '/operaciones'
     case 'preparador': return '/alistamiento'
     case 'asesor_ush':
     case 'asesor_rg': return '/entrega'
