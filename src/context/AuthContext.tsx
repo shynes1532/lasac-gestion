@@ -50,23 +50,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
+    const clearAuth = () => {
+      if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+    }
+
     const init = async () => {
       try {
-        // 1. Get initial session
+        // 1. Get session from localStorage (no network call)
         const { data: { session }, error } = await supabase.auth.getSession()
 
         if (error) {
           console.error('getSession error:', error.message)
-          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+          clearAuth()
           return
         }
 
-        if (session?.user) {
-          const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
-          if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
-        } else {
-          if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+        if (!session?.user) {
+          clearAuth()
+          return
         }
+
+        // 2. Validate session server-side — this catches expired/revoked tokens
+        //    that getSession() still returns from localStorage
+        const { data: { user }, error: userError } = await supabase.auth.getUser()
+
+        if (userError || !user) {
+          console.warn('Sesión expirada o inválida, limpiando:', userError?.message)
+          await supabase.auth.signOut().catch(() => {})
+          clearAuth()
+          return
+        }
+
+        // 3. Session is valid — fetch profile
+        const { perfil, error: perfilError } = await fetchPerfil(user.id)
+
+        // If profile fetch fails with auth error, session might be partially invalid
+        if (!perfil && perfilError) {
+          const isAuthError = perfilError.includes('JWTExpired') ||
+            perfilError.includes('JWT') ||
+            perfilError.includes('401') ||
+            perfilError.includes('403')
+          if (isAuthError) {
+            console.warn('Perfil fetch auth error, limpiando sesión:', perfilError)
+            await supabase.auth.signOut().catch(() => {})
+            clearAuth()
+            return
+          }
+        }
+
+        if (mounted) setState({ user, session, perfil, loading: false, perfilError })
       } catch (err: any) {
         console.error('Auth init error:', err)
         if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: err?.message || 'Error de inicialización' })
@@ -78,14 +110,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 2. Listen for auth changes (login, logout, token refresh)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      // Skip INITIAL_SESSION since we handle it above with getSession
+      // Skip INITIAL_SESSION since we handle it above with getSession+getUser
       if (event === 'INITIAL_SESSION') return
+
+      // On sign out, clear everything
+      if (event === 'SIGNED_OUT') {
+        clearAuth()
+        return
+      }
 
       if (session?.user) {
         const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
         if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
       } else {
-        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+        clearAuth()
       }
     })
 
@@ -115,8 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
-    await supabase.auth.signOut()
+    // Always clear local state even if signOut fails (e.g. network error)
     setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+    await supabase.auth.signOut().catch(() => {})
   }
 
   const resetPassword = async (email: string) => {
