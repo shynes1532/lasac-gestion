@@ -10,3 +10,15 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
   },
 })
+
+// Client that always uses the anon role (no auth token).
+// Used for tables where RLS grants access to anon but not authenticated.
+export const supabaseAnon = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: false,
+    autoRefreshToken: false,
+  },
+  global: {
+    headers: { apikey: supabaseAnonKey },
+  },
+})

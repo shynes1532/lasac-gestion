@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAnon } from '../lib/supabase'
 import type { Usuario, RolUsuario } from '../lib/types'
 
 interface AuthState {
@@ -30,7 +30,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchPerfil = async (userId: string): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
-      const { data, error } = await supabase
+      // Use anon client: the authenticated role lacks SELECT on usuarios
+      const { data, error } = await supabaseAnon
         .from('usuarios')
         .select('*')
         .eq('id', userId)
