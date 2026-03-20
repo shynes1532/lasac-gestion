@@ -50,97 +50,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true
 
-    const clearAuth = () => {
-      if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
-    }
-
-    const init = async () => {
-      try {
-        // 1. Get session from localStorage (no network call)
-        const { data: { session }, error } = await supabase.auth.getSession()
-
-        if (error) {
-          console.error('getSession error:', error.message)
-          clearAuth()
-          return
-        }
-
-        if (!session?.user) {
-          clearAuth()
-          return
-        }
-
-        // 2. Validate session server-side — this catches expired/revoked tokens
-        //    that getSession() still returns from localStorage
-        const { data: { user }, error: userError } = await supabase.auth.getUser()
-
-        if (userError || !user) {
-          console.warn('Sesión expirada o inválida, limpiando:', userError?.message)
-          await supabase.auth.signOut().catch(() => {})
-          clearAuth()
-          return
-        }
-
-        // 3. Session is valid — fetch profile
-        const { perfil, error: perfilError } = await fetchPerfil(user.id)
-
-        // If profile fetch fails with auth error, session might be partially invalid
-        if (!perfil && perfilError) {
-          const isAuthError = perfilError.includes('JWTExpired') ||
-            perfilError.includes('JWT') ||
-            perfilError.includes('401') ||
-            perfilError.includes('403')
-          if (isAuthError) {
-            console.warn('Perfil fetch auth error, limpiando sesión:', perfilError)
-            await supabase.auth.signOut().catch(() => {})
-            clearAuth()
-            return
-          }
-        }
-
-        if (mounted) setState({ user, session, perfil, loading: false, perfilError })
-      } catch (err: any) {
-        console.error('Auth init error:', err)
-        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: err?.message || 'Error de inicialización' })
-      }
-    }
-
-    init()
-
-    // 2. Listen for auth changes (login, logout, token refresh)
+    // Single source of truth: onAuthStateChange handles EVERYTHING
+    // including INITIAL_SESSION (first load) and SIGNED_IN (login).
+    // No separate init() to avoid race conditions.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return
-      // Skip INITIAL_SESSION since we handle it above with getSession+getUser
-      if (event === 'INITIAL_SESSION') return
 
-      // On sign out, clear everything
+      // On sign out, clear everything immediately
       if (event === 'SIGNED_OUT') {
-        clearAuth()
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
         return
       }
 
-      if (session?.user) {
-        // Set loading=true while we fetch the profile so pages wait
-        if (mounted) setState(prev => ({ ...prev, user: session.user, session, loading: true }))
-        const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
-        if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
-      } else {
-        clearAuth()
+      // No session → clear state
+      if (!session?.user) {
+        if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+        return
       }
+
+      // We have a session — set user + loading while we validate & fetch profile
+      if (mounted) setState(prev => ({ ...prev, user: session.user, session, loading: true }))
+
+      // On initial load, validate the stored session is still valid
+      if (event === 'INITIAL_SESSION') {
+        const { error: userError } = await supabase.auth.getUser()
+        if (!mounted) return
+        if (userError) {
+          console.warn('Sesión expirada, mostrando login:', userError.message)
+          // Don't call signOut() here — just clear local state.
+          // Avoids race condition if user logs in while this is running.
+          setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
+          return
+        }
+      }
+
+      // Fetch profile
+      const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
+      if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
     })
 
-    // 3. Safety timeout
+    // Safety timeout — if nothing fires within 5s, stop loading
     const timeout = setTimeout(() => {
       if (mounted) {
         setState(prev => {
           if (prev.loading) {
-            console.warn('Auth timeout: forzando fin de loading después de 4s')
+            console.warn('Auth timeout: forzando fin de loading después de 5s')
             return { ...prev, loading: false }
           }
           return prev
         })
       }
-    }, 4000)
+    }, 5000)
 
     return () => {
       mounted = false
