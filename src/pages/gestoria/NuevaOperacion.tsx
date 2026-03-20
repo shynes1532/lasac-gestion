@@ -53,11 +53,34 @@ export function NuevaOperacion() {
   })
   const [loading, setLoading] = useState(false)
   const [modelos, setModelos] = useState<{ value: string; label: string }[]>([])
+  const [modelosError, setModelosError] = useState(false)
 
   useEffect(() => {
-    supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data }) => {
-      if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
-    })
+    let cancelled = false
+    const fetchModelos = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('modelos_fiat')
+          .select('nombre, categoria')
+          .eq('activo', true)
+          .order('categoria')
+        if (cancelled) return
+        if (error) {
+          console.error('Error cargando modelos:', error)
+          setModelosError(true)
+          notify.error('No se pudieron cargar los modelos')
+          return
+        }
+        if (data) setModelos(data.map(m => ({ value: m.nombre, label: m.nombre })))
+      } catch (err) {
+        if (cancelled) return
+        console.error('Error cargando modelos:', err)
+        setModelosError(true)
+        notify.error('No se pudieron cargar los modelos')
+      }
+    }
+    fetchModelos()
+    return () => { cancelled = true }
   }, [])
 
   const set = (field: keyof FormData, value: string) =>
@@ -246,7 +269,7 @@ export function NuevaOperacion() {
             label="Modelo / Versión *"
             value={form.modelo_version}
             onChange={e => set('modelo_version', e.target.value)}
-            options={[{ value: '', label: modelos.length ? 'Seleccionar modelo...' : 'Cargando...' }, ...modelos]}
+            options={[{ value: '', label: modelos.length ? 'Seleccionar modelo...' : modelosError ? 'Error al cargar modelos' : 'Cargando...' }, ...modelos]}
           />
           <div className="grid grid-cols-2 gap-3">
             <Input
