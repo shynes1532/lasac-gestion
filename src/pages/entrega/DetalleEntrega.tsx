@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Calendar, Clock, MessageCircle, CheckCircle, ClipboardCheck } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import { Button, Card, EstadoBadge, Tabs, Textarea, ConfirmDialog, notify, Skeleton } from '../../components/ui'
 import { formatDate } from '../../utils/formatters'
 
@@ -17,7 +17,7 @@ export function DetalleEntrega() {
   const { data: entrega, isLoading } = useQuery({
     queryKey: ['entrega', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAnon
         .from('entregas')
         .select(`
           *,

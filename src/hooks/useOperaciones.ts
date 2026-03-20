@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAnon } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Operacion, Titular, Unidad, GestoriaTramite, OperacionCompleta } from '../lib/types'
 
@@ -19,7 +19,7 @@ export function useOperaciones(filtros: FiltrosOperaciones = {}) {
   return useQuery({
     queryKey: ['operaciones', filtros, perfil?.sucursal],
     queryFn: async () => {
-      let query = supabase
+      let query = supabaseAnon
         .from('operaciones')
         .select(`
           *,
@@ -57,7 +57,7 @@ export function useOperacion(id: string | undefined) {
   return useQuery({
     queryKey: ['operacion', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAnon
         .from('operaciones')
         .select(`
           *,
@@ -149,7 +149,7 @@ export function useActualizarEstadoGestoria() {
   return useMutation({
     mutationFn: async ({ id, nuevoEstado, motivo }: { id: string; nuevoEstado: string; motivo?: string }) => {
       // Get current state
-      const { data: current } = await supabase
+      const { data: current } = await supabaseAnon
         .from('operaciones')
         .select('estado_gestoria')
         .eq('id', id)
@@ -171,7 +171,7 @@ export function useActualizarEstadoGestoria() {
       if (error) throw error
 
       // Add to historial
-      const { data: gestoria } = await supabase
+      const { data: gestoria } = await supabaseAnon
         .from('gestoria_tramites')
         .select('historial_estados')
         .eq('operacion_id', id)

@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ShieldCheck, ExternalLink } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton'
 
@@ -11,7 +11,7 @@ export function CalidadPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['calidad-lista'],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAnon
         .from('operaciones')
         .select(`
           id, numero_operacion, cliente_nombre, sucursal, tipo_operacion,

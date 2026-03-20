@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Wrench, Clock, AlertTriangle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { Button, Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } from '../../components/ui'
 import { diasEntre } from '../../utils/formatters'
 
@@ -22,7 +22,7 @@ export function ColaPDI() {
   const { data: alistamientos, isLoading } = useQuery({
     queryKey: ['alistamiento', estadoFiltro],
     queryFn: async () => {
-      let query = supabase
+      let query = supabaseAnon
         .from('alistamiento_pdi')
         .select(`
           *,

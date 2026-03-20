@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, AlertTriangle, Save } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import { TIPOS_OPERACION, BANCOS, SUCURSALES_SELECT, CHECKLIST_DOC_0KM, CHECKLIST_PDI_TEMPLATE } from '../../lib/constants'
 import type { TipoOperacion, FormaPago, BancoEntidad, Sucursal } from '../../lib/types'
 import { Button } from '../../components/ui/Button'
@@ -55,7 +55,7 @@ export function NuevaOperacion() {
   const [modelos, setModelos] = useState<{ value: string; label: string }[]>([])
 
   useEffect(() => {
-    supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data }) => {
+    supabaseAnon.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data }) => {
       if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
     })
   }, [])

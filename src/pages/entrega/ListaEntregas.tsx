@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Truck, Calendar, MessageCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } from '../../components/ui'
 import { formatDate } from '../../utils/formatters'
 
@@ -21,7 +21,7 @@ export function ListaEntregas() {
   const { data: entregas, isLoading } = useQuery({
     queryKey: ['entregas', estadoFiltro],
     queryFn: async () => {
-      let query = supabase
+      let query = supabaseAnon
         .from('entregas')
         .select(`
           *,

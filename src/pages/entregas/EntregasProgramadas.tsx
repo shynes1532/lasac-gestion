@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Truck, ExternalLink, MessageCircle } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { COLORES_TIPO, TIPO_LABEL, SUCURSALES_SELECT, waConfirmacion2dRG, waConfirmacion2dUSH } from '../../lib/constants'
 import type { TipoOperacion } from '../../lib/types'
 import { EmptyState } from '../../components/ui/EmptyState'
@@ -15,7 +15,7 @@ export function EntregasProgramadas() {
   const { data, isLoading } = useQuery({
     queryKey: ['entregas-programadas', filtroSucursal],
     queryFn: async () => {
-      let q = supabase
+      let q = supabaseAnon
         .from('operaciones')
         .select(`
           id, numero_operacion, cliente_nombre, cliente_telefono,

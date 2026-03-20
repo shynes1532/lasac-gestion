@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Car, FileText, CreditCard, AlertTriangle, CheckCircle2, Clock, TrendingUp } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { getSemaforoCompromiso } from '../../lib/types'
 import type { TipoOperacion } from '../../lib/types'
@@ -116,7 +116,7 @@ export function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard-v2', filtroSucursal],
     queryFn: async () => {
-      let q = supabase
+      let q = supabaseAnon
         .from('operaciones')
         .select(`
           id, tipo_operacion, estado_actual, estado_prenda, forma_pago,

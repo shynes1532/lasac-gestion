@@ -2,7 +2,7 @@ import { useState, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Check, X, Minus, AlertTriangle, CheckCircle, XCircle } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { Button, Card, EstadoBadge, Badge, Tabs, ProgressBar, Textarea, ConfirmDialog, notify, Skeleton } from '../../components/ui'
 import type { ChecklistPDIItem, NoConformidad } from '../../lib/types'
@@ -22,7 +22,7 @@ export function DetallePDI() {
   const { data: pdi, isLoading } = useQuery({
     queryKey: ['pdi', id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAnon
         .from('alistamiento_pdi')
         .select(`
           *,

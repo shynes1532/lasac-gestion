@@ -24,7 +24,7 @@ import {
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 import { useAuth } from '../../context/AuthContext'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import type {
   Operacion,
   Unidad,
@@ -198,7 +198,7 @@ function Card({ children, className = '' }: { children: React.ReactNode; classNa
 // ============================================================
 
 async function fetchOperacion(id: string): Promise<OperacionDetalle> {
-  const { data, error } = await supabase
+  const { data, error } = await supabaseAnon
     .from('operaciones')
     .select(`
       *,

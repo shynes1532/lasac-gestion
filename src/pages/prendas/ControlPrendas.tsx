@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { CreditCard, ExternalLink } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabase, supabaseAnon } from '../../lib/supabase'
 import { SUCURSALES_SELECT } from '../../lib/constants'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton'
@@ -21,7 +21,7 @@ export function ControlPrendas() {
   const { data, isLoading } = useQuery({
     queryKey: ['prendas', filtroEstado, filtroBanco, filtroSucursal],
     queryFn: async () => {
-      let q = supabase
+      let q = supabaseAnon
         .from('operaciones')
         .select(`
           id, numero_operacion, sucursal, tipo_operacion, forma_pago,

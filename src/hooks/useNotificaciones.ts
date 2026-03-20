@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseAnon } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Notificacion } from '../lib/types'
 
@@ -11,7 +11,7 @@ export function useNotificaciones() {
   const query = useQuery({
     queryKey: ['notificaciones', user?.id],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAnon
         .from('notificaciones')
         .select('*')
         .eq('destinatario_id', user!.id)

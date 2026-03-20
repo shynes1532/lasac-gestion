@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Filter } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
+import { supabaseAnon } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { COLORES_TIPO, TIPO_LABEL, ESTADO_LABEL, SEMAFORO_EMOJI, SUCURSALES_SELECT } from '../../lib/constants'
 import { getSemaforoCompromiso } from '../../lib/types'
@@ -34,7 +34,7 @@ export function ListaOperaciones() {
   const { data: operaciones, isLoading } = useQuery({
     queryKey: ['operaciones', filtroEstado, filtroTipo, filtroSucursal],
     queryFn: async () => {
-      let q = supabase
+      let q = supabaseAnon
         .from('operaciones')
         .select(`
           id, numero_operacion, sucursal, tipo_operacion, estado_actual,
