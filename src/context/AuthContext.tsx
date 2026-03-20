@@ -1,7 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
+import { createClient } from '@supabase/supabase-js'
 import { supabase } from '../lib/supabase'
 import type { Usuario, RolUsuario } from '../lib/types'
+
+// Cliente sin auth para leer perfil (evita problemas de GRANT en role authenticated)
+const anonClient = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } }
+)
 
 interface AuthState {
   user: User | null
@@ -30,7 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const fetchPerfil = async (userId: string): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await anonClient
         .from('usuarios')
         .select('*')
         .eq('id', userId)
