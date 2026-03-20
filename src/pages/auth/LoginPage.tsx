@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { Mail, Lock, Car } from 'lucide-react'
 import { useAuth, getDefaultRoute } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
@@ -12,11 +12,19 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showReset, setShowReset] = useState(false)
   const { login, resetPassword, user, perfil, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
 
   // If already authenticated with profile, redirect to default route
   if (!authLoading && user && perfil) {
     return <Navigate to={getDefaultRoute(perfil.rol)} replace />
+  }
+
+  // If auth is still loading (initial check or post-login profile fetch), show spinner
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-bg-primary flex items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-action border-t-transparent" />
+      </div>
+    )
   }
 
   const handleLogin = async (e: FormEvent) => {
@@ -24,15 +32,14 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(email, password)
-      // onAuthStateChange will update the context, wait briefly then navigate
-      setTimeout(() => {
-        navigate('/', { replace: true })
-      }, 300)
+      // Navigation is handled by the redirect at the top of this component:
+      // when onAuthStateChange updates user+perfil, the component re-renders
+      // and <Navigate to={getDefaultRoute(perfil.rol)} /> kicks in.
+      // We keep loading=true so the button stays disabled while profile loads.
     } catch (err: any) {
       notify.error(err.message === 'Invalid login credentials'
         ? 'Email o contraseña incorrectos'
         : err.message || 'Error al iniciar sesión')
-    } finally {
       setLoading(false)
     }
   }

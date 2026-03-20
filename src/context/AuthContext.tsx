@@ -120,6 +120,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (session?.user) {
+        // Set loading=true while we fetch the profile so pages wait
+        if (mounted) setState(prev => ({ ...prev, user: session.user, session, loading: true }))
         const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
         if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
       } else {
