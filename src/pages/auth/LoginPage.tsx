@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate, Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router-dom'
 import { Mail, Lock, Car } from 'lucide-react'
 import { useAuth, getDefaultRoute } from '../../context/AuthContext'
 import { Button } from '../../components/ui/Button'
@@ -12,7 +12,7 @@ export function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [showReset, setShowReset] = useState(false)
   const { login, resetPassword, user, perfil, loading: authLoading } = useAuth()
-  const navigate = useNavigate()
+
 
   // If already authenticated with profile, redirect to default route
   if (!authLoading && user && perfil) {

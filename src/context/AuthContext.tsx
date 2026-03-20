@@ -30,19 +30,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
   const [initCount, setInitCount] = useState(0)
 
-  const fetchPerfil = async (userId: string, signal?: AbortSignal): Promise<{ perfil: Usuario | null; error: string | null }> => {
+  const fetchPerfil = async (userId: string): Promise<{ perfil: Usuario | null; error: string | null }> => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('usuarios')
         .select('*')
         .eq('id', userId)
         .single()
-
-      if (signal) {
-        query = query.abortSignal(signal)
-      }
-
-      const { data, error } = await query
 
       if (error) {
         console.warn('Error al cargar perfil:', error.code, error.message, error.details)
@@ -50,9 +44,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       return { perfil: data as Usuario, error: null }
     } catch (err: any) {
-      if (err?.name === 'AbortError') {
-        return { perfil: null, error: 'Tiempo de espera agotado al cargar perfil' }
-      }
       console.error('fetchPerfil exception:', err)
       return { perfil: null, error: err?.message || 'Error desconocido' }
     }
@@ -65,8 +56,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let mounted = true
-    const abortController = new AbortController()
-
     const init = async () => {
       try {
         // 1. Get initial session (with 5s timeout)
@@ -84,7 +73,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
-          const { perfil, error: perfilError } = await fetchPerfil(session.user.id, abortController.signal)
+          const { perfil, error: perfilError } = await fetchPerfil(session.user.id)
           if (mounted) setState({ user: session.user, session, perfil, loading: false, perfilError })
         } else {
           if (mounted) setState({ user: null, session: null, perfil: null, loading: false, perfilError: null })
@@ -114,7 +103,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // 3. Safety timeout — abort hanging requests and force loading off
     const timeout = setTimeout(() => {
       if (mounted) {
-        abortController.abort()
         setState(prev => {
           if (prev.loading) {
             console.warn('Auth timeout: forzando fin de loading después de 6s')
@@ -129,7 +117,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false
-      abortController.abort()
       clearTimeout(timeout)
       subscription.unsubscribe()
     }
