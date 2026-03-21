@@ -160,7 +160,7 @@ export function DashboardPage() {
   const ops = data || []
 
   // ── 7 KPIs ──
-  const boletos0km = ops.filter(o => o.tipo_operacion === '0km' && o.estado_actual === 'cierre').length
+  const boletos0km = ops.filter(o => o.tipo_operacion === '0km').length
   const usadosVendidos = ops.filter(o => o.tipo_operacion === 'usados').length
   const planPatentados = ops.filter(o => o.tipo_operacion === 'plan_ahorro' && o.dominio_patente).length
   const km0Patentados = ops.filter(o => o.tipo_operacion === '0km' && o.dominio_patente).length
@@ -198,7 +198,7 @@ export function DashboardPage() {
       {/* 7 KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <KPI label="Boletos 0KM" value={boletos0km} color="#185FA5" icon={FileText}
-          onClick={() => navigate('/operaciones?tipo=0km&estado=cierre')} />
+          onClick={() => navigate('/operaciones?tipo=0km')} />
         <KPI label="Usados vendidos" value={usadosVendidos} color="#854F0B" icon={Car}
           onClick={() => navigate('/operaciones?tipo=usados')} />
         <KPI label="Plan patentados" value={planPatentados} color="#534AB7" icon={CheckCircle2}

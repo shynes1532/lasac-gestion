@@ -204,7 +204,8 @@ async function fetchOperacion(id: string): Promise<OperacionDetalle> {
       *,
       unidades ( modelo, vin_chasis, color, patente_nueva ),
       contactos_calidad ( * ),
-      alistamiento_pdi ( * )
+      alistamiento_pdi ( * ),
+      asesor:usuarios!asesor_id ( id, nombre_completo, rol, sucursal )
     `)
     .eq('id', id)
     .single()
