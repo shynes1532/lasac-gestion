@@ -40,13 +40,17 @@ function Calendario({ entregas }: { entregas: any[] }) {
 
   const entregasPorDia: Record<number, any[]> = {}
   entregas.forEach(e => {
-    const fecha = e.contactos_calidad?.[0]?.fecha_entrega_confirmada
+    // Prioridad: fecha confirmada > fecha compromiso
+    const fechaConfirmada = Array.isArray(e.contactos_calidad)
+      ? e.contactos_calidad[0]?.fecha_entrega_confirmada
+      : e.contactos_calidad?.fecha_entrega_confirmada
+    const fecha = fechaConfirmada || e.fecha_compromiso
     if (!fecha) return
-    const d = new Date(fecha)
+    const d = new Date(fecha + 'T12:00:00') // evitar problemas de timezone
     if (d.getFullYear() === mes.y && d.getMonth() === mes.m) {
       const dia = d.getDate()
       if (!entregasPorDia[dia]) entregasPorDia[dia] = []
-      entregasPorDia[dia].push(e)
+      entregasPorDia[dia].push({ ...e, _fechaUsada: fechaConfirmada ? 'confirmada' : 'compromiso' })
     }
   })
 
@@ -175,9 +179,9 @@ export function DashboardPage() {
     o.estado_prenda === 'pendiente'
   ).length
 
-  // Entregas para el calendario (estado calidad o entrega con fecha confirmada)
+  // Entregas para el calendario (todas las activas + entregadas con fecha)
   const entregasCalendario = ops.filter(o =>
-    ['calidad','entrega'].includes(o.estado_actual)
+    o.fecha_compromiso || (o.contactos_calidad as any)?.[0]?.fecha_entrega_confirmada
   )
 
   return (
