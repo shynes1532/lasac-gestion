@@ -609,9 +609,7 @@ function Paso3Gestoria({
   const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
   const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
 
-  const puedeAvanzarPDI =
-    op.egresado_registro &&
-    !!op.dominio_patente
+  const puedeAvanzarPDI = true
 
   function handle(field: keyof Operacion, value: unknown) {
     onMutate({ [field]: value } as Partial<Operacion>)
