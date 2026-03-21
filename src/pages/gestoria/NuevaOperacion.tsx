@@ -99,7 +99,7 @@ export function NuevaOperacion() {
     if (esFinanciado && !esPlan && !form.banco_entidad) return notify.error('Seleccioná el banco')
     if (esPlan && !form.nro_grupo_orden.trim()) return notify.error('El N° de grupo/orden es obligatorio')
     if (esPlan && !form.fecha_adjudicacion) return notify.error('La fecha de adjudicación es obligatoria')
-    if (!form.asesor_id) return notify.error('Seleccioná el asesor comercial')
+    if (!form.asesor_id) return notify.error('Seleccioná el vendedor')
 
     setLoading(true)
     try {
@@ -221,10 +221,10 @@ export function NuevaOperacion() {
             />
           )}
           <Select
-            label="Asesor comercial *"
+            label="Vendedor *"
             value={form.asesor_id}
             onChange={e => set('asesor_id', e.target.value)}
-            options={[{ value: '', label: 'Seleccionar asesor...' }, ...asesores]}
+            options={[{ value: '', label: 'Seleccionar vendedor...' }, ...asesores]}
           />
         </section>
 
