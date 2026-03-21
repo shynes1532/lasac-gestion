@@ -639,8 +639,7 @@ function Paso3Gestoria({
 
   const puedeAvanzarPDI =
     op.egresado_registro &&
-    !!op.dominio_patente &&
-    !inhibido
+    !!op.dominio_patente
 
   function handle(field: keyof Operacion, value: unknown) {
     onMutate({ [field]: value } as Partial<Operacion>)
@@ -692,9 +691,9 @@ function Paso3Gestoria({
             </div>
           )}
           {inhibido && (
-            <BlockerBanner>
-              BLOQUEADO: Titular inhibido en 02. Contactar al director.
-            </BlockerBanner>
+            <WarnBanner>
+              Atención: Titular inhibido en 02. Contactar al director.
+            </WarnBanner>
           )}
         </div>
       </Card>
@@ -706,7 +705,6 @@ function Paso3Gestoria({
           <Checkbox
             label="Ingresado al registro"
             checked={op.ingresado_registro}
-            disabled={inhibido}
             onChange={(e) => handle('ingresado_registro', e.target.checked)}
           />
           <div>
@@ -714,7 +712,6 @@ function Paso3Gestoria({
             <input
               type="date"
               value={op.fecha_ingreso_registro ?? ''}
-              disabled={inhibido}
               onChange={(e) => handle('fecha_ingreso_registro', e.target.value || null)}
               className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 disabled:opacity-50"
             />
@@ -769,7 +766,7 @@ function Paso3Gestoria({
         <>
           {!puedeAvanzarPDI && (
             <WarnBanner>
-              Para avanzar: egreso del registro confirmado, dominio/patente cargado y 02 libre.
+              Para avanzar: egreso del registro confirmado y dominio/patente cargado.
             </WarnBanner>
           )}
           <Button
