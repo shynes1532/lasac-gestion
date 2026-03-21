@@ -21,7 +21,6 @@ export function EntregasProgramadas() {
           id, numero_operacion, cliente_nombre, cliente_telefono,
           sucursal, tipo_operacion, estado_actual, forma_pago,
           unidades (modelo),
-          usuarios!asesor_id (nombre_completo),
           contactos_calidad (fecha_entrega_confirmada, estado_calidad)
         `)
         .in('estado_actual', ['calidad', 'entrega'])
