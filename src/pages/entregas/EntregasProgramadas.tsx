@@ -62,7 +62,7 @@ export function EntregasProgramadas() {
             const tipo = op.tipo_operacion as TipoOperacion
             const colores = COLORES_TIPO[tipo] || COLORES_TIPO['0km']
             const modelo = (op.unidades as any)?.[0]?.modelo || '—'
-            const asesor = (op.usuarios as any)?.nombre_completo || '—'
+            const asesor = '—'
             const calidad = (op.contactos_calidad as any)?.[0]
             const fechaEntrega = calidad?.fecha_entrega_confirmada
 
