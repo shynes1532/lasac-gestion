@@ -211,7 +211,7 @@ async function fetchOperacion(id: string): Promise<OperacionDetalle> {
 
   if (error) throw error
 
-  // Supabase returns arrays for one-to-many relations — normalize to single objects
+  // Supabase devuelve arrays en relaciones uno-a-muchos — normalizar a objetos individuales
   const raw = data as any
   if (Array.isArray(raw.unidades)) {
     raw.unidades = raw.unidades[0] ?? null
