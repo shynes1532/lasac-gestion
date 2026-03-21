@@ -55,7 +55,11 @@ export function NuevaOperacion() {
   const [modelos, setModelos] = useState<{ value: string; label: string }[]>([])
 
   useEffect(() => {
-    supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data }) => {
+    supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data, error }) => {
+      if (error) {
+        console.error('Error cargando modelos:', error)
+        return
+      }
       if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
     })
   }, [])
@@ -140,6 +144,11 @@ export function NuevaOperacion() {
         checklist_pdi: { items: CHECKLIST_PDI_TEMPLATE },
         no_conformidades: [],
         fotos_evidencia: [],
+      })
+
+      await supabase.from('contactos_calidad').insert({
+        operacion_id: op.id,
+        estado_calidad: 'citar_2d',
       })
 
       notify.success('Operación creada')

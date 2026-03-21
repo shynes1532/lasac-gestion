@@ -1362,7 +1362,19 @@ export function DetalleOperacion() {
   // --- Mutation: actualizar contacto_calidad ---
   const mutCalidad = useMutation({
     mutationFn: async (updates: Partial<ContactoCalidad>) => {
-      if (!op?.contactos_calidad?.id) throw new Error('Sin registro de calidad')
+      if (!op) throw new Error('Sin operación cargada')
+
+      // Auto-create contactos_calidad if missing
+      if (!op.contactos_calidad?.id) {
+        const { error: createErr } = await supabase
+          .from('contactos_calidad')
+          .insert({ operacion_id: op.id, estado_calidad: 'citar_2d', ...updates })
+          .select('id')
+          .single()
+        if (createErr) throw createErr
+        return
+      }
+
       const { error } = await supabase
         .from('contactos_calidad')
         .update(updates)

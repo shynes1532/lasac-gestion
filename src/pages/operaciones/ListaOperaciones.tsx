@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search, Filter } from 'lucide-react'
+import { Plus, Search, Filter, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { COLORES_TIPO, TIPO_LABEL, ESTADO_LABEL, SEMAFORO_EMOJI, SUCURSALES_SELECT } from '../../lib/constants'
@@ -31,7 +31,7 @@ export function ListaOperaciones() {
   const [filtroTipo, setFiltroTipo] = useState<TipoOperacion | 'todos'>('todos')
   const [filtroSucursal, setFiltroSucursal] = useState<string>('todas')
 
-  const { data: operaciones, isLoading } = useQuery({
+  const { data: operaciones, isLoading, isError, error: queryError } = useQuery({
     queryKey: ['operaciones', filtroEstado, filtroTipo, filtroSucursal],
     queryFn: async () => {
       let q = supabase
@@ -40,8 +40,7 @@ export function ListaOperaciones() {
           id, numero_operacion, sucursal, tipo_operacion, estado_actual,
           cliente_nombre, fecha_compromiso, estado_prenda, forma_pago,
           created_at, nro_epod,
-          unidades (modelo, vin_chasis),
-          usuarios!asesor_id (nombre_completo)
+          unidades (modelo, vin_chasis)
         `)
         .order('created_at', { ascending: false })
         .limit(100)
@@ -143,6 +142,12 @@ export function ListaOperaciones() {
         <div className="space-y-3">
           {[...Array(5)].map((_, i) => <LoadingSkeleton key={i} className="h-20 rounded-xl" />)}
         </div>
+      ) : isError ? (
+        <EmptyState
+          icon={<AlertTriangle className="h-12 w-12 text-red-400" />}
+          title="Error al cargar"
+          description={`No se pudieron cargar las operaciones: ${(queryError as any)?.message || 'Error desconocido'}`}
+        />
       ) : filtradas.length === 0 ? (
         <EmptyState
           icon={<Filter className="h-12 w-12" />}
@@ -155,7 +160,6 @@ export function ListaOperaciones() {
             const tipo = op.tipo_operacion as TipoOperacion
             const colores = COLORES_TIPO[tipo] || COLORES_TIPO['0km']
             const modelo = (op.unidades as any)?.[0]?.modelo || '—'
-            const asesor = (op.usuarios as any)?.nombre_completo
             const semaforo = op.fecha_compromiso ? getSemaforoCompromiso(op.fecha_compromiso) : null
             const requierePrenda = op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
 
@@ -209,9 +213,6 @@ export function ListaOperaciones() {
                   </div>
                 </div>
 
-                {asesor && (
-                  <p className="text-xs text-text-muted mt-2">Asesor: {asesor}</p>
-                )}
               </div>
             )
           })}
