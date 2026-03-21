@@ -24,6 +24,7 @@ interface FormData {
   banco_entidad: BancoEntidad | ''
   nro_grupo_orden: string
   fecha_adjudicacion: string
+  vendedor_id: string
 }
 
 const INITIAL_FORM: FormData = {
@@ -40,6 +41,7 @@ const INITIAL_FORM: FormData = {
   banco_entidad: '',
   nro_grupo_orden: '',
   fecha_adjudicacion: '',
+  vendedor_id: '',
 }
 
 export function NuevaOperacion() {
@@ -53,15 +55,23 @@ export function NuevaOperacion() {
   })
   const [loading, setLoading] = useState(false)
   const [modelos, setModelos] = useState<{ value: string; label: string }[]>([])
+  const [vendedores, setVendedores] = useState<{ value: string; label: string }[]>([])
 
   useEffect(() => {
     supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data, error }) => {
       if (error) {
         console.error('Error cargando modelos:', error)
-        notify.error('No se pudieron cargar los modelos')
         return
       }
       if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
+    })
+
+    supabase.from('usuarios').select('id, nombre_completo, rol').eq('activo', true).in('rol', ['director', 'asesor_ush', 'asesor_rg']).order('nombre_completo').then(({ data, error }) => {
+      if (error) {
+        console.error('Error cargando vendedores:', error)
+        return
+      }
+      if (data) setVendedores(data.map(u => ({ value: u.id, label: u.nombre_completo })))
     })
   }, [])
 
@@ -87,6 +97,7 @@ export function NuevaOperacion() {
     if (esFinanciado && !esPlan && !form.banco_entidad) return notify.error('Seleccioná el banco')
     if (esPlan && !form.nro_grupo_orden.trim()) return notify.error('El N° de grupo/orden es obligatorio')
     if (esPlan && !form.fecha_adjudicacion) return notify.error('La fecha de adjudicación es obligatoria')
+    if (!form.vendedor_id) return notify.error('Seleccioná el vendedor')
 
     setLoading(true)
     try {
@@ -106,7 +117,7 @@ export function NuevaOperacion() {
           estado_prenda: requierePrenda ? 'pendiente' : null,
           nro_grupo_orden: esPlan ? form.nro_grupo_orden.trim() : null,
           fecha_adjudicacion: esPlan ? form.fecha_adjudicacion : null,
-          asesor_id: perfil?.id,
+          asesor_id: form.vendedor_id,
           created_by: perfil?.id,
           estado_gestoria: 'ingresado',
           estado_alistamiento: 'pendiente',
@@ -207,6 +218,12 @@ export function NuevaOperacion() {
               options={[{ value: '', label: 'Seleccionar...' }, { value: 'contado', label: 'Contado' }, { value: 'financiado_banco', label: 'Financiado por Banco' }]}
             />
           )}
+          <Select
+            label="Vendedor *"
+            value={form.vendedor_id}
+            onChange={e => set('vendedor_id', e.target.value)}
+            options={[{ value: '', label: vendedores.length ? 'Seleccionar vendedor...' : 'Cargando...' }, ...vendedores]}
+          />
         </section>
 
         {/* PLAN DE AHORRO */}
