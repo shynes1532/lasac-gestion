@@ -766,11 +766,10 @@ function Paso3Gestoria({
         <>
           {!puedeAvanzarPDI && (
             <WarnBanner>
-              Para avanzar: egreso del registro confirmado y dominio/patente cargado.
+              Recordatorio: egreso del registro confirmado y dominio/patente cargado.
             </WarnBanner>
           )}
           <Button
-            disabled={!puedeAvanzarPDI}
             onClick={() =>
               onMutate(
                 { estado_actual: 'alistamiento' },
