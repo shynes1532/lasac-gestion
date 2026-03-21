@@ -3,7 +3,7 @@
 // Pipeline 6 pasos: cierre → documentacion → gestoria → alistamiento → calidad → entrega
 // ============================================================
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -613,6 +613,30 @@ function Paso3Gestoria({
 
   const inhibido = op.resultado_o2 === 'inhibido'
 
+  // --- Debounced dominio_patente ---
+  const [dominioLocal, setDominioLocal] = useState(op.dominio_patente ?? '')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sync from server when op changes externally
+  useEffect(() => {
+    setDominioLocal(op.dominio_patente ?? '')
+  }, [op.dominio_patente])
+
+  const handleDominioChange = useCallback((value: string) => {
+    setDominioLocal(value)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      onMutate({ dominio_patente: value || null } as Partial<Operacion>)
+    }, 800)
+  }, [onMutate])
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
   const puedeAvanzarPDI =
     op.egresado_registro &&
     !!op.dominio_patente &&
@@ -732,8 +756,8 @@ function Paso3Gestoria({
             <input
               type="text"
               placeholder="ABC 123"
-              value={op.dominio_patente ?? ''}
-              onChange={(e) => handle('dominio_patente', e.target.value || null)}
+              value={dominioLocal}
+              onChange={(e) => handleDominioChange(e.target.value)}
               className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 uppercase"
             />
           </div>
