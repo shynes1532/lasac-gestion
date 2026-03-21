@@ -28,7 +28,6 @@ import { supabase } from '../../lib/supabase'
 import type {
   Operacion,
   Unidad,
-  Usuario,
   ContactoCalidad,
   AlistamientoPDI,
   HistorialEstado,
@@ -66,10 +65,9 @@ import { Checkbox } from '../../components/ui/Checkbox'
 // ============================================================
 
 interface OperacionDetalle extends Operacion {
-  unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'>[] | null
-  asesor: Pick<Usuario, 'nombre_completo'> | null
-  contactos_calidad: ContactoCalidad | ContactoCalidad[] | null
-  alistamiento_pdi: AlistamientoPDI | AlistamientoPDI[] | null
+  unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | null
+  contactos_calidad: ContactoCalidad | null
+  alistamiento_pdi: AlistamientoPDI | null
 }
 
 const ESTADO_A_PASO: Record<EstadoActual, number> = {
@@ -330,7 +328,7 @@ function BanderasViajeras({ op }: { op: OperacionDetalle }) {
         <User className="h-3.5 w-3.5 text-text-muted" />
         <span className="text-text-muted">Asesor:</span>
         <span className="text-text-primary font-medium">
-          {op.asesor?.nombre_completo ?? 'Sin asignar'}
+          {(op as any).asesor?.nombre_completo ?? 'Sin asignar'}
         </span>
       </div>
     </div>
@@ -789,8 +787,8 @@ function Paso4Alistamiento({
 
   const pdi = op.alistamiento_pdi
   const items = pdi?.checklist_pdi?.items ?? []
-  const criticos = items.filter((i) => i.es_critico)
-  const criticosOk = criticos.filter((i) => i.estado === 'OK')
+  const criticos = items.filter((i: any) => i.es_critico)
+  const criticosOk = criticos.filter((i: any) => i.estado === 'OK')
   const todosOk = criticos.length > 0 && criticosOk.length === criticos.length
 
   return (
@@ -887,7 +885,7 @@ function Paso5Calidad({
 
   const nombre = op.cliente_nombre ?? ''
   const modelo = op.unidades?.modelo ?? 'su vehículo'
-  const vendedor = op.asesor?.nombre_completo ?? ''
+  const vendedor = (op as any).asesor?.nombre_completo ?? ''
 
   function handleWA2d() {
     const fecha = calidad?.fecha_entrega_confirmada
