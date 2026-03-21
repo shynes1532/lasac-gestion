@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Filter, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -26,9 +26,21 @@ const ESTADOS: { value: EstadoActual | 'todas'; label: string }[] = [
 export function ListaOperaciones() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
+  const [searchParams] = useSearchParams()
+
+  const estadoValidos: (EstadoActual | 'todas')[] = ['todas','cierre','documentacion','gestoria','alistamiento','calidad','entrega','entregado','caida']
+  const tipoValidos: (TipoOperacion | 'todos')[] = ['todos','0km','usados','plan_ahorro']
+
+  const estadoParam = searchParams.get('estado') as EstadoActual | null
+  const tipoParam = searchParams.get('tipo') as TipoOperacion | null
+
   const [busqueda, setBusqueda] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState<EstadoActual | 'todas'>('todas')
-  const [filtroTipo, setFiltroTipo] = useState<TipoOperacion | 'todos'>('todos')
+  const [filtroEstado, setFiltroEstado] = useState<EstadoActual | 'todas'>(
+    estadoParam && estadoValidos.includes(estadoParam) ? estadoParam : 'todas'
+  )
+  const [filtroTipo, setFiltroTipo] = useState<TipoOperacion | 'todos'>(
+    tipoParam && tipoValidos.includes(tipoParam) ? tipoParam : 'todos'
+  )
   const [filtroSucursal, setFiltroSucursal] = useState<string>('todas')
 
   const { data: operaciones, isLoading, isError, error: queryError } = useQuery({
@@ -52,6 +64,18 @@ export function ListaOperaciones() {
       const { data, error } = await q
       if (error) throw error
       return data || []
+    },
+  })
+
+  // Debug: query de conteo sin filtros para diagnosticar RLS
+  const { data: totalCount } = useQuery({
+    queryKey: ['operaciones-count-debug'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('operaciones')
+        .select('*', { count: 'exact', head: true })
+      if (error) return `Error: ${error.message} (${error.code})`
+      return `${count ?? 0} operaciones en DB`
     },
   })
 
@@ -81,6 +105,11 @@ export function ListaOperaciones() {
             <Plus className="h-4 w-4 mr-1" /> Nueva operación
           </Button>
         )}
+      </div>
+
+      {/* Debug - quitar en producción */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs text-yellow-800">
+        <strong>Diagnóstico:</strong> Rol: {perfil?.rol ?? 'sin rol'} | Sucursal: {perfil?.sucursal ?? 'sin sucursal'} | {typeof totalCount === 'string' ? totalCount : 'cargando...'} | Query: {isError ? `ERROR: ${(queryError as any)?.message}` : `${operaciones?.length ?? 0} resultados`}
       </div>
 
       {/* Filtros */}
@@ -146,7 +175,11 @@ export function ListaOperaciones() {
         <EmptyState
           icon={<AlertTriangle className="h-12 w-12 text-red-400" />}
           title="Error al cargar"
+<<<<<<< HEAD
           description={`No se pudieron cargar las operaciones: ${(queryError as any)?.message || 'Error desconocido'}`}
+=======
+          description="No se pudieron cargar las operaciones. Intentá recargar la página."
+>>>>>>> 4f22d2a (Fix lista operaciones: quitar join usuarios que rompe la query)
         />
       ) : filtradas.length === 0 ? (
         <EmptyState

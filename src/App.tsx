@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider, useAuth, getDefaultRoute } from './context/AuthContext'
 import { ToastProvider } from './components/ui'
@@ -45,6 +45,11 @@ function RootRedirect() {
   return <Navigate to={getDefaultRoute(perfil.rol)} replace />
 }
 
+function GestoriaIdRedirect() {
+  const { id } = useParams()
+  return <Navigate to={`/operaciones/${id}`} replace />
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
@@ -85,7 +90,7 @@ export default function App() {
                 {/* Rutas legado — redirigen a nuevas */}
                 <Route path="/gestoria" element={<Navigate to="/operaciones" replace />} />
                 <Route path="/gestoria/nueva" element={<Navigate to="/operaciones/nueva" replace />} />
-                <Route path="/gestoria/:id" element={<Navigate to="/operaciones" replace />} />
+                <Route path="/gestoria/:id" element={<GestoriaIdRedirect />} />
 
                 <Route path="/alistamiento" element={
                   <ProtectedRoute><ColaPDI /></ProtectedRoute>

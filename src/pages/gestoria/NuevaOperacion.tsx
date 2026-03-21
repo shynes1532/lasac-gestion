@@ -58,6 +58,7 @@ export function NuevaOperacion() {
     supabase.from('modelos_fiat').select('nombre, categoria').eq('activo', true).order('categoria').then(({ data, error }) => {
       if (error) {
         console.error('Error cargando modelos:', error)
+        notify.error('No se pudieron cargar los modelos')
         return
       }
       if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
