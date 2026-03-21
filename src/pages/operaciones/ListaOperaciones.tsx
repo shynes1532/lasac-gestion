@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Search, Filter, AlertTriangle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -26,9 +26,21 @@ const ESTADOS: { value: EstadoActual | 'todas'; label: string }[] = [
 export function ListaOperaciones() {
   const navigate = useNavigate()
   const { perfil } = useAuth()
+  const [searchParams] = useSearchParams()
+
+  const estadoValidos: (EstadoActual | 'todas')[] = ['todas','cierre','documentacion','gestoria','alistamiento','calidad','entrega','entregado','caida']
+  const tipoValidos: (TipoOperacion | 'todos')[] = ['todos','0km','usados','plan_ahorro']
+
+  const estadoParam = searchParams.get('estado') as EstadoActual | null
+  const tipoParam = searchParams.get('tipo') as TipoOperacion | null
+
   const [busqueda, setBusqueda] = useState('')
-  const [filtroEstado, setFiltroEstado] = useState<EstadoActual | 'todas'>('todas')
-  const [filtroTipo, setFiltroTipo] = useState<TipoOperacion | 'todos'>('todos')
+  const [filtroEstado, setFiltroEstado] = useState<EstadoActual | 'todas'>(
+    estadoParam && estadoValidos.includes(estadoParam) ? estadoParam : 'todas'
+  )
+  const [filtroTipo, setFiltroTipo] = useState<TipoOperacion | 'todos'>(
+    tipoParam && tipoValidos.includes(tipoParam) ? tipoParam : 'todos'
+  )
   const [filtroSucursal, setFiltroSucursal] = useState<string>('todas')
 
   const { data: operaciones, isLoading, isError, error: queryError } = useQuery({

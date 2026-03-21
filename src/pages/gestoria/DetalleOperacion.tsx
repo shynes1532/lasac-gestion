@@ -66,10 +66,10 @@ import { Checkbox } from '../../components/ui/Checkbox'
 // ============================================================
 
 interface OperacionDetalle extends Operacion {
-  unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | null
+  unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'>[] | null
   asesor: Pick<Usuario, 'nombre_completo'> | null
-  contactos_calidad: ContactoCalidad | null
-  alistamiento_pdi: AlistamientoPDI | null
+  contactos_calidad: ContactoCalidad | ContactoCalidad[] | null
+  alistamiento_pdi: AlistamientoPDI | AlistamientoPDI[] | null
 }
 
 const ESTADO_A_PASO: Record<EstadoActual, number> = {
@@ -210,7 +210,20 @@ async function fetchOperacion(id: string): Promise<OperacionDetalle> {
     .single()
 
   if (error) throw error
-  return data as unknown as OperacionDetalle
+
+  // Supabase returns arrays for one-to-many relations — normalize to single objects
+  const raw = data as any
+  if (Array.isArray(raw.unidades)) {
+    raw.unidades = raw.unidades[0] ?? null
+  }
+  if (Array.isArray(raw.contactos_calidad)) {
+    raw.contactos_calidad = raw.contactos_calidad[0] ?? null
+  }
+  if (Array.isArray(raw.alistamiento_pdi)) {
+    raw.alistamiento_pdi = raw.alistamiento_pdi[0] ?? null
+  }
+
+  return raw as OperacionDetalle
 }
 
 // ============================================================
@@ -1414,7 +1427,7 @@ export function DetalleOperacion() {
       <div className="text-center py-12 space-y-3">
         <AlertTriangle className="h-8 w-8 text-red-400 mx-auto" />
         <p className="text-text-secondary">No se pudo cargar la operación.</p>
-        <Button variant="ghost" onClick={() => navigate('/gestoria')}>
+        <Button variant="ghost" onClick={() => navigate('/operaciones')}>
           <ArrowLeft className="h-4 w-4" />
           Volver
         </Button>
@@ -1450,7 +1463,7 @@ export function DetalleOperacion() {
       {/* ---- HEADER ---- */}
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-5">
         <button
-          onClick={() => navigate('/gestoria')}
+          onClick={() => navigate('/operaciones')}
           className="p-1.5 rounded-lg hover:bg-bg-tertiary text-text-muted hover:text-text-primary transition-colors cursor-pointer shrink-0 mt-0.5"
         >
           <ArrowLeft className="h-5 w-5" />
