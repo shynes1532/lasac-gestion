@@ -175,11 +175,7 @@ export function ListaOperaciones() {
         <EmptyState
           icon={<AlertTriangle className="h-12 w-12 text-red-400" />}
           title="Error al cargar"
-<<<<<<< HEAD
-          description={`No se pudieron cargar las operaciones: ${(queryError as any)?.message || 'Error desconocido'}`}
-=======
           description="No se pudieron cargar las operaciones. Intentá recargar la página."
->>>>>>> 4f22d2a (Fix lista operaciones: quitar join usuarios que rompe la query)
         />
       ) : filtradas.length === 0 ? (
         <EmptyState
