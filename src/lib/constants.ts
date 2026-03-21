@@ -190,66 +190,14 @@ export const CHECKLIST_DOC_0KM: ChecklistDocItem[] = [
 // ============================================================
 
 export const CHECKLIST_PDI_TEMPLATE: ChecklistPDIItem[] = [
-  // 1. Exterior - Carrocería
-  { id: 1, seccion: 'Exterior - Carrocería', item: 'Estado general de pintura (sin rayas, golpes ni imperfecciones)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 2, seccion: 'Exterior - Carrocería', item: 'Paneles alineados y sin diferencias de color', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 3, seccion: 'Exterior - Carrocería', item: 'Parabrisas y luneta sin fisuras ni rayones', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 4, seccion: 'Exterior - Carrocería', item: 'Burletes de puertas y baúl en buen estado', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 5, seccion: 'Exterior - Carrocería', item: 'Vidrios laterales sin defectos', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 2. Exterior - Iluminación
-  { id: 6, seccion: 'Exterior - Iluminación', item: 'Faros delanteros funcionando (baja, alta, posición)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 7, seccion: 'Exterior - Iluminación', item: 'Luces traseras, stop y marcha atrás', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 8, seccion: 'Exterior - Iluminación', item: 'Giros delanteros y traseros', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 9, seccion: 'Exterior - Iluminación', item: 'Balizas funcionando correctamente', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 10, seccion: 'Exterior - Iluminación', item: 'Luz de patente', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 3. Interior - Habitáculo
-  { id: 11, seccion: 'Interior - Habitáculo', item: 'Tapizado sin manchas, roturas ni defectos', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 12, seccion: 'Interior - Habitáculo', item: 'Cinturones de seguridad funcionando (todos los asientos)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 13, seccion: 'Interior - Habitáculo', item: 'Espejos retrovisores interior y exteriores', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 14, seccion: 'Interior - Habitáculo', item: 'Alfombras y protectores en posición', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 15, seccion: 'Interior - Habitáculo', item: 'Guantera y compartimientos sin defectos', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 4. Interior - Tablero
-  { id: 16, seccion: 'Interior - Tablero e Instrumentos', item: 'Tablero sin testigos de error encendidos', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 17, seccion: 'Interior - Tablero e Instrumentos', item: 'Velocímetro, tacómetro y nivel de combustible operativos', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 18, seccion: 'Interior - Tablero e Instrumentos', item: 'Bocina funcionando', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 19, seccion: 'Interior - Tablero e Instrumentos', item: 'Comandos de volante operativos', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 5. Climatización
-  { id: 20, seccion: 'Climatización y Confort', item: 'Aire acondicionado enfría correctamente', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 21, seccion: 'Climatización y Confort', item: 'Calefacción funciona en todas las velocidades', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 22, seccion: 'Climatización y Confort', item: 'Desempañador trasero operativo', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 23, seccion: 'Climatización y Confort', item: 'Limpiaparabrisas y lavaparabrisas', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 6. Multimedia
-  { id: 24, seccion: 'Sistema Multimedia', item: 'Radio / pantalla multimedia enciende', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 25, seccion: 'Sistema Multimedia', item: 'Parlantes sin distorsión', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 26, seccion: 'Sistema Multimedia', item: 'Conexión Bluetooth / USB / Android Auto / Apple CarPlay', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 27, seccion: 'Sistema Multimedia', item: 'Cámara de retroceso (si aplica)', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 7. Motor
-  { id: 28, seccion: 'Motor y Compartimiento', item: 'Nivel de aceite correcto', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 29, seccion: 'Motor y Compartimiento', item: 'Nivel de refrigerante correcto', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 30, seccion: 'Motor y Compartimiento', item: 'Nivel de líquido de frenos correcto', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 31, seccion: 'Motor y Compartimiento', item: 'Sin pérdidas visibles de fluidos', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 32, seccion: 'Motor y Compartimiento', item: 'Batería con carga adecuada y bornes limpios', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 8. Neumáticos
-  { id: 33, seccion: 'Neumáticos y Ruedas', item: 'Presión de inflado correcta (4 ruedas + auxilio)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 34, seccion: 'Neumáticos y Ruedas', item: 'Neumáticos sin defectos ni desgaste irregular', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 35, seccion: 'Neumáticos y Ruedas', item: 'Llantas sin golpes ni rayones', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 36, seccion: 'Neumáticos y Ruedas', item: 'Rueda de auxilio y herramientas presentes', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 9. Frenos
-  { id: 37, seccion: 'Frenos y Seguridad', item: 'Freno de servicio responde correctamente', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 38, seccion: 'Frenos y Seguridad', item: 'Freno de estacionamiento funciona', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 39, seccion: 'Frenos y Seguridad', item: 'Airbags sin testigos de falla', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 40, seccion: 'Frenos y Seguridad', item: 'ABS / ESP sin alertas', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 10. Accesorios
-  { id: 41, seccion: 'Accesorios y Documentación', item: 'Manual de usuario presente', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 42, seccion: 'Accesorios y Documentación', item: 'Libreta de mantenimiento / service', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 43, seccion: 'Accesorios y Documentación', item: 'Juego de llaves completo (2 llaves + tarjeta si aplica)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 44, seccion: 'Accesorios y Documentación', item: 'Matafuego y balizas triangulares', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 45, seccion: 'Accesorios y Documentación', item: 'Chaleco reflectante', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  // 11. Items nuevos (Bloque 5)
-  { id: 46, seccion: 'Motor y Compartimiento', item: 'Prueba de batería (carga y arranque)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 47, seccion: 'Neumáticos y Ruedas', item: 'Revisión de neumáticos (cocada mínima 4mm)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 48, seccion: 'Accesorios y Documentación', item: 'Patente colocada correctamente', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
-  { id: 49, seccion: 'Accesorios y Documentación', item: 'Combustible cargado (mínimo 1/4 tanque)', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 1, seccion: 'Inspección Pre-Entrega', item: 'Revisión mecánica / PDI', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 2, seccion: 'Inspección Pre-Entrega', item: 'Check de recalls / actualizaciones técnicas', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 3, seccion: 'Inspección Pre-Entrega', item: 'Accesorios colocados según pedido', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 4, seccion: 'Inspección Pre-Entrega', item: 'Patente colocada', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 5, seccion: 'Inspección Pre-Entrega', item: 'Combustible cargado', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 6, seccion: 'Inspección Pre-Entrega', item: 'Lavado y estética final', es_critico: false, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 7, seccion: 'Inspección Pre-Entrega', item: 'Prueba de batería (carga y arranque, < 7 días antes)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
+  { id: 8, seccion: 'Inspección Pre-Entrega', item: 'Revisión de neumáticos (cocada mínima 4mm)', es_critico: true, estado: null, observacion: '', foto_url: null, validado_por: null, validado_at: null },
 ]
 
 // ============================================================
