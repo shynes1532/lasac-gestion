@@ -113,7 +113,7 @@ export function DashboardPage() {
   const navigate = useNavigate()
   const [filtroSucursal, setFiltroSucursal] = useState<string>('todas')
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard-v2', filtroSucursal],
     queryFn: async () => {
       let q = supabase
@@ -143,6 +143,16 @@ export function DashboardPage() {
             <div key={i} className="bg-bg-secondary rounded-xl border border-border p-4 h-24 animate-pulse" />
           ))}
         </div>
+      </div>
+    )
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center">
+        <AlertTriangle className="h-12 w-12 text-red-400 mb-3" />
+        <h2 className="text-lg font-semibold text-text-primary">Error al cargar el dashboard</h2>
+        <p className="text-sm text-text-muted mt-1">No se pudieron obtener los datos. Intentá recargar la página.</p>
       </div>
     )
   }
