@@ -67,6 +67,18 @@ export function ListaOperaciones() {
     },
   })
 
+  // Debug: query de conteo sin filtros para diagnosticar RLS
+  const { data: totalCount } = useQuery({
+    queryKey: ['operaciones-count-debug'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('operaciones')
+        .select('*', { count: 'exact', head: true })
+      if (error) return `Error: ${error.message} (${error.code})`
+      return `${count ?? 0} operaciones en DB`
+    },
+  })
+
   const filtradas = (operaciones || []).filter(op => {
     if (!busqueda.trim()) return true
     const b = busqueda.toLowerCase()
@@ -93,6 +105,11 @@ export function ListaOperaciones() {
             <Plus className="h-4 w-4 mr-1" /> Nueva operación
           </Button>
         )}
+      </div>
+
+      {/* Debug - quitar en producción */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4 text-xs text-yellow-800">
+        <strong>Diagnóstico:</strong> Rol: {perfil?.rol ?? 'sin rol'} | Sucursal: {perfil?.sucursal ?? 'sin sucursal'} | {typeof totalCount === 'string' ? totalCount : 'cargando...'} | Query: {isError ? `ERROR: ${(queryError as any)?.message}` : `${operaciones?.length ?? 0} resultados`}
       </div>
 
       {/* Filtros */}
