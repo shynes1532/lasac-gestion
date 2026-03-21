@@ -609,12 +609,9 @@ function Paso3Gestoria({
   const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
   const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
 
-  const inhibido = op.resultado_o2 === 'inhibido'
-
   const puedeAvanzarPDI =
     op.egresado_registro &&
-    !!op.dominio_patente &&
-    !inhibido
+    !!op.dominio_patente
 
   function handle(field: keyof Operacion, value: unknown) {
     onMutate({ [field]: value } as Partial<Operacion>)
@@ -665,11 +662,6 @@ function Paso3Gestoria({
               </select>
             </div>
           )}
-          {inhibido && (
-            <BlockerBanner>
-              BLOQUEADO: Titular inhibido en 02. Contactar al director.
-            </BlockerBanner>
-          )}
         </div>
       </Card>
 
@@ -680,7 +672,6 @@ function Paso3Gestoria({
           <Checkbox
             label="Ingresado al registro"
             checked={op.ingresado_registro}
-            disabled={inhibido}
             onChange={(e) => handle('ingresado_registro', e.target.checked)}
           />
           <div>
@@ -688,7 +679,6 @@ function Paso3Gestoria({
             <input
               type="date"
               value={op.fecha_ingreso_registro ?? ''}
-              disabled={inhibido}
               onChange={(e) => handle('fecha_ingreso_registro', e.target.value || null)}
               className="w-full bg-bg-input border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 disabled:opacity-50"
             />
