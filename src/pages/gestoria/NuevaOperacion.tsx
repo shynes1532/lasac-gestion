@@ -25,6 +25,10 @@ interface FormData {
   nro_grupo_orden: string
   fecha_adjudicacion: string
   vendedor_id: string
+  valor_unidad: string
+  valor_credito: string
+  quebranto_porcentaje: string
+  forma_pago_saldo: '' | 'tarjeta' | 'transferencia' | 'efectivo'
 }
 
 const INITIAL_FORM: FormData = {
@@ -42,6 +46,14 @@ const INITIAL_FORM: FormData = {
   nro_grupo_orden: '',
   fecha_adjudicacion: '',
   vendedor_id: '',
+  valor_unidad: '',
+  valor_credito: '',
+  quebranto_porcentaje: '',
+  forma_pago_saldo: '',
+}
+
+function formatMoney(n: number): string {
+  return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
 }
 
 export function NuevaOperacion() {
@@ -81,6 +93,16 @@ export function NuevaOperacion() {
   const esPlan = form.tipo_operacion === 'plan_ahorro'
   const esFinanciado = form.forma_pago === 'financiado_banco' || esPlan
   const requierePrenda = esFinanciado
+  const mostrarFinanciero = !esPlan && (form.tipo_operacion === '0km' || form.tipo_operacion === 'usados')
+
+  // Cálculos financieros
+  const valorUnidad = parseFloat(form.valor_unidad) || 0
+  const valorCredito = parseFloat(form.valor_credito) || 0
+  const quebrantoPct = parseFloat(form.quebranto_porcentaje) || 0
+  const quebrantoMonto = valorCredito * (quebrantoPct / 100)
+  const netoCredito = valorCredito - quebrantoMonto
+  const saldoCliente = esFinanciado ? valorUnidad - netoCredito : valorUnidad
+  const clienteDebeSaldo = saldoCliente > 0
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -118,6 +140,13 @@ export function NuevaOperacion() {
           nro_grupo_orden: esPlan ? form.nro_grupo_orden.trim() : null,
           fecha_adjudicacion: esPlan ? form.fecha_adjudicacion : null,
           asesor_id: form.vendedor_id,
+          valor_unidad: mostrarFinanciero && valorUnidad ? valorUnidad : null,
+          valor_credito: mostrarFinanciero && esFinanciado && valorCredito ? valorCredito : null,
+          quebranto_porcentaje: mostrarFinanciero && esFinanciado && quebrantoPct ? quebrantoPct : null,
+          quebranto_monto: mostrarFinanciero && esFinanciado && quebrantoMonto ? quebrantoMonto : null,
+          saldo_cliente: mostrarFinanciero ? saldoCliente : null,
+          forma_pago_saldo: mostrarFinanciero && form.forma_pago_saldo ? form.forma_pago_saldo : null,
+          saldo_pagado: mostrarFinanciero ? !clienteDebeSaldo : null,
           created_by: perfil?.id,
           estado_gestoria: 'ingresado',
           estado_alistamiento: 'pendiente',
@@ -256,6 +285,107 @@ export function NuevaOperacion() {
               />
             )}
             <p className="text-xs text-yellow-700">Se registrará como pendiente. El seguimiento continúa en el Paso 2.</p>
+          </section>
+        )}
+
+        {/* FINANCIERO — solo 0km y usados */}
+        {mostrarFinanciero && (
+          <section className="bg-emerald-50 rounded-xl border-2 border-emerald-300 p-5 space-y-4">
+            <h2 className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Valores y financiación</h2>
+
+            <Input
+              label="Valor de la unidad *"
+              type="number"
+              value={form.valor_unidad}
+              onChange={e => set('valor_unidad', e.target.value)}
+              placeholder="Ej: 25000000"
+            />
+
+            {esFinanciado && (
+              <>
+                <Input
+                  label="Valor del crédito"
+                  type="number"
+                  value={form.valor_credito}
+                  onChange={e => set('valor_credito', e.target.value)}
+                  placeholder="Monto aprobado por el banco"
+                />
+
+                <div className="grid grid-cols-2 gap-3">
+                  <Input
+                    label="Quebranto / Otorgamiento %"
+                    type="number"
+                    value={form.quebranto_porcentaje}
+                    onChange={e => set('quebranto_porcentaje', e.target.value)}
+                    placeholder="Ej: 3.5"
+                  />
+                  <div className="flex flex-col justify-end">
+                    <p className="text-xs text-text-muted mb-1">Descuento del crédito</p>
+                    <p className="text-sm font-semibold text-emerald-700">
+                      {quebrantoMonto > 0 ? formatMoney(quebrantoMonto) : '—'}
+                    </p>
+                  </div>
+                </div>
+
+                {valorCredito > 0 && (
+                  <div className="bg-white rounded-lg border border-emerald-200 p-3 space-y-1">
+                    <div className="flex justify-between text-xs text-text-secondary">
+                      <span>Crédito aprobado</span>
+                      <span>{formatMoney(valorCredito)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-red-500">
+                      <span>– Quebranto ({quebrantoPct}%)</span>
+                      <span>– {formatMoney(quebrantoMonto)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-semibold text-text-primary border-t pt-1">
+                      <span>Neto que recibe el cliente</span>
+                      <span>{formatMoney(netoCredito)}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* Saldo */}
+            {valorUnidad > 0 && (
+              <div className={`rounded-lg border-2 p-4 ${clienteDebeSaldo ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50'}`}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <p className="text-xs text-text-muted">Saldo del cliente</p>
+                    <p className={`text-lg font-bold ${clienteDebeSaldo ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatMoney(saldoCliente)}
+                    </p>
+                  </div>
+                  {clienteDebeSaldo && (
+                    <div className="flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
+                      <AlertTriangle className="h-3 w-3" />
+                      DEBE SALDO
+                    </div>
+                  )}
+                  {!clienteDebeSaldo && saldoCliente <= 0 && (
+                    <div className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                      CUBIERTO
+                    </div>
+                  )}
+                </div>
+
+                {clienteDebeSaldo && (
+                  <div className="mt-3">
+                    <Select
+                      label="¿Cómo paga el saldo?"
+                      value={form.forma_pago_saldo}
+                      onChange={e => set('forma_pago_saldo', e.target.value)}
+                      options={[
+                        { value: '', label: 'Seleccionar...' },
+                        { value: 'transferencia', label: 'Transferencia bancaria' },
+                        { value: 'efectivo', label: 'Efectivo' },
+                        { value: 'tarjeta', label: 'Tarjeta' },
+                      ]}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
           </section>
         )}
 
