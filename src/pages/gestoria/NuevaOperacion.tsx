@@ -30,6 +30,7 @@ interface FormData {
   quebranto_porcentaje: string
   forma_pago_saldo: '' | 'tarjeta' | 'transferencia' | 'efectivo'
   pago_inicial: string
+  numero_recibo: string
 }
 
 const INITIAL_FORM: FormData = {
@@ -52,6 +53,7 @@ const INITIAL_FORM: FormData = {
   quebranto_porcentaje: '',
   forma_pago_saldo: '',
   pago_inicial: '',
+  numero_recibo: '',
 }
 
 function formatMoney(n: number): string {
@@ -204,6 +206,7 @@ export function NuevaOperacion() {
           forma_pago: form.forma_pago_saldo,
           fecha: new Date().toISOString().split('T')[0],
           observacion: 'Pago inicial al crear operación',
+          numero_recibo: form.numero_recibo.trim() || 'REC-001',
         })
         // Si pagó todo, marcar saldo_pagado
         if (pagoInicial >= saldoCliente) {
@@ -403,6 +406,18 @@ export function NuevaOperacion() {
 
                 {clienteDebeSaldo && (
                   <>
+                    {/* N° Recibo */}
+                    <div>
+                      <label className="text-xs text-text-muted block mb-1 font-medium">N° Recibo</label>
+                      <input
+                        type="text"
+                        value={form.numero_recibo}
+                        onChange={e => set('numero_recibo', e.target.value)}
+                        placeholder="Ej: REC-001"
+                        className="w-full text-sm border border-gray-300 rounded-lg px-3 py-2 bg-white text-gray-900 font-mono placeholder-gray-400"
+                      />
+                    </div>
+
                     {/* Monto a pagar */}
                     <div>
                       <label className="text-xs text-text-muted block mb-1 font-medium">Monto a pagar ahora</label>
