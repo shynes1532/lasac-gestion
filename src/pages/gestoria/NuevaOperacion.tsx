@@ -414,7 +414,7 @@ export function NuevaOperacion() {
                           placeholder="0"
                           min="0"
                           max={saldoCliente}
-                          className={`flex-1 text-sm border-2 rounded-lg px-3 py-2 bg-white text-text-primary font-semibold ${
+                          className={`flex-1 text-sm border-2 rounded-lg px-3 py-2 bg-white text-gray-900 font-semibold placeholder-gray-400 ${
                             pagoInicial > saldoCliente ? 'border-red-500' : form.pago_inicial ? 'border-emerald-500' : 'border-gray-300'
                           }`}
                         />
