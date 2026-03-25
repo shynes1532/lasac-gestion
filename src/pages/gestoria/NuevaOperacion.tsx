@@ -25,6 +25,8 @@ interface FormData {
   nro_grupo_orden: string
   fecha_adjudicacion: string
   fecha_arribo_unidad: string
+  gasto_adjudicacion: string
+  gasto_patentamiento: string
   vendedor_id: string
   valor_unidad: string
   valor_credito: string
@@ -49,6 +51,8 @@ const INITIAL_FORM: FormData = {
   nro_grupo_orden: '',
   fecha_adjudicacion: '',
   fecha_arribo_unidad: '',
+  gasto_adjudicacion: '',
+  gasto_patentamiento: '',
   vendedor_id: '',
   valor_unidad: '',
   valor_credito: '',
@@ -148,6 +152,8 @@ export function NuevaOperacion() {
           nro_grupo_orden: esPlan ? form.nro_grupo_orden.trim() : null,
           fecha_adjudicacion: esPlan ? form.fecha_adjudicacion : null,
           fecha_arribo_unidad: form.fecha_arribo_unidad || null,
+          gasto_adjudicacion: esPlan && parseFloat(form.gasto_adjudicacion) ? parseFloat(form.gasto_adjudicacion) : null,
+          gasto_patentamiento: esPlan && parseFloat(form.gasto_patentamiento) ? parseFloat(form.gasto_patentamiento) : null,
           asesor_id: form.vendedor_id,
           valor_unidad: mostrarFinanciero && valorUnidad ? valorUnidad : null,
           valor_credito: mostrarFinanciero && esFinanciado && valorCredito ? valorCredito : null,
@@ -291,6 +297,30 @@ export function NuevaOperacion() {
               <Input label="N° Grupo / Orden *" value={form.nro_grupo_orden} onChange={e => set('nro_grupo_orden', e.target.value)} placeholder="Ej: GR-12345" />
               <Input label="Fecha de asignación *" type="date" value={form.fecha_adjudicacion} onChange={e => set('fecha_adjudicacion', e.target.value)} />
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Input label="Gasto de adjudicación" type="number" value={form.gasto_adjudicacion} onChange={e => set('gasto_adjudicacion', e.target.value)} placeholder="Ej: 150000" />
+              <Input label="Gasto de patentamiento" type="number" value={form.gasto_patentamiento} onChange={e => set('gasto_patentamiento', e.target.value)} placeholder="Ej: 350000" />
+            </div>
+            {(parseFloat(form.gasto_adjudicacion) > 0 || parseFloat(form.gasto_patentamiento) > 0) && (
+              <div className="bg-white rounded-lg border border-violet-200 p-3 space-y-1">
+                {parseFloat(form.gasto_adjudicacion) > 0 && (
+                  <div className="flex justify-between text-xs text-text-secondary">
+                    <span>Gasto adjudicación</span>
+                    <span>{formatMoney(parseFloat(form.gasto_adjudicacion))}</span>
+                  </div>
+                )}
+                {parseFloat(form.gasto_patentamiento) > 0 && (
+                  <div className="flex justify-between text-xs text-text-secondary">
+                    <span>Gasto patentamiento</span>
+                    <span>{formatMoney(parseFloat(form.gasto_patentamiento))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-xs font-semibold text-violet-700 border-t pt-1">
+                  <span>Total gastos</span>
+                  <span>{formatMoney((parseFloat(form.gasto_adjudicacion) || 0) + (parseFloat(form.gasto_patentamiento) || 0))}</span>
+                </div>
+              </div>
+            )}
           </section>
         )}
 

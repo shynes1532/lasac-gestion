@@ -171,6 +171,8 @@ export interface Operacion {
   nro_grupo_orden: string | null
   fecha_adjudicacion: string | null
   fecha_arribo_unidad: string | null
+  gasto_adjudicacion: number | null
+  gasto_patentamiento: number | null
 
   // Paso 2 — Documentación
   estado_paso2: EstadoPaso2
