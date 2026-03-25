@@ -205,6 +205,7 @@ export function DashboardPage() {
   const demoradosRegistro = enRegistro.filter(o =>
     o.fecha_ingreso_registro && diasDesde(o.fecha_ingreso_registro) > 4
   )
+  const egresadosRegistro = enGestoria.filter(o => o.egresado_registro)
 
   // Entregas para calendario
   const entregasCalendario = ops.filter(o =>
@@ -264,7 +265,7 @@ export function DashboardPage() {
           <span className="text-xs text-text-muted">({enGestoria.length} en gestoría)</span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mb-4">
+        <div className="grid grid-cols-4 gap-3 mb-4">
           <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <p className="text-2xl font-bold text-yellow-700">{noIngresadosRegistro.length}</p>
             <p className="text-xs text-yellow-600 font-medium">No ingresados</p>
@@ -272,6 +273,10 @@ export function DashboardPage() {
           <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
             <p className="text-2xl font-bold text-blue-700">{enRegistro.length}</p>
             <p className="text-xs text-blue-600 font-medium">En registro</p>
+          </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-2xl font-bold text-green-700">{egresadosRegistro.length}</p>
+            <p className="text-xs text-green-600 font-medium">Salidas / Egresados</p>
           </div>
           <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
             <p className="text-2xl font-bold text-red-700">{demoradosRegistro.length}</p>
