@@ -71,6 +71,7 @@ interface PagoSaldo {
   forma_pago: 'tarjeta' | 'transferencia' | 'efectivo'
   fecha: string
   observacion: string | null
+  numero_recibo: string | null
   created_at: string
 }
 
@@ -1132,38 +1133,53 @@ function SaldoPagos({
   onPagoRegistrado: () => void
 }) {
   const [showForm, setShowForm] = useState(false)
+  const [recibo, setRecibo] = useState('')
   const [monto, setMonto] = useState('')
   const [forma, setForma] = useState<'tarjeta' | 'transferencia' | 'efectivo' | ''>('')
+  const [fechaPago, setFechaPago] = useState(new Date().toISOString().split('T')[0])
   const [obs, setObs] = useState('')
   const [saving, setSaving] = useState(false)
   const [confirmando, setConfirmando] = useState(false)
+  const [fechaCancelacion, setFechaCancelacion] = useState(op.fecha_cancelacion_total ?? '')
 
   const saldoTotal = op.saldo_cliente ?? 0
   const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0)
   const saldoPendiente = saldoTotal - totalPagado
   const montoNum = parseFloat(monto) || 0
 
-  // Estados del saldo
   const estaPagado = saldoPendiente <= 0
   const tienePagosParciales = pagos.length > 0 && saldoPendiente > 0
   const pctPagado = saldoTotal > 0 ? Math.min(100, Math.round((totalPagado / saldoTotal) * 100)) : 0
 
-  // Validaciones
   const montoExcede = montoNum > saldoPendiente
   const montoInvalido = montoNum <= 0
   const sinFormaPago = !forma
   const requiereConfirmacion = montoNum > 1_000_000
 
+  // Auto-generar número de recibo
+  const nextRecibo = `REC-${String(pagos.length + 1).padStart(3, '0')}`
+
+  function openForm() {
+    setRecibo(nextRecibo)
+    setFechaPago(new Date().toISOString().split('T')[0])
+    setShowForm(true)
+  }
+
   function pagarTotal() {
     setMonto(String(Math.round(saldoPendiente)))
+  }
+
+  async function guardarFechaCancelacion(fecha: string) {
+    setFechaCancelacion(fecha)
+    await supabase.from('operaciones').update({ fecha_cancelacion_total: fecha || null }).eq('id', op.id)
   }
 
   async function registrarPago() {
     if (montoInvalido) return notify.error('Ingresá un monto mayor a 0')
     if (montoExcede) return notify.error(`El monto no puede superar el saldo pendiente (${formatMoney(saldoPendiente)})`)
     if (sinFormaPago) return notify.error('Seleccioná la forma de pago')
+    if (!fechaPago) return notify.error('Seleccioná la fecha del pago')
 
-    // Confirmación para montos grandes
     if (requiereConfirmacion && !confirmando) {
       setConfirmando(true)
       return
@@ -1175,8 +1191,9 @@ function SaldoPagos({
         operacion_id: op.id,
         monto: montoNum,
         forma_pago: forma,
-        fecha: new Date().toISOString().split('T')[0],
+        fecha: fechaPago,
         observacion: obs.trim() || null,
+        numero_recibo: recibo.trim() || nextRecibo,
       })
       if (error) throw error
 
@@ -1185,10 +1202,11 @@ function SaldoPagos({
         await supabase.from('operaciones').update({ saldo_pagado: true }).eq('id', op.id)
       }
 
-      notify.success(`Pago de ${formatMoney(montoNum)} registrado`)
+      notify.success(`Pago ${recibo || nextRecibo} de ${formatMoney(montoNum)} registrado`)
       setMonto('')
       setObs('')
       setForma('')
+      setRecibo('')
       setShowForm(false)
       setConfirmando(false)
       onPagoRegistrado()
@@ -1211,39 +1229,76 @@ function SaldoPagos({
 
   return (
     <Card className={borderColor}>
-      <div className="flex items-center justify-between mb-3">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           {estaPagado
-            ? <CheckCircle2 className="h-4 w-4 text-green-400" />
-            : <AlertTriangle className="h-4 w-4 text-red-400" />
+            ? <CheckCircle2 className="h-5 w-5 text-green-400" />
+            : <AlertTriangle className="h-5 w-5 text-red-400" />
           }
-          <h3 className="text-sm font-semibold text-text-primary">Saldo del cliente</h3>
+          <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Estado de cuenta</h3>
         </div>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badgeColor}`}>
           {badgeText}
         </span>
       </div>
 
-      {/* Resumen */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div className="text-center p-2 bg-bg-secondary rounded-lg">
-          <p className="text-xs text-text-muted">Total</p>
-          <p className="text-sm font-bold">{formatMoney(saldoTotal)}</p>
-        </div>
-        <div className="text-center p-2 bg-green-50 rounded-lg">
-          <p className="text-xs text-text-muted">Pagado</p>
-          <p className="text-sm font-bold text-green-600">{formatMoney(totalPagado)}</p>
-        </div>
-        <div className={`text-center p-2 rounded-lg ${estaPagado ? 'bg-green-50' : 'bg-red-50'}`}>
-          <p className="text-xs text-text-muted">Pendiente</p>
-          <p className={`text-sm font-bold ${estaPagado ? 'text-green-600' : 'text-red-600'}`}>
-            {formatMoney(Math.max(0, saldoPendiente))}
+      {/* Saldo total destacado */}
+      <div className="text-center p-3 bg-bg-secondary rounded-lg mb-3">
+        <p className="text-xs text-text-muted">Saldo total</p>
+        <p className="text-2xl font-bold text-text-primary">{formatMoney(saldoTotal)}</p>
+      </div>
+
+      {/* Tabla de pagos registrados */}
+      {pagos.length > 0 && (
+        <div className="mb-3">
+          <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">
+            Pagos registrados
           </p>
+          <div className="border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-bg-tertiary text-text-muted">
+                  <th className="text-left px-3 py-2 font-medium">N° Recibo</th>
+                  <th className="text-left px-3 py-2 font-medium">Fecha</th>
+                  <th className="text-left px-3 py-2 font-medium">Método</th>
+                  <th className="text-right px-3 py-2 font-medium">Monto</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {pagos.map(p => (
+                  <tr key={p.id} className="hover:bg-bg-secondary/50">
+                    <td className="px-3 py-2 font-mono text-action">{p.numero_recibo || '—'}</td>
+                    <td className="px-3 py-2 text-text-muted">{formatDate(p.fecha)}</td>
+                    <td className="px-3 py-2">
+                      <span className="capitalize bg-bg-tertiary px-1.5 py-0.5 rounded text-text-secondary">{p.forma_pago}</span>
+                    </td>
+                    <td className="px-3 py-2 text-right font-semibold text-green-600">+ {formatMoney(Number(p.monto))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Resumen: pagado / pendiente */}
+      <div className="space-y-1.5 mb-3">
+        <div className="flex justify-between text-xs text-text-secondary px-1">
+          <span>Total pagado</span>
+          <span className="font-semibold text-green-600">{formatMoney(totalPagado)}</span>
+        </div>
+        <div className="border-t border-border" />
+        <div className="flex justify-between text-sm px-1">
+          <span className="font-bold text-text-primary">SALDO RESTANTE</span>
+          <span className={`font-bold text-lg ${estaPagado ? 'text-green-600' : 'text-red-600'}`}>
+            {formatMoney(Math.max(0, saldoPendiente))}
+          </span>
         </div>
       </div>
 
       {/* Barra de progreso */}
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-4">
         <div className="flex-1 bg-bg-tertiary rounded-full h-2.5">
           <div
             className={`rounded-full h-2.5 transition-all ${estaPagado ? 'bg-green-500' : tienePagosParciales ? 'bg-yellow-500' : 'bg-red-500'}`}
@@ -1253,41 +1308,44 @@ function SaldoPagos({
         <span className="text-xs text-text-muted font-medium">{pctPagado}%</span>
       </div>
 
-      {/* Historial de pagos */}
-      {pagos.length > 0 && (
-        <div className="mb-3">
-          <p className="text-xs text-text-muted font-semibold mb-2">
-            Historial de pagos ({pagos.length}):
-          </p>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {pagos.map((p, i) => (
-              <div key={p.id} className="flex items-center justify-between text-xs bg-bg-secondary rounded-lg px-3 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-text-muted w-5 text-center font-mono">{i + 1}</span>
-                  <span className="text-text-muted">{formatDate(p.fecha)}</span>
-                  <span className="capitalize bg-bg-tertiary px-1.5 py-0.5 rounded text-text-secondary">{p.forma_pago}</span>
-                  {p.observacion && (
-                    <span className="text-text-muted italic truncate max-w-[120px]">{p.observacion}</span>
-                  )}
-                </div>
-                <span className="font-semibold text-green-600">+ {formatMoney(Number(p.monto))}</span>
-              </div>
-            ))}
-          </div>
+      {/* Fecha de cancelación total */}
+      {!estaPagado && (
+        <div className="mb-4">
+          <label className="text-xs text-text-muted block mb-1 font-medium">
+            Fecha de cancelación total
+          </label>
+          <input
+            type="date"
+            value={fechaCancelacion}
+            onChange={e => guardarFechaCancelacion(e.target.value)}
+            className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+          />
         </div>
       )}
 
       {/* Botón registrar pago */}
       {!estaPagado && !showForm && (
-        <Button size="sm" onClick={() => setShowForm(true)} fullWidth>
-          Registrar pago
+        <Button size="sm" onClick={openForm} fullWidth>
+          Registrar nuevo pago
         </Button>
       )}
 
       {/* Formulario de pago */}
       {showForm && (
         <div className="border-2 border-action/30 rounded-lg p-4 space-y-3 mt-2 bg-bg-secondary">
-          <p className="text-xs font-semibold text-action uppercase tracking-wider">Nuevo pago</p>
+          <p className="text-xs font-bold text-action uppercase tracking-wider">Registrar nuevo pago</p>
+
+          {/* N° Recibo */}
+          <div>
+            <label className="text-xs text-text-muted block mb-1">N° Recibo</label>
+            <input
+              type="text"
+              value={recibo}
+              onChange={e => setRecibo(e.target.value)}
+              placeholder={nextRecibo}
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary font-mono"
+            />
+          </div>
 
           {/* Monto */}
           <div>
@@ -1309,24 +1367,20 @@ function SaldoPagos({
                 onClick={pagarTotal}
                 className="text-xs px-3 py-2 bg-action/10 text-action rounded-lg hover:bg-action/20 transition-colors whitespace-nowrap cursor-pointer font-medium"
               >
-                Pagar total
+                Pagar todo
               </button>
             </div>
             {montoExcede && (
-              <p className="text-xs text-red-500 mt-1">
-                El monto no puede superar {formatMoney(saldoPendiente)}
-              </p>
+              <p className="text-xs text-red-500 mt-1">No puede superar {formatMoney(saldoPendiente)}</p>
             )}
             {montoNum > 0 && !montoExcede && (
-              <p className="text-xs text-text-muted mt-1">
-                Quedaría pendiente: {formatMoney(saldoPendiente - montoNum)}
-              </p>
+              <p className="text-xs text-text-muted mt-1">Quedaría pendiente: {formatMoney(saldoPendiente - montoNum)}</p>
             )}
           </div>
 
-          {/* Forma de pago */}
+          {/* Método de pago */}
           <div>
-            <label className="text-xs text-text-muted block mb-1">Forma de pago *</label>
+            <label className="text-xs text-text-muted block mb-1">Método de pago *</label>
             <select
               value={forma}
               onChange={e => setForma(e.target.value as any)}
@@ -1339,6 +1393,17 @@ function SaldoPagos({
               <option value="efectivo">Efectivo</option>
               <option value="tarjeta">Tarjeta</option>
             </select>
+          </div>
+
+          {/* Fecha del pago */}
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Fecha del pago *</label>
+            <input
+              type="date"
+              value={fechaPago}
+              onChange={e => setFechaPago(e.target.value)}
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+            />
           </div>
 
           {/* Observación */}
@@ -1363,7 +1428,7 @@ function SaldoPagos({
 
           {/* Botones */}
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => { setShowForm(false); setConfirmando(false); setMonto(''); setForma('') }}>
+            <Button size="sm" variant="secondary" onClick={() => { setShowForm(false); setConfirmando(false); setMonto(''); setForma(''); setRecibo('') }}>
               Cancelar
             </Button>
             <Button
@@ -1371,6 +1436,7 @@ function SaldoPagos({
               onClick={registrarPago}
               loading={saving}
               disabled={montoInvalido || montoExcede || sinFormaPago}
+              fullWidth
             >
               {confirmando ? 'Sí, confirmar pago' : 'Registrar pago'}
             </Button>

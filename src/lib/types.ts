@@ -212,6 +212,7 @@ export interface Operacion {
   saldo_cliente: number | null
   forma_pago_saldo: 'tarjeta' | 'transferencia' | 'efectivo' | null
   saldo_pagado: boolean
+  fecha_cancelacion_total: string | null
 
   // Legado (compatibilidad)
   estado_gestoria: EstadoGestoria
