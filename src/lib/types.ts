@@ -170,6 +170,7 @@ export interface Operacion {
   // Plan de Ahorro
   nro_grupo_orden: string | null
   fecha_adjudicacion: string | null
+  fecha_arribo_unidad: string | null
 
   // Paso 2 — Documentación
   estado_paso2: EstadoPaso2

@@ -24,6 +24,7 @@ interface FormData {
   banco_entidad: BancoEntidad | ''
   nro_grupo_orden: string
   fecha_adjudicacion: string
+  fecha_arribo_unidad: string
   vendedor_id: string
   valor_unidad: string
   valor_credito: string
@@ -47,6 +48,7 @@ const INITIAL_FORM: FormData = {
   banco_entidad: '',
   nro_grupo_orden: '',
   fecha_adjudicacion: '',
+  fecha_arribo_unidad: '',
   vendedor_id: '',
   valor_unidad: '',
   valor_credito: '',
@@ -124,7 +126,7 @@ export function NuevaOperacion() {
     if (!form.fecha_compromiso) return notify.error('La fecha de compromiso es obligatoria')
     if (esFinanciado && !esPlan && !form.banco_entidad) return notify.error('Seleccioná el banco')
     if (esPlan && !form.nro_grupo_orden.trim()) return notify.error('El N° de grupo/orden es obligatorio')
-    if (esPlan && !form.fecha_adjudicacion) return notify.error('La fecha de adjudicación es obligatoria')
+    if (esPlan && !form.fecha_adjudicacion) return notify.error('La fecha de asignación es obligatoria')
     if (!form.vendedor_id) return notify.error('Seleccioná el vendedor')
 
     setLoading(true)
@@ -145,6 +147,7 @@ export function NuevaOperacion() {
           estado_prenda: requierePrenda ? 'pendiente' : null,
           nro_grupo_orden: esPlan ? form.nro_grupo_orden.trim() : null,
           fecha_adjudicacion: esPlan ? form.fecha_adjudicacion : null,
+          fecha_arribo_unidad: form.fecha_arribo_unidad || null,
           asesor_id: form.vendedor_id,
           valor_unidad: mostrarFinanciero && valorUnidad ? valorUnidad : null,
           valor_credito: mostrarFinanciero && esFinanciado && valorCredito ? valorCredito : null,
@@ -286,7 +289,7 @@ export function NuevaOperacion() {
             </h2>
             <div className="grid grid-cols-2 gap-3">
               <Input label="N° Grupo / Orden *" value={form.nro_grupo_orden} onChange={e => set('nro_grupo_orden', e.target.value)} placeholder="Ej: GR-12345" />
-              <Input label="Fecha de adjudicación *" type="date" value={form.fecha_adjudicacion} onChange={e => set('fecha_adjudicacion', e.target.value)} />
+              <Input label="Fecha de asignación *" type="date" value={form.fecha_adjudicacion} onChange={e => set('fecha_adjudicacion', e.target.value)} />
             </div>
           </section>
         )}
@@ -513,6 +516,13 @@ export function NuevaOperacion() {
             />
             <Input label="Color" value={form.color} onChange={e => set('color', e.target.value)} placeholder="Ej: Rojo Rally" />
           </div>
+          <Input
+            label="Fecha de arribo de la unidad"
+            type="date"
+            value={form.fecha_arribo_unidad}
+            onChange={e => set('fecha_arribo_unidad', e.target.value)}
+          />
+          <p className="text-xs text-text-muted">Fecha estimada/confirmada de llegada del vehículo a la sucursal.</p>
         </section>
 
         {/* COMPROMISO */}
