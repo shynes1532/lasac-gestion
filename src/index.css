@@ -58,3 +58,29 @@ body {
   background: var(--color-bg-tertiary);
   border-radius: 3px;
 }
+
+/* Print styles */
+@media print {
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 11px;
+  }
+  aside, nav, .print\:hidden {
+    display: none !important;
+  }
+  main, #root, [class*="lg:ml-"] {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+  #reporte-contenido {
+    padding: 0 !important;
+  }
+  table { page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  .bg-bg-secondary, .bg-bg-tertiary, .bg-bg-card { background: white !important; }
+  .text-text-primary { color: black !important; }
+  .text-text-secondary, .text-text-muted { color: #555 !important; }
+  .border-border { border-color: #ccc !important; }
+}

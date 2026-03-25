@@ -21,6 +21,7 @@ const ControlPrendas = lazy(() => import('./pages/prendas/ControlPrendas').then(
 const CalidadPage = lazy(() => import('./pages/calidad/CalidadPage').then(m => ({ default: m.CalidadPage })))
 const EntregasProgramadas = lazy(() => import('./pages/entregas/EntregasProgramadas').then(m => ({ default: m.EntregasProgramadas })))
 const SaldosPendientes = lazy(() => import('./pages/saldos/SaldosPendientes').then(m => ({ default: m.SaldosPendientes })))
+const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage').then(m => ({ default: m.ReportesPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -89,6 +90,9 @@ export default function App() {
                 } />
                 <Route path="/saldos" element={
                   <ProtectedRoute><SaldosPendientes /></ProtectedRoute>
+                } />
+                <Route path="/reportes" element={
+                  <ProtectedRoute><ReportesPage /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}
