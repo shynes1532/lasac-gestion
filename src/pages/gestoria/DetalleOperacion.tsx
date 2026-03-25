@@ -1133,18 +1133,42 @@ function SaldoPagos({
 }) {
   const [showForm, setShowForm] = useState(false)
   const [monto, setMonto] = useState('')
-  const [forma, setForma] = useState<'tarjeta' | 'transferencia' | 'efectivo'>('transferencia')
+  const [forma, setForma] = useState<'tarjeta' | 'transferencia' | 'efectivo' | ''>('')
   const [obs, setObs] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmando, setConfirmando] = useState(false)
 
   const saldoTotal = op.saldo_cliente ?? 0
   const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0)
   const saldoPendiente = saldoTotal - totalPagado
-  const debeAlgo = saldoPendiente > 0
+  const montoNum = parseFloat(monto) || 0
+
+  // Estados del saldo
+  const estaPagado = saldoPendiente <= 0
+  const tienePagosParciales = pagos.length > 0 && saldoPendiente > 0
+  const pctPagado = saldoTotal > 0 ? Math.min(100, Math.round((totalPagado / saldoTotal) * 100)) : 0
+
+  // Validaciones
+  const montoExcede = montoNum > saldoPendiente
+  const montoInvalido = montoNum <= 0
+  const sinFormaPago = !forma
+  const requiereConfirmacion = montoNum > 1_000_000
+
+  function pagarTotal() {
+    setMonto(String(Math.round(saldoPendiente)))
+  }
 
   async function registrarPago() {
-    const montoNum = parseFloat(monto)
-    if (!montoNum || montoNum <= 0) return notify.error('Ingresá un monto válido')
+    if (montoInvalido) return notify.error('Ingresá un monto mayor a 0')
+    if (montoExcede) return notify.error(`El monto no puede superar el saldo pendiente (${formatMoney(saldoPendiente)})`)
+    if (sinFormaPago) return notify.error('Seleccioná la forma de pago')
+
+    // Confirmación para montos grandes
+    if (requiereConfirmacion && !confirmando) {
+      setConfirmando(true)
+      return
+    }
+
     setSaving(true)
     try {
       const { error } = await supabase.from('pagos_saldo').insert({
@@ -1156,16 +1180,17 @@ function SaldoPagos({
       })
       if (error) throw error
 
-      // Actualizar saldo_pagado en operaciones
       const nuevoTotalPagado = totalPagado + montoNum
       if (nuevoTotalPagado >= saldoTotal) {
         await supabase.from('operaciones').update({ saldo_pagado: true }).eq('id', op.id)
       }
 
-      notify.success('Pago registrado')
+      notify.success(`Pago de ${formatMoney(montoNum)} registrado`)
       setMonto('')
       setObs('')
+      setForma('')
       setShowForm(false)
+      setConfirmando(false)
       onPagoRegistrado()
     } catch (err: any) {
       notify.error(err?.message || 'Error al registrar pago')
@@ -1176,25 +1201,30 @@ function SaldoPagos({
 
   if (!saldoTotal || saldoTotal <= 0) return null
 
+  const badgeColor = estaPagado
+    ? 'bg-green-100 text-green-700'
+    : tienePagosParciales
+      ? 'bg-yellow-100 text-yellow-700'
+      : 'bg-red-100 text-red-700'
+  const badgeText = estaPagado ? 'PAGADO' : tienePagosParciales ? 'PAGO PARCIAL' : 'DEBE SALDO'
+  const borderColor = estaPagado ? 'border-green-500/50' : tienePagosParciales ? 'border-yellow-500/50' : 'border-red-500/50'
+
   return (
-    <Card className={debeAlgo ? 'border-red-500/50' : 'border-green-500/50'}>
+    <Card className={borderColor}>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
-          <AlertTriangle className={`h-4 w-4 ${debeAlgo ? 'text-red-400' : 'text-green-400'}`} />
+          {estaPagado
+            ? <CheckCircle2 className="h-4 w-4 text-green-400" />
+            : <AlertTriangle className="h-4 w-4 text-red-400" />
+          }
           <h3 className="text-sm font-semibold text-text-primary">Saldo del cliente</h3>
         </div>
-        {debeAlgo && (
-          <span className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
-            DEBE SALDO
-          </span>
-        )}
-        {!debeAlgo && (
-          <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-            SALDADO
-          </span>
-        )}
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+          {badgeText}
+        </span>
       </div>
 
+      {/* Resumen */}
       <div className="grid grid-cols-3 gap-3 mb-3">
         <div className="text-center p-2 bg-bg-secondary rounded-lg">
           <p className="text-xs text-text-muted">Total</p>
@@ -1204,76 +1234,146 @@ function SaldoPagos({
           <p className="text-xs text-text-muted">Pagado</p>
           <p className="text-sm font-bold text-green-600">{formatMoney(totalPagado)}</p>
         </div>
-        <div className={`text-center p-2 rounded-lg ${debeAlgo ? 'bg-red-50' : 'bg-green-50'}`}>
+        <div className={`text-center p-2 rounded-lg ${estaPagado ? 'bg-green-50' : 'bg-red-50'}`}>
           <p className="text-xs text-text-muted">Pendiente</p>
-          <p className={`text-sm font-bold ${debeAlgo ? 'text-red-600' : 'text-green-600'}`}>
+          <p className={`text-sm font-bold ${estaPagado ? 'text-green-600' : 'text-red-600'}`}>
             {formatMoney(Math.max(0, saldoPendiente))}
           </p>
         </div>
       </div>
 
-      {/* Lista de pagos */}
+      {/* Barra de progreso */}
+      <div className="flex items-center gap-2 mb-3">
+        <div className="flex-1 bg-bg-tertiary rounded-full h-2.5">
+          <div
+            className={`rounded-full h-2.5 transition-all ${estaPagado ? 'bg-green-500' : tienePagosParciales ? 'bg-yellow-500' : 'bg-red-500'}`}
+            style={{ width: `${pctPagado}%` }}
+          />
+        </div>
+        <span className="text-xs text-text-muted font-medium">{pctPagado}%</span>
+      </div>
+
+      {/* Historial de pagos */}
       {pagos.length > 0 && (
-        <div className="mb-3 space-y-1">
-          <p className="text-xs text-text-muted font-semibold mb-1">Pagos registrados:</p>
-          {pagos.map(p => (
-            <div key={p.id} className="flex items-center justify-between text-xs bg-bg-secondary rounded-lg px-3 py-2">
-              <div className="flex items-center gap-2">
-                <span className="text-text-muted">{formatDate(p.fecha)}</span>
-                <span className="capitalize bg-bg-tertiary px-1.5 py-0.5 rounded text-text-secondary">{p.forma_pago}</span>
+        <div className="mb-3">
+          <p className="text-xs text-text-muted font-semibold mb-2">
+            Historial de pagos ({pagos.length}):
+          </p>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {pagos.map((p, i) => (
+              <div key={p.id} className="flex items-center justify-between text-xs bg-bg-secondary rounded-lg px-3 py-2.5">
+                <div className="flex items-center gap-2">
+                  <span className="text-text-muted w-5 text-center font-mono">{i + 1}</span>
+                  <span className="text-text-muted">{formatDate(p.fecha)}</span>
+                  <span className="capitalize bg-bg-tertiary px-1.5 py-0.5 rounded text-text-secondary">{p.forma_pago}</span>
+                  {p.observacion && (
+                    <span className="text-text-muted italic truncate max-w-[120px]">{p.observacion}</span>
+                  )}
+                </div>
+                <span className="font-semibold text-green-600">+ {formatMoney(Number(p.monto))}</span>
               </div>
-              <span className="font-semibold text-green-600">+ {formatMoney(Number(p.monto))}</span>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Botón / Form nuevo pago */}
-      {debeAlgo && !showForm && (
+      {/* Botón registrar pago */}
+      {!estaPagado && !showForm && (
         <Button size="sm" onClick={() => setShowForm(true)} fullWidth>
           Registrar pago
         </Button>
       )}
 
+      {/* Formulario de pago */}
       {showForm && (
-        <div className="border border-border rounded-lg p-3 space-y-3 mt-2">
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="text-xs text-text-muted block mb-1">Monto *</label>
+        <div className="border-2 border-action/30 rounded-lg p-4 space-y-3 mt-2 bg-bg-secondary">
+          <p className="text-xs font-semibold text-action uppercase tracking-wider">Nuevo pago</p>
+
+          {/* Monto */}
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Monto a pagar *</label>
+            <div className="flex gap-2">
               <input
                 type="number"
                 value={monto}
-                onChange={e => setMonto(e.target.value)}
-                placeholder={`Máx: ${Math.round(saldoPendiente)}`}
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+                onChange={e => { setMonto(e.target.value); setConfirmando(false) }}
+                placeholder="0"
+                min="1"
+                max={saldoPendiente}
+                className={`flex-1 text-sm border-2 rounded-lg px-3 py-2 bg-bg-primary text-text-primary font-semibold ${
+                  montoExcede ? 'border-red-500' : monto ? 'border-action' : 'border-border'
+                }`}
               />
-            </div>
-            <div>
-              <label className="text-xs text-text-muted block mb-1">Forma de pago</label>
-              <select
-                value={forma}
-                onChange={e => setForma(e.target.value as any)}
-                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+              <button
+                type="button"
+                onClick={pagarTotal}
+                className="text-xs px-3 py-2 bg-action/10 text-action rounded-lg hover:bg-action/20 transition-colors whitespace-nowrap cursor-pointer font-medium"
               >
-                <option value="transferencia">Transferencia</option>
-                <option value="efectivo">Efectivo</option>
-                <option value="tarjeta">Tarjeta</option>
-              </select>
+                Pagar total
+              </button>
             </div>
+            {montoExcede && (
+              <p className="text-xs text-red-500 mt-1">
+                El monto no puede superar {formatMoney(saldoPendiente)}
+              </p>
+            )}
+            {montoNum > 0 && !montoExcede && (
+              <p className="text-xs text-text-muted mt-1">
+                Quedaría pendiente: {formatMoney(saldoPendiente - montoNum)}
+              </p>
+            )}
           </div>
+
+          {/* Forma de pago */}
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Forma de pago *</label>
+            <select
+              value={forma}
+              onChange={e => setForma(e.target.value as any)}
+              className={`w-full text-sm border-2 rounded-lg px-3 py-2 bg-bg-primary text-text-primary ${
+                sinFormaPago && monto ? 'border-red-400' : 'border-border'
+              }`}
+            >
+              <option value="">Seleccionar...</option>
+              <option value="transferencia">Transferencia bancaria</option>
+              <option value="efectivo">Efectivo</option>
+              <option value="tarjeta">Tarjeta</option>
+            </select>
+          </div>
+
+          {/* Observación */}
           <div>
             <label className="text-xs text-text-muted block mb-1">Observación (opcional)</label>
             <input
               type="text"
               value={obs}
               onChange={e => setObs(e.target.value)}
-              placeholder="Ej: Seña inicial"
+              placeholder="Ej: Seña inicial, 2da cuota, saldo final..."
               className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
             />
           </div>
+
+          {/* Confirmación para montos > $1M */}
+          {confirmando && (
+            <div className="bg-yellow-50 border border-yellow-400 rounded-lg p-3 text-xs text-yellow-800">
+              <p className="font-semibold mb-1">Confirmar pago de {formatMoney(montoNum)}</p>
+              <p>Este monto es mayor a $1.000.000. ¿Estás seguro?</p>
+            </div>
+          )}
+
+          {/* Botones */}
           <div className="flex gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button size="sm" onClick={registrarPago} loading={saving}>Confirmar pago</Button>
+            <Button size="sm" variant="secondary" onClick={() => { setShowForm(false); setConfirmando(false); setMonto(''); setForma('') }}>
+              Cancelar
+            </Button>
+            <Button
+              size="sm"
+              onClick={registrarPago}
+              loading={saving}
+              disabled={montoInvalido || montoExcede || sinFormaPago}
+            >
+              {confirmando ? 'Sí, confirmar pago' : 'Registrar pago'}
+            </Button>
           </div>
         </div>
       )}
