@@ -29,6 +29,7 @@ interface FormData {
   valor_credito: string
   quebranto_porcentaje: string
   forma_pago_saldo: '' | 'tarjeta' | 'transferencia' | 'efectivo'
+  pago_inicial: string
 }
 
 const INITIAL_FORM: FormData = {
@@ -50,6 +51,7 @@ const INITIAL_FORM: FormData = {
   valor_credito: '',
   quebranto_porcentaje: '',
   forma_pago_saldo: '',
+  pago_inicial: '',
 }
 
 function formatMoney(n: number): string {
@@ -102,6 +104,8 @@ export function NuevaOperacion() {
   const quebrantoMonto = valorCredito * (quebrantoPct / 100)
   const netoCredito = valorCredito - quebrantoMonto
   const saldoCliente = esFinanciado ? valorUnidad - netoCredito : valorUnidad
+  const pagoInicial = parseFloat(form.pago_inicial) || 0
+  const saldoRestante = saldoCliente - pagoInicial
   const clienteDebeSaldo = saldoCliente > 0
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,6 +195,21 @@ export function NuevaOperacion() {
         operacion_id: op.id,
         estado_calidad: 'citar_2d',
       })
+
+      // Registrar pago inicial si existe
+      if (pagoInicial > 0 && pagoInicial <= saldoCliente && form.forma_pago_saldo) {
+        await supabase.from('pagos_saldo').insert({
+          operacion_id: op.id,
+          monto: pagoInicial,
+          forma_pago: form.forma_pago_saldo,
+          fecha: new Date().toISOString().split('T')[0],
+          observacion: 'Pago inicial al crear operación',
+        })
+        // Si pagó todo, marcar saldo_pagado
+        if (pagoInicial >= saldoCliente) {
+          await supabase.from('operaciones').update({ saldo_pagado: true }).eq('id', op.id)
+        }
+      }
 
       notify.success('Operación creada')
       navigate(`/operaciones/${op.id}`)
@@ -348,7 +367,12 @@ export function NuevaOperacion() {
 
             {/* Saldo */}
             {valorUnidad > 0 && (
-              <div className={`rounded-lg border-2 p-4 ${clienteDebeSaldo ? 'border-red-400 bg-red-50' : 'border-green-400 bg-green-50'}`}>
+              <div className={`rounded-lg border-2 p-4 space-y-3 ${
+                saldoRestante > 0 ? 'border-red-400 bg-red-50'
+                : saldoRestante === 0 && pagoInicial > 0 ? 'border-green-400 bg-green-50'
+                : clienteDebeSaldo ? 'border-red-400 bg-red-50'
+                : 'border-green-400 bg-green-50'
+              }`}>
                 <div className="flex justify-between items-center">
                   <div>
                     <p className="text-xs text-text-muted">Saldo del cliente</p>
@@ -356,13 +380,21 @@ export function NuevaOperacion() {
                       {formatMoney(saldoCliente)}
                     </p>
                   </div>
-                  {clienteDebeSaldo && (
+                  {saldoRestante <= 0 && pagoInicial > 0 ? (
+                    <div className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
+                      PAGADO
+                    </div>
+                  ) : pagoInicial > 0 && saldoRestante > 0 ? (
+                    <div className="flex items-center gap-1 bg-yellow-100 text-yellow-700 text-xs font-semibold px-2 py-1 rounded-full">
+                      <AlertTriangle className="h-3 w-3" />
+                      PAGO PARCIAL
+                    </div>
+                  ) : clienteDebeSaldo ? (
                     <div className="flex items-center gap-1 bg-red-100 text-red-700 text-xs font-semibold px-2 py-1 rounded-full">
                       <AlertTriangle className="h-3 w-3" />
                       DEBE SALDO
                     </div>
-                  )}
-                  {!clienteDebeSaldo && saldoCliente <= 0 && (
+                  ) : (
                     <div className="flex items-center gap-1 bg-green-100 text-green-700 text-xs font-semibold px-2 py-1 rounded-full">
                       CUBIERTO
                     </div>
@@ -370,9 +402,38 @@ export function NuevaOperacion() {
                 </div>
 
                 {clienteDebeSaldo && (
-                  <div className="mt-3">
+                  <>
+                    {/* Monto a pagar */}
+                    <div>
+                      <label className="text-xs text-text-muted block mb-1 font-medium">Monto a pagar ahora</label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          value={form.pago_inicial}
+                          onChange={e => set('pago_inicial', e.target.value)}
+                          placeholder="0"
+                          min="0"
+                          max={saldoCliente}
+                          className={`flex-1 text-sm border-2 rounded-lg px-3 py-2 bg-white text-text-primary font-semibold ${
+                            pagoInicial > saldoCliente ? 'border-red-500' : form.pago_inicial ? 'border-emerald-500' : 'border-gray-300'
+                          }`}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => set('pago_inicial', String(Math.round(saldoCliente)))}
+                          className="text-xs px-3 py-2 bg-emerald-100 text-emerald-700 rounded-lg hover:bg-emerald-200 transition-colors whitespace-nowrap cursor-pointer font-medium"
+                        >
+                          Pagar todo
+                        </button>
+                      </div>
+                      {pagoInicial > saldoCliente && (
+                        <p className="text-xs text-red-600 mt-1">No puede superar {formatMoney(saldoCliente)}</p>
+                      )}
+                    </div>
+
+                    {/* Forma de pago */}
                     <Select
-                      label="¿Cómo paga el saldo?"
+                      label="¿Cómo paga?"
                       value={form.forma_pago_saldo}
                       onChange={e => set('forma_pago_saldo', e.target.value)}
                       options={[
@@ -382,7 +443,30 @@ export function NuevaOperacion() {
                         { value: 'tarjeta', label: 'Tarjeta' },
                       ]}
                     />
-                  </div>
+
+                    {/* Resumen */}
+                    {pagoInicial > 0 && pagoInicial <= saldoCliente && (
+                      <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-1">
+                        <div className="flex justify-between text-xs text-text-secondary">
+                          <span>Saldo total</span>
+                          <span>{formatMoney(saldoCliente)}</span>
+                        </div>
+                        <div className="flex justify-between text-xs text-green-600">
+                          <span>– Pago inicial</span>
+                          <span>– {formatMoney(pagoInicial)}</span>
+                        </div>
+                        <div className={`flex justify-between text-xs font-semibold border-t pt-1 ${saldoRestante > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                          <span>Saldo restante</span>
+                          <span>{formatMoney(Math.max(0, saldoRestante))}</span>
+                        </div>
+                        {saldoRestante > 0 && (
+                          <p className="text-xs text-red-500 mt-1 italic">
+                            El cliente queda debiendo {formatMoney(saldoRestante)}. Podrás registrar más pagos desde el detalle de la operación.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
