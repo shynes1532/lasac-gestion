@@ -64,10 +64,21 @@ import { Checkbox } from '../../components/ui/Checkbox'
 // Tipos locales / helpers
 // ============================================================
 
+interface PagoSaldo {
+  id: string
+  operacion_id: string
+  monto: number
+  forma_pago: 'tarjeta' | 'transferencia' | 'efectivo'
+  fecha: string
+  observacion: string | null
+  created_at: string
+}
+
 interface OperacionDetalle extends Operacion {
   unidades: Pick<Unidad, 'modelo' | 'vin_chasis' | 'color' | 'patente_nueva'> | null
   contactos_calidad: ContactoCalidad | null
   alistamiento_pdi: AlistamientoPDI | null
+  pagos_saldo: PagoSaldo[]
 }
 
 const ESTADO_A_PASO: Record<EstadoActual, number> = {
@@ -202,7 +213,8 @@ async function fetchOperacion(id: string): Promise<OperacionDetalle> {
       *,
       unidades ( modelo, vin_chasis, color, patente_nueva ),
       contactos_calidad ( * ),
-      alistamiento_pdi ( * )
+      alistamiento_pdi ( * ),
+      pagos_saldo ( * )
     `)
     .eq('id', id)
     .single()
@@ -1103,6 +1115,173 @@ function Paso5Calidad({
 }
 
 // ============================================================
+// SALDO Y PAGOS PARCIALES
+// ============================================================
+
+function formatMoney(n: number): string {
+  return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
+}
+
+function SaldoPagos({
+  op,
+  pagos,
+  onPagoRegistrado,
+}: {
+  op: OperacionDetalle
+  pagos: PagoSaldo[]
+  onPagoRegistrado: () => void
+}) {
+  const [showForm, setShowForm] = useState(false)
+  const [monto, setMonto] = useState('')
+  const [forma, setForma] = useState<'tarjeta' | 'transferencia' | 'efectivo'>('transferencia')
+  const [obs, setObs] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const saldoTotal = op.saldo_cliente ?? 0
+  const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0)
+  const saldoPendiente = saldoTotal - totalPagado
+  const debeAlgo = saldoPendiente > 0
+
+  async function registrarPago() {
+    const montoNum = parseFloat(monto)
+    if (!montoNum || montoNum <= 0) return notify.error('Ingresá un monto válido')
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('pagos_saldo').insert({
+        operacion_id: op.id,
+        monto: montoNum,
+        forma_pago: forma,
+        fecha: new Date().toISOString().split('T')[0],
+        observacion: obs.trim() || null,
+      })
+      if (error) throw error
+
+      // Actualizar saldo_pagado en operaciones
+      const nuevoTotalPagado = totalPagado + montoNum
+      if (nuevoTotalPagado >= saldoTotal) {
+        await supabase.from('operaciones').update({ saldo_pagado: true }).eq('id', op.id)
+      }
+
+      notify.success('Pago registrado')
+      setMonto('')
+      setObs('')
+      setShowForm(false)
+      onPagoRegistrado()
+    } catch (err: any) {
+      notify.error(err?.message || 'Error al registrar pago')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  if (!saldoTotal || saldoTotal <= 0) return null
+
+  return (
+    <Card className={debeAlgo ? 'border-red-500/50' : 'border-green-500/50'}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className={`h-4 w-4 ${debeAlgo ? 'text-red-400' : 'text-green-400'}`} />
+          <h3 className="text-sm font-semibold text-text-primary">Saldo del cliente</h3>
+        </div>
+        {debeAlgo && (
+          <span className="text-xs font-semibold bg-red-100 text-red-700 px-2 py-0.5 rounded-full">
+            DEBE SALDO
+          </span>
+        )}
+        {!debeAlgo && (
+          <span className="text-xs font-semibold bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+            SALDADO
+          </span>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="text-center p-2 bg-bg-secondary rounded-lg">
+          <p className="text-xs text-text-muted">Total</p>
+          <p className="text-sm font-bold">{formatMoney(saldoTotal)}</p>
+        </div>
+        <div className="text-center p-2 bg-green-50 rounded-lg">
+          <p className="text-xs text-text-muted">Pagado</p>
+          <p className="text-sm font-bold text-green-600">{formatMoney(totalPagado)}</p>
+        </div>
+        <div className={`text-center p-2 rounded-lg ${debeAlgo ? 'bg-red-50' : 'bg-green-50'}`}>
+          <p className="text-xs text-text-muted">Pendiente</p>
+          <p className={`text-sm font-bold ${debeAlgo ? 'text-red-600' : 'text-green-600'}`}>
+            {formatMoney(Math.max(0, saldoPendiente))}
+          </p>
+        </div>
+      </div>
+
+      {/* Lista de pagos */}
+      {pagos.length > 0 && (
+        <div className="mb-3 space-y-1">
+          <p className="text-xs text-text-muted font-semibold mb-1">Pagos registrados:</p>
+          {pagos.map(p => (
+            <div key={p.id} className="flex items-center justify-between text-xs bg-bg-secondary rounded-lg px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-text-muted">{formatDate(p.fecha)}</span>
+                <span className="capitalize bg-bg-tertiary px-1.5 py-0.5 rounded text-text-secondary">{p.forma_pago}</span>
+              </div>
+              <span className="font-semibold text-green-600">+ {formatMoney(Number(p.monto))}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Botón / Form nuevo pago */}
+      {debeAlgo && !showForm && (
+        <Button size="sm" onClick={() => setShowForm(true)} fullWidth>
+          Registrar pago
+        </Button>
+      )}
+
+      {showForm && (
+        <div className="border border-border rounded-lg p-3 space-y-3 mt-2">
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Monto *</label>
+              <input
+                type="number"
+                value={monto}
+                onChange={e => setMonto(e.target.value)}
+                placeholder={`Máx: ${Math.round(saldoPendiente)}`}
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-text-muted block mb-1">Forma de pago</label>
+              <select
+                value={forma}
+                onChange={e => setForma(e.target.value as any)}
+                className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+              >
+                <option value="transferencia">Transferencia</option>
+                <option value="efectivo">Efectivo</option>
+                <option value="tarjeta">Tarjeta</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-text-muted block mb-1">Observación (opcional)</label>
+            <input
+              type="text"
+              value={obs}
+              onChange={e => setObs(e.target.value)}
+              placeholder="Ej: Seña inicial"
+              className="w-full text-sm border border-border rounded-lg px-3 py-2 bg-bg-primary text-text-primary"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" variant="secondary" onClick={() => setShowForm(false)}>Cancelar</Button>
+            <Button size="sm" onClick={registrarPago} loading={saving}>Confirmar pago</Button>
+          </div>
+        </div>
+      )}
+    </Card>
+  )
+}
+
+// ============================================================
 // PASO 6: Entrega
 // ============================================================
 
@@ -1526,6 +1705,15 @@ export function DetalleOperacion() {
       {/* ---- CONTENIDO PASO ACTUAL ---- */}
       {activeTab === 'paso' && (
         <div>
+          {/* Saldo — visible siempre que haya saldo pendiente */}
+          {op.saldo_cliente != null && op.saldo_cliente > 0 && (
+            <SaldoPagos
+              op={op}
+              pagos={op.pagos_saldo ?? []}
+              onPagoRegistrado={() => queryClient.invalidateQueries({ queryKey: ['operacion', id] })}
+            />
+          )}
+
           {op.estado_actual === 'caida' && (
             <Card>
               <div className="flex items-center gap-3 text-red-400">

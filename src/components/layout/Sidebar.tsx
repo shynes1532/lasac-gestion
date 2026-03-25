@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
-  LogOut, Menu, X, CreditCard, ShieldCheck
+  LogOut, Menu, X, CreditCard, ShieldCheck, DollarSign
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
@@ -14,6 +14,7 @@ const navItems = [
   { path: '/calidad',             label: 'Calidad',      icon: ShieldCheck },
   { path: '/entregas-programadas',label: 'Entregas',     icon: Truck },
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
+  { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
 ]
 
 export function Sidebar() {

@@ -204,6 +204,15 @@ export interface Operacion {
   dias_totales: number | null
   diferencia_compromiso: number | null
 
+  // Financiero
+  valor_unidad: number | null
+  valor_credito: number | null
+  quebranto_porcentaje: number | null
+  quebranto_monto: number | null
+  saldo_cliente: number | null
+  forma_pago_saldo: 'tarjeta' | 'transferencia' | 'efectivo' | null
+  saldo_pagado: boolean
+
   // Legado (compatibilidad)
   estado_gestoria: EstadoGestoria
   estado_alistamiento: EstadoAlistamiento

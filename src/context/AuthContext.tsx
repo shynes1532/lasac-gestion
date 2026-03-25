@@ -154,6 +154,7 @@ const roleAccess: Record<string, RolUsuario[]> = {
   '/calidad':              ['director', 'calidad'],
   '/entregas-programadas': ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
   '/prendas':              ['director', 'gestor'],
+  '/saldos':               ['director', 'gestor'],
   '/entrega':              ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
 }
 
