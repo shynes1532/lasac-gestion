@@ -1,7 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp,
+  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Link,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista, GrupoAhorro, TipoPlan, CodigoPlan, VehiculoCodigo } from '../../lib/types'
@@ -24,6 +24,8 @@ export function AhorristasPage() {
   const [filtroEstado, setFiltroEstado] = useState<EstadoAhorrista | ''>('')
   const [showAlta, setShowAlta] = useState(false)
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [asignarGrupo, setAsignarGrupo] = useState<Ahorrista | null>(null)
+  const [formGrupo, setFormGrupo] = useState({ grupo_id: '', numero_orden: '' })
 
   const { data: ahorristas, isLoading } = useQuery({
     queryKey: ['ahorristas', filtroEstado],
@@ -61,8 +63,6 @@ export function AhorristasPage() {
     localidad: '',
     telefono: '',
     email: '',
-    grupo_id: '',
-    numero_orden: '',
     tipo_plan: 'H' as TipoPlan,
     codigo_plan: '' as CodigoPlan | '',
     vehiculo_codigo: '' as VehiculoCodigo | '',
@@ -122,8 +122,6 @@ export function AhorristasPage() {
         localidad: form.localidad || null,
         telefono: form.telefono || null,
         email: form.email || null,
-        grupo_id: form.grupo_id || null,
-        numero_orden: form.numero_orden ? parseInt(form.numero_orden) : null,
         tipo_plan: form.tipo_plan,
         codigo_plan: form.codigo_plan,
         vehiculo_codigo: form.vehiculo_codigo,
@@ -146,6 +144,24 @@ export function AhorristasPage() {
       queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
       toast.success('Alta registrada correctamente')
       setShowAlta(false)
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  const guardarGrupo = useMutation({
+    mutationFn: async (ahorrista: Ahorrista) => {
+      const { error } = await supabase.from('ahorristas')
+        .update({
+          grupo_id: formGrupo.grupo_id || null,
+          numero_orden: formGrupo.numero_orden ? parseInt(formGrupo.numero_orden) : null,
+        })
+        .eq('id', ahorrista.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+      toast.success('Grupo y orden asignados')
+      setAsignarGrupo(null)
     },
     onError: (e: Error) => toast.error(e.message),
   })
@@ -374,6 +390,19 @@ export function AhorristasPage() {
                           </p>
                         </div>
                       )}
+                      {/* Grupo y orden (asignados por la terminal) */}
+                      <div>
+                        <p className="text-text-muted text-xs">Grupo</p>
+                        <p className="text-text-primary font-medium">
+                          {a.grupo ? a.grupo.numero_grupo : <span className="text-yellow-400">Pendiente terminal</span>}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs">Orden</p>
+                        <p className="text-text-primary font-medium">
+                          {a.numero_orden ?? <span className="text-yellow-400">Pendiente</span>}
+                        </p>
+                      </div>
                       {a.domicilio && (
                         <div className="col-span-2">
                           <p className="text-text-muted text-xs">Domicilio</p>
@@ -387,6 +416,14 @@ export function AhorristasPage() {
                         </div>
                       )}
                     </div>
+                    {/* Botón asignar grupo (cuando la terminal ya procesó) */}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setAsignarGrupo(a); setFormGrupo({ grupo_id: a.grupo_id ?? '', numero_orden: a.numero_orden?.toString() ?? '' }) }}
+                      className="mt-3 flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 text-purple-400 rounded-lg text-xs font-medium hover:bg-purple-500/20 transition-colors cursor-pointer"
+                    >
+                      <Link className="h-3.5 w-3.5" />
+                      {a.grupo_id ? 'Cambiar grupo/orden' : 'Asignar grupo y orden (procesado por terminal)'}
+                    </button>
                   </div>
                 )}
               </div>
@@ -511,15 +548,6 @@ export function AhorristasPage() {
                     )}
                   </select>
                 </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Grupo (opcional)</label>
-                  <select value={form.grupo_id}
-                    onChange={e => setForm(f => ({ ...f, grupo_id: e.target.value }))}
-                    className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary cursor-pointer">
-                    <option value="">Sin grupo asignado</option>
-                    {(grupos ?? []).map(g => <option key={g.id} value={g.id}>{g.numero_grupo} — {g.modelo}</option>)}
-                  </select>
-                </div>
               </div>
 
               {/* Valores */}
@@ -561,13 +589,6 @@ export function AhorristasPage() {
                     className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-action"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-text-muted mb-1">Nro. orden en grupo</label>
-                  <input type="number" value={form.numero_orden}
-                    onChange={e => setForm(f => ({ ...f, numero_orden: e.target.value }))}
-                    className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-action"
-                  />
-                </div>
                 <div className="flex items-center gap-3 pt-5">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={form.es_subite}
@@ -601,6 +622,45 @@ export function AhorristasPage() {
               <button type="submit" disabled={crearAhorrista.isPending}
                 className="w-full py-2.5 bg-action text-white rounded-lg text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 cursor-pointer">
                 {crearAhorrista.isPending ? 'Registrando...' : 'Registrar alta'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Asignar Grupo y Orden (después de procesar en terminal) */}
+      {asignarGrupo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setAsignarGrupo(null)} />
+          <div className="relative bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-md mx-4">
+            <button onClick={() => setAsignarGrupo(null)} className="absolute top-4 right-4 text-text-muted hover:text-text-primary cursor-pointer">
+              <X className="h-5 w-5" />
+            </button>
+            <h2 className="text-lg font-bold text-text-primary mb-1">Asignar grupo y orden</h2>
+            <p className="text-sm text-text-secondary mb-1">{asignarGrupo.nombre_apellido}</p>
+            <p className="text-xs text-text-muted mb-4">Sol: {asignarGrupo.numero_solicitud} — Procesado por la terminal</p>
+
+            <form onSubmit={e => { e.preventDefault(); guardarGrupo.mutate(asignarGrupo) }} className="space-y-4">
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Grupo asignado por terminal</label>
+                <select value={formGrupo.grupo_id}
+                  onChange={e => setFormGrupo(f => ({ ...f, grupo_id: e.target.value }))}
+                  className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary cursor-pointer">
+                  <option value="">Seleccionar grupo...</option>
+                  {(grupos ?? []).map(g => <option key={g.id} value={g.id}>{g.numero_grupo} — {g.modelo} (Plan {g.tipo_plan})</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Nro. de orden en el grupo</label>
+                <input type="number" value={formGrupo.numero_orden}
+                  onChange={e => setFormGrupo(f => ({ ...f, numero_orden: e.target.value }))}
+                  className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-action"
+                  placeholder="Ej: 45"
+                />
+              </div>
+              <button type="submit" disabled={guardarGrupo.isPending}
+                className="w-full py-2.5 bg-action text-white rounded-lg text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 cursor-pointer">
+                {guardarGrupo.isPending ? 'Guardando...' : 'Guardar grupo y orden'}
               </button>
             </form>
           </div>
