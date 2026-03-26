@@ -145,23 +145,7 @@ export function useAuth() {
   return ctx
 }
 
-// Helper para chequear acceso por rol
-const roleAccess: Record<string, RolUsuario[]> = {
-  '/dashboard':            ['director', 'calidad'],
-  '/operaciones':          ['director', 'gestor', 'asesor_ush', 'asesor_rg', 'calidad'],
-  '/gestoria':             ['director', 'gestor'],
-  '/alistamiento':         ['director', 'preparador', 'calidad'],
-  '/calidad':              ['director', 'calidad'],
-  '/entregas-programadas': ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
-  '/prendas':              ['director', 'gestor'],
-  '/saldos':               ['director', 'gestor'],
-  '/calibre':              ['director', 'calidad'],
-  '/reportes':             ['director', 'gestor', 'calidad'],
-  '/entrega':              ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
-}
-
 export function canAccessRoute(_rol: RolUsuario, _path: string): boolean {
-  // Todos los roles acceden a todo
   return true
 }
 

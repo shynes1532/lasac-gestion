@@ -420,12 +420,13 @@ export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacio
   return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
 }
 
-// Puede avanzar de Paso 2 a 3?
-export function puedeAvanzarPaso2(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion' | 'pago_cliente_completo' | 'pago_banco_recibido' | 'unidad_en_sucursal'>): { ok: boolean; motivo?: string } {
-  if (!op.pago_cliente_completo) return { ok: false, motivo: 'Pago del cliente pendiente' }
+// Puede avanzar de Paso 2 a 3? (siempre permite avanzar, solo devuelve advertencias)
+export function puedeAvanzarPaso2(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion' | 'pago_cliente_completo' | 'pago_banco_recibido' | 'unidad_en_sucursal'>): { ok: boolean; advertencias: string[] } {
+  const advertencias: string[] = []
+  if (!op.pago_cliente_completo) advertencias.push('Pago del cliente pendiente')
   if (op.forma_pago === 'financiado_banco' && !op.pago_banco_recibido)
-    return { ok: false, motivo: 'Pago del banco pendiente' }
+    advertencias.push('Pago del banco pendiente')
   if (op.tipo_operacion === 'plan_ahorro' && op.unidad_en_sucursal === false)
-    return { ok: false, motivo: 'La unidad aún no está en sucursal' }
-  return { ok: true }
+    advertencias.push('La unidad aún no está en sucursal')
+  return { ok: true, advertencias }
 }

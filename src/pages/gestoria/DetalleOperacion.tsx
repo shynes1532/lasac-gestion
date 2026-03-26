@@ -20,6 +20,7 @@ import {
   XCircle,
   Calendar,
   AlertCircle,
+  Trash2,
 } from 'lucide-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
@@ -491,9 +492,9 @@ function Paso2Documentacion({
 
   return (
     <div className="space-y-5">
-      {/* Controles financieros — bloquean avance */}
+      {/* Controles financieros */}
       <Card>
-        <SectionTitle>Controles financieros — bloquean avance</SectionTitle>
+        <SectionTitle>Controles financieros</SectionTitle>
         <div className="space-y-3">
           <Checkbox
             label="Pago del cliente completo"
@@ -575,13 +576,14 @@ function Paso2Documentacion({
       </Card>
 
       {/* Botón avanzar */}
-      {!puedeAvanzar.ok && (
-        <WarnBanner>No se puede avanzar: {puedeAvanzar.motivo}</WarnBanner>
+      {puedeAvanzar.advertencias.length > 0 && (
+        <WarnBanner>
+          Pendientes: {puedeAvanzar.advertencias.join(' · ')}
+        </WarnBanner>
       )}
 
       {op.estado_actual === 'documentacion' && (
         <Button
-          disabled={!puedeAvanzar.ok}
           onClick={() =>
             onMutate(
               { estado_actual: 'gestoria' },
@@ -622,7 +624,12 @@ function Paso3Gestoria({
   const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
   const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
 
-  const puedeAvanzarPDI = true
+  // Advertencias visuales (no bloquean)
+  const advertenciasPaso3: string[] = []
+  if (!op.egresado_registro) advertenciasPaso3.push('Egreso de registro pendiente')
+  if (!op.dominio_patente) advertenciasPaso3.push('Dominio/patente sin cargar')
+  if (op.resultado_o2 === 'inhibido') advertenciasPaso3.push('O2 inhibido')
+  if (op.resultado_o2 == null && op.o2_solicitado) advertenciasPaso3.push('O2 sin resultado')
 
   function handle(field: keyof Operacion, value: unknown) {
     onMutate({ [field]: value } as Partial<Operacion>)
@@ -742,13 +749,12 @@ function Paso3Gestoria({
       {/* Avanzar */}
       {op.estado_actual === 'gestoria' && (
         <>
-          {!puedeAvanzarPDI && (
+          {advertenciasPaso3.length > 0 && (
             <WarnBanner>
-              Para avanzar: egreso del registro confirmado, dominio/patente cargado y 02 libre.
+              Pendientes: {advertenciasPaso3.join(' · ')}
             </WarnBanner>
           )}
           <Button
-            disabled={!puedeAvanzarPDI}
             onClick={() =>
               onMutate(
                 { estado_actual: 'alistamiento' },
@@ -839,11 +845,10 @@ function Paso4Alistamiento({
         <>
           {!todosOk && (
             <WarnBanner>
-              Para avanzar todos los ítems críticos del PDI deben estar OK.
+              Pendiente: {criticosOk.length}/{criticos.length} ítems críticos del PDI aprobados.
             </WarnBanner>
           )}
           <Button
-            disabled={!todosOk}
             onClick={() =>
               onMutate(
                 { estado_actual: 'calidad' },
@@ -912,7 +917,11 @@ function Paso5Calidad({
     openWA(op.cliente_telefono, waSeguimientoPost(nombre, modelo))
   }
 
-  const puedeAvanzar = calidad?.carta_enviada === true
+  // Advertencias visuales (no bloquean)
+  const advertenciasCalidad: string[] = []
+  if (!calidad?.carta_enviada) advertenciasCalidad.push('Carta de felicitaciones no enviada')
+  if (!calidad?.contacto_2d_antes) advertenciasCalidad.push('Contacto 2 días antes no realizado')
+  if (!calidad?.contacto_1h_antes) advertenciasCalidad.push('Contacto 1 hora antes no realizado')
 
   return (
     <div className="space-y-5">
@@ -1087,11 +1096,12 @@ function Paso5Calidad({
       {/* Avanzar a Entrega */}
       {op.estado_actual === 'calidad' && (
         <>
-          {!puedeAvanzar && (
-            <WarnBanner>Para avanzar: carta de felicitaciones enviada.</WarnBanner>
+          {advertenciasCalidad.length > 0 && (
+            <WarnBanner>
+              Pendientes: {advertenciasCalidad.join(' · ')}
+            </WarnBanner>
           )}
           <Button
-            disabled={!puedeAvanzar}
             onClick={() =>
               onMutateOp(
                 { estado_actual: 'entrega' },
@@ -1654,6 +1664,8 @@ export function DetalleOperacion() {
   const queryClient = useQueryClient()
 
   const [activeTab, setActiveTab] = useState<'paso' | 'timeline'>('paso')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   // --- Query ---
   const {
@@ -1740,6 +1752,24 @@ export function DetalleOperacion() {
 
   function handleMutCalidad(updates: Partial<ContactoCalidad>) {
     mutCalidad.mutate(updates)
+  }
+
+  async function handleDeleteOperacion() {
+    if (!op) return
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('operaciones')
+        .delete()
+        .eq('id', op.id)
+      if (error) throw error
+      notify.success('Operación eliminada')
+      navigate('/operaciones')
+    } catch (err: any) {
+      notify.error(err?.message || 'Error al eliminar la operación')
+      setDeleting(false)
+      setConfirmDelete(false)
+    }
   }
 
   // --- Loading / error ---
@@ -1936,6 +1966,49 @@ export function DetalleOperacion() {
           <Timeline historial={historial} />
         </Card>
       )}
+
+      {/* ---- ELIMINAR OPERACION ---- */}
+      <div className="mt-8 pt-6 border-t border-border">
+        {!confirmDelete ? (
+          <Button
+            variant="ghost"
+            onClick={() => setConfirmDelete(true)}
+            className="w-full text-red-500 hover:bg-red-900/20 hover:text-red-400 border border-red-500/30"
+          >
+            <Trash2 className="h-4 w-4" />
+            Eliminar operación
+          </Button>
+        ) : (
+          <div className="bg-red-900/20 border border-red-700 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2 text-red-400">
+              <AlertTriangle className="h-5 w-5" />
+              <p className="font-semibold text-sm">¿Confirmar eliminación?</p>
+            </div>
+            <p className="text-xs text-text-secondary">
+              Se eliminará la operación <strong>{op.numero_operacion}</strong> y todos sus registros asociados. Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setConfirmDelete(false)}
+                disabled={deleting}
+              >
+                Cancelar
+              </Button>
+              <Button
+                size="sm"
+                onClick={handleDeleteOperacion}
+                loading={deleting}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                <Trash2 className="h-4 w-4" />
+                Sí, eliminar
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
