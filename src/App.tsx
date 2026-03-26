@@ -22,6 +22,7 @@ const CalidadPage = lazy(() => import('./pages/calidad/CalidadPage').then(m => (
 const EntregasProgramadas = lazy(() => import('./pages/entregas/EntregasProgramadas').then(m => ({ default: m.EntregasProgramadas })))
 const SaldosPendientes = lazy(() => import('./pages/saldos/SaldosPendientes').then(m => ({ default: m.SaldosPendientes })))
 const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage').then(m => ({ default: m.ReportesPage })))
+const CalibrePage = lazy(() => import('./pages/calibre/CalibrePage').then(m => ({ default: m.CalibrePage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -93,6 +94,9 @@ export default function App() {
                 } />
                 <Route path="/reportes" element={
                   <ProtectedRoute><ReportesPage /></ProtectedRoute>
+                } />
+                <Route path="/calibre" element={
+                  <ProtectedRoute><CalibrePage /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}

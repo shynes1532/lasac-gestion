@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
-  LogOut, Menu, X, CreditCard, ShieldCheck, DollarSign, Printer
+  LogOut, Menu, X, CreditCard, ShieldCheck, DollarSign, Printer, Shield
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
@@ -15,6 +15,7 @@ const navItems = [
   { path: '/entregas-programadas',label: 'Entregas',     icon: Truck },
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
   { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
+  { path: '/calibre',              label: 'Calibre',      icon: Shield },
   { path: '/reportes',            label: 'Reportes',     icon: Printer },
 ]
 
