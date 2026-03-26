@@ -23,7 +23,6 @@ const EntregasProgramadas = lazy(() => import('./pages/entregas/EntregasPrograma
 const SaldosPendientes = lazy(() => import('./pages/saldos/SaldosPendientes').then(m => ({ default: m.SaldosPendientes })))
 const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage').then(m => ({ default: m.ReportesPage })))
 const CalibrePage = lazy(() => import('./pages/calibre/CalibrePage').then(m => ({ default: m.CalibrePage })))
-const PlanesAhorroPage = lazy(() => import('./pages/planes-ahorro/PlanesAhorroPage').then(m => ({ default: m.PlanesAhorroPage })))
 const AhorristasPage = lazy(() => import('./pages/ahorristas/AhorristasPage').then(m => ({ default: m.AhorristasPage })))
 const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m => ({ default: m.GestionMoraPage })))
 const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
@@ -101,9 +100,6 @@ export default function App() {
                 } />
                 <Route path="/calibre" element={
                   <ProtectedRoute><CalibrePage /></ProtectedRoute>
-                } />
-                <Route path="/planes-ahorro" element={
-                  <ProtectedRoute><PlanesAhorroPage /></ProtectedRoute>
                 } />
                 <Route path="/ahorristas" element={
                   <ProtectedRoute><AhorristasPage /></ProtectedRoute>

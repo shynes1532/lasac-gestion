@@ -4,8 +4,8 @@ import {
   Phone, Mail, Skull, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import type { Ahorrista, GrupoAhorro, EstadoAhorrista } from '../../lib/types'
-import { ESTADOS_AHORRISTA, ESTADOS_GRUPO, REGLAS_FIAT_PLAN } from '../../lib/constants'
+import type { Ahorrista, EstadoAhorrista } from '../../lib/types'
+import { ESTADOS_AHORRISTA, REGLAS_FIAT_PLAN } from '../../lib/constants'
 import { Skeleton } from '../../components/ui'
 import { useNavigate } from 'react-router-dom'
 
@@ -28,23 +28,9 @@ export function CarteraPage() {
     },
   })
 
-  const { data: grupos, isLoading: loadingG } = useQuery({
-    queryKey: ['cartera-grupos'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('grupos_ahorro')
-        .select('*')
-        .order('created_at', { ascending: false })
-      if (error) throw error
-      return (data ?? []) as GrupoAhorro[]
-    },
-  })
-
-  if (loadingA || loadingG) return <Skeleton className="h-64" />
+  if (loadingA) return <Skeleton className="h-64" />
 
   const all = ahorristas ?? []
-  const allGrupos = grupos ?? []
-
   // Conteos por estado
   const countEstado = (e: EstadoAhorrista) => all.filter(a => a.estado === e).length
   const activos = countEstado('activo')
@@ -63,9 +49,6 @@ export function CarteraPage() {
   const totalConHistoria = activos + adjudicados + entregados + renunciados + rescindidos + transferidos
   const tasaAdj = totalConHistoria > 0 ? Math.round(((adjudicados + entregados) / totalConHistoria) * 100) : 0
   const tasaDesercion = totalConHistoria > 0 ? Math.round(((renunciados + rescindidos) / totalConHistoria) * 100) : 0
-
-  // Grupos activos
-  const gruposActivos = allGrupos.filter(g => g.estado === 'activo')
 
   return (
     <div>
@@ -204,25 +187,6 @@ export function CarteraPage() {
           )}
         </div>
 
-        {/* Grupos por estado */}
-        <div>
-          <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider flex items-center gap-1 mb-3">
-            Grupos por estado
-          </h2>
-          <div className="grid grid-cols-2 gap-3">
-            {(Object.entries(ESTADOS_GRUPO) as [string, { label: string; color: string }][]).map(([estado, info]) => {
-              const count = allGrupos.filter(g => g.estado === estado).length
-              return (
-                <div key={estado} onClick={() => navigate('/planes-ahorro')}
-                  className="bg-bg-secondary border border-border rounded-xl p-4 cursor-pointer hover:border-action/40 transition-colors text-center">
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${info.color}`}>{info.label}</span>
-                  <p className="text-2xl font-bold text-text-primary mt-2">{count}</p>
-                  <p className="text-xs text-text-muted">grupos</p>
-                </div>
-              )
-            })}
-          </div>
-        </div>
       </div>
     </div>
   )
