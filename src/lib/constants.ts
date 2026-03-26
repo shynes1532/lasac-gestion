@@ -10,6 +10,11 @@ import type {
   BancoEntidad,
   FormaPago,
   Semaforo,
+  EstadoGrupo,
+  EstadoAhorrista,
+  EstadoCuota,
+  TipoGestionMora,
+  ResultadoGestionMora,
 } from './types'
 
 // ============================================================
@@ -163,6 +168,51 @@ export const ESTADOS_ALISTAMIENTO: Record<EstadoAlistamiento, { label: string; c
   aprobado:   { label: 'Aprobado', color: 'bg-green-100 text-green-800' },
   rechazado:  { label: 'Rechazado', color: 'bg-red-100 text-red-800' },
 }
+
+// ============================================================
+// SGA — Planes de Ahorro
+// ============================================================
+
+export const ESTADOS_GRUPO: Record<EstadoGrupo, { label: string; color: string }> = {
+  formando:  { label: 'Formando', color: 'bg-blue-100 text-blue-800' },
+  activo:    { label: 'Activo', color: 'bg-green-100 text-green-800' },
+  cerrado:   { label: 'Cerrado', color: 'bg-gray-100 text-gray-800' },
+  disuelto:  { label: 'Disuelto', color: 'bg-red-100 text-red-800' },
+}
+
+export const ESTADOS_AHORRISTA: Record<EstadoAhorrista, { label: string; color: string }> = {
+  activo:       { label: 'Activo', color: 'bg-green-100 text-green-800' },
+  adjudicado:   { label: 'Adjudicado', color: 'bg-blue-100 text-blue-800' },
+  renunciado:   { label: 'Renunciado', color: 'bg-orange-100 text-orange-800' },
+  rescindido:   { label: 'Rescindido', color: 'bg-red-100 text-red-800' },
+  transferido:  { label: 'Transferido', color: 'bg-purple-100 text-purple-800' },
+}
+
+export const ESTADOS_CUOTA: Record<EstadoCuota, { label: string; color: string }> = {
+  pendiente:  { label: 'Pendiente', color: 'bg-gray-100 text-gray-800' },
+  pagada:     { label: 'Pagada', color: 'bg-green-100 text-green-800' },
+  vencida:    { label: 'Vencida', color: 'bg-orange-100 text-orange-800' },
+  en_mora:    { label: 'En Mora', color: 'bg-red-100 text-red-800' },
+  bonificada: { label: 'Bonificada', color: 'bg-blue-100 text-blue-800' },
+}
+
+export const TIPOS_GESTION_MORA: { value: TipoGestionMora; label: string }[] = [
+  { value: 'llamada', label: 'Llamada telefonica' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'Email' },
+  { value: 'carta_documento', label: 'Carta documento' },
+  { value: 'visita', label: 'Visita' },
+  { value: 'otro', label: 'Otro' },
+]
+
+export const RESULTADOS_GESTION_MORA: { value: ResultadoGestionMora; label: string }[] = [
+  { value: 'sin_contacto', label: 'Sin contacto' },
+  { value: 'promesa_pago', label: 'Promesa de pago' },
+  { value: 'pago_parcial', label: 'Pago parcial' },
+  { value: 'pago_total', label: 'Pago total' },
+  { value: 'rechazo', label: 'Rechazo' },
+  { value: 'otro', label: 'Otro' },
+]
 
 // ============================================================
 // Template Checklist Documentación 0KM

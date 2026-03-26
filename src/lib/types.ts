@@ -415,6 +415,93 @@ export function getSemaforoCompromiso(fechaCompromiso: string): Semaforo {
   return 'rojo'
 }
 
+// ============================================================
+// SGA — Planes de Ahorro
+// ============================================================
+
+export type EstadoGrupo = 'formando' | 'activo' | 'cerrado' | 'disuelto'
+export type EstadoAhorrista = 'activo' | 'adjudicado' | 'renunciado' | 'rescindido' | 'transferido'
+export type TipoAdjudicacion = 'sorteo' | 'licitacion' | 'acto_especial'
+export type EstadoCuota = 'pendiente' | 'pagada' | 'vencida' | 'en_mora' | 'bonificada'
+export type TipoGestionMora = 'llamada' | 'whatsapp' | 'email' | 'carta_documento' | 'visita' | 'otro'
+export type ResultadoGestionMora = 'sin_contacto' | 'promesa_pago' | 'pago_parcial' | 'pago_total' | 'rechazo' | 'otro'
+
+export interface GrupoAhorro {
+  id: string
+  numero_grupo: string
+  modelo: string
+  valor_movil: number
+  cantidad_integrantes: number
+  cantidad_cuotas: number
+  cuotas_pagas: number
+  fecha_formacion: string | null
+  estado: EstadoGrupo
+  sucursal: Sucursal
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Ahorrista {
+  id: string
+  grupo_id: string | null
+  operacion_id: string | null
+  nombre_apellido: string
+  dni_cuil: string
+  telefono: string | null
+  email: string | null
+  numero_orden: number | null
+  fecha_suscripcion: string | null
+  estado: EstadoAhorrista
+  adjudicado: boolean
+  fecha_adjudicacion: string | null
+  tipo_adjudicacion: TipoAdjudicacion | null
+  monto_licitacion: number | null
+  vehiculo_retirado: boolean
+  fecha_retiro: string | null
+  sucursal: Sucursal
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+  // Joins
+  grupo?: GrupoAhorro | null
+  cuotas?: CuotaAhorro[]
+}
+
+export interface CuotaAhorro {
+  id: string
+  ahorrista_id: string
+  grupo_id: string
+  numero_cuota: number
+  monto: number
+  fecha_vencimiento: string
+  fecha_pago: string | null
+  monto_pagado: number
+  estado: EstadoCuota
+  dias_mora: number
+  interes_mora: number
+  comprobante: string | null
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GestionMora {
+  id: string
+  ahorrista_id: string
+  cuota_id: string | null
+  tipo_gestion: TipoGestionMora
+  fecha_gestion: string
+  resultado: ResultadoGestionMora
+  fecha_promesa: string | null
+  monto_prometido: number | null
+  observaciones: string | null
+  gestionado_por: string | null
+  created_at: string
+  // Joins
+  ahorrista?: Ahorrista | null
+}
+
 // Requiere prenda?
 export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion'>): boolean {
   return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
