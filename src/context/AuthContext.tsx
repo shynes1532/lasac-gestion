@@ -160,14 +160,9 @@ const roleAccess: Record<string, RolUsuario[]> = {
   '/entrega':              ['director', 'asesor_ush', 'asesor_rg', 'calidad'],
 }
 
-export function canAccessRoute(rol: RolUsuario, path: string): boolean {
-  // Director accede a todo
-  if (rol === 'director') return true
-
-  const basePath = '/' + path.split('/')[1]
-  const allowedRoles = roleAccess[basePath]
-  if (!allowedRoles) return true
-  return allowedRoles.includes(rol)
+export function canAccessRoute(_rol: RolUsuario, _path: string): boolean {
+  // Todos los roles acceden a todo
+  return true
 }
 
 export function getDefaultRoute(rol: RolUsuario): string {
