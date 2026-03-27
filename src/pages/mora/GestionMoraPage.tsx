@@ -1,11 +1,11 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  AlertTriangle, Phone, Mail, Clock, Plus, X, Calendar, Skull,
+  AlertTriangle, Phone, Mail, Clock, Plus, X, Skull,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, GestionMora, TipoGestionMora, ResultadoGestionMora } from '../../lib/types'
-import { ESTADOS_AHORRISTA, TIPOS_GESTION_MORA, RESULTADOS_GESTION_MORA, REGLAS_FIAT_PLAN } from '../../lib/constants'
+import { TIPOS_GESTION_MORA, RESULTADOS_GESTION_MORA, REGLAS_FIAT_PLAN } from '../../lib/constants'
 import { Skeleton } from '../../components/ui'
 import { useAuth } from '../../context/AuthContext'
 import toast from 'react-hot-toast'

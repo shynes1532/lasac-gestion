@@ -1,17 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import {
-  PieChart, Users, Award, XCircle, ArrowRightLeft, AlertTriangle,
+  PieChart, Users, Award, XCircle, ArrowRightLeft,
   Phone, Mail, Skull, Clock,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista } from '../../lib/types'
-import { ESTADOS_AHORRISTA, REGLAS_FIAT_PLAN } from '../../lib/constants'
 import { Skeleton } from '../../components/ui'
 import { useNavigate } from 'react-router-dom'
-
-function formatMoney(n: number): string {
-  return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
-}
 
 export function CarteraPage() {
   const navigate = useNavigate()

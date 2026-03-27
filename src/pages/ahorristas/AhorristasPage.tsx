@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp,
+  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista, TipoPlan, CodigoPlan, VehiculoCodigo } from '../../lib/types'
@@ -24,6 +24,16 @@ export function AhorristasPage() {
   const [filtroEstado, setFiltroEstado] = useState<EstadoAhorrista | ''>('')
   const [showAlta, setShowAlta] = useState(false)
   const [expandido, setExpandido] = useState<string | null>(null)
+  const [eliminando, setEliminando] = useState<string | null>(null)
+  const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([])
+  const [vendedorId, setVendedorId] = useState('')
+
+  // Cargar vendedores
+  useState(() => {
+    supabase.from('usuarios').select('id, nombre_completo').eq('activo', true).order('nombre_completo').then(({ data }) => {
+      if (data) setVendedores(data.map(u => ({ id: u.id, nombre: u.nombre_completo })))
+    })
+  })
 
   const { data: ahorristas, isLoading } = useQuery({
     queryKey: ['ahorristas', filtroEstado],
@@ -116,8 +126,8 @@ export function AhorristasPage() {
         fecha_arranque: form.fecha_arranque,
         nro_recibo_c1: form.nro_recibo_c1 || null,
         es_subite: form.es_subite,
-        vendedor_id: perfil?.id ?? null,
-        vendedor_nombre: perfil?.nombre_completo ?? null,
+        vendedor_id: vendedorId || perfil?.id || null,
+        vendedor_nombre: vendedorId ? (vendedores.find(v => v.id === vendedorId)?.nombre ?? null) : (perfil?.nombre_completo ?? null),
         sucursal: form.sucursal,
         cuotas_pagas: 1,
         derecho_admision: valorMovil * REGLAS_FIAT_PLAN.DERECHO_ADMISION_PCT / 100,
@@ -292,6 +302,27 @@ export function AhorristasPage() {
                           <Mail className="h-4 w-4" />
                         </a>
                       )}
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (eliminando === a.id) {
+                            const { error } = await supabase.from('ahorristas').delete().eq('id', a.id)
+                            if (error) { toast.error(error.message); setEliminando(null); return }
+                            toast.success('Cliente eliminado')
+                            setEliminando(null)
+                            queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                          } else {
+                            setEliminando(a.id)
+                            setTimeout(() => setEliminando(null), 3000)
+                          }
+                        }}
+                        className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                          eliminando === a.id ? 'bg-red-600 text-white' : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'
+                        }`}
+                        title={eliminando === a.id ? 'Click para confirmar' : 'Eliminar'}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                       {isExpanded ? <ChevronUp className="h-4 w-4 text-text-muted" /> : <ChevronDown className="h-4 w-4 text-text-muted" />}
                     </div>
                   </div>
@@ -546,6 +577,16 @@ export function AhorristasPage() {
                 </div>
               </div>
 
+              {/* Vendedor */}
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Vendedor *</label>
+                <select value={vendedorId} onChange={e => setVendedorId(e.target.value)}
+                  className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-action">
+                  <option value="">Seleccionar vendedor...</option>
+                  {vendedores.map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-xs text-text-muted mb-1">Observaciones</label>
                 <textarea value={form.observaciones}
@@ -560,7 +601,7 @@ export function AhorristasPage() {
                 <div className="bg-bg-tertiary rounded-lg p-3 text-xs text-text-secondary space-y-1">
                   <p className="font-semibold text-text-primary">Resumen del alta:</p>
                   <p>Derecho de admisión (2,5%): <span className="text-text-primary font-medium">{formatMoney(parseFloat(form.valor_movil) * 0.025)}</span></p>
-                  <p>Vendedor: <span className="text-text-primary font-medium">{perfil?.nombre_completo || '—'}</span></p>
+                  <p>Vendedor: <span className="text-text-primary font-medium">{vendedorId ? vendedores.find(v => v.id === vendedorId)?.nombre : perfil?.nombre_completo || '—'}</span></p>
                   {form.tipo_plan === 'H' && <p className="text-yellow-400">Plan H: necesita 24 cuotas integradas para retirar la unidad</p>}
                 </div>
               )}
