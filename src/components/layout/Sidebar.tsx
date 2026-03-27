@@ -19,6 +19,7 @@ const navItems = [
   { path: '/entregas-programadas',label: 'Entregas',     icon: Truck },
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
   { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
+  { path: '/garantias',             label: 'Garantias',    icon: Wrench },
   { path: '/calibre',              label: 'Calibre',      icon: Shield },
   { path: '/reportes',            label: 'Reportes',     icon: Printer },
 ]

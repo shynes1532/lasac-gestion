@@ -26,6 +26,7 @@ const CalibrePage = lazy(() => import('./pages/calibre/CalibrePage').then(m => (
 const AhorristasPage = lazy(() => import('./pages/ahorristas/AhorristasPage').then(m => ({ default: m.AhorristasPage })))
 const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m => ({ default: m.GestionMoraPage })))
 const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
+const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(m => ({ default: m.GarantiasPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -109,6 +110,9 @@ export default function App() {
                 } />
                 <Route path="/cartera" element={
                   <ProtectedRoute><CarteraPage /></ProtectedRoute>
+                } />
+                <Route path="/garantias" element={
+                  <ProtectedRoute><GarantiasPage /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}
