@@ -343,6 +343,22 @@ export function AhorristasPage() {
                             <Award className="h-3 w-3" /> Adjudicado
                           </span>
                         )}
+                        {a.adjudicado && (a as any).etapa_adjudicacion && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                            (a as any).etapa_adjudicacion === 'aprobado' ? 'bg-green-100 text-green-800' :
+                            (a as any).etapa_adjudicacion === 'facturado' ? 'bg-blue-100 text-blue-800' :
+                            (a as any).etapa_adjudicacion === 'esperando_unidad' ? 'bg-yellow-100 text-yellow-800' :
+                            (a as any).etapa_adjudicacion === 'papeles_listos' ? 'bg-purple-100 text-purple-800' :
+                            (a as any).etapa_adjudicacion === 'certificado_listo' ? 'bg-emerald-100 text-emerald-800' :
+                            'bg-gray-100 text-gray-800'
+                          }`}>
+                            {(a as any).etapa_adjudicacion === 'aprobado' ? 'Aprobado' :
+                             (a as any).etapa_adjudicacion === 'facturado' ? 'Facturado' :
+                             (a as any).etapa_adjudicacion === 'esperando_unidad' ? 'Esperando unidad' :
+                             (a as any).etapa_adjudicacion === 'papeles_listos' ? 'Papeles listos' :
+                             (a as any).etapa_adjudicacion === 'certificado_listo' ? 'Certificado listo' : ''}
+                          </span>
+                        )}
                         {a.en_riesgo_rescision && (
                           <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-100 text-red-800">
                             <AlertTriangle className="h-3 w-3" /> 3 cuotas
@@ -755,6 +771,40 @@ export function AhorristasPage() {
                           >
                             Desadjudicar
                           </button>
+                        </div>
+
+                        {/* Etapa adjudicación */}
+                        <div className="mb-3">
+                          <label className="block text-xs text-blue-400 font-medium mb-1.5">Etapa de adjudicación:</label>
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[
+                              { val: 'aprobado', label: 'Aprobado', color: 'bg-green-600' },
+                              { val: 'facturado', label: 'Facturado', color: 'bg-blue-600' },
+                              { val: 'esperando_unidad', label: 'Esperando unidad', color: 'bg-yellow-600' },
+                              { val: 'papeles_listos', label: 'Papeles listos', color: 'bg-purple-600' },
+                              { val: 'certificado_listo', label: 'Certificado listo', color: 'bg-emerald-600' },
+                            ].map(etapa => (
+                              <button key={etapa.val}
+                                onClick={async () => {
+                                  const { error } = await supabase.from('ahorristas')
+                                    .update({ etapa_adjudicacion: etapa.val })
+                                    .eq('id', a.id)
+                                  if (error) toast.error(error.message)
+                                  else {
+                                    toast.success(`Etapa: ${etapa.label}`)
+                                    queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                                  }
+                                }}
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer transition-colors ${
+                                  (a as any).etapa_adjudicacion === etapa.val
+                                    ? `${etapa.color} text-white`
+                                    : 'bg-bg-tertiary text-text-secondary hover:text-text-primary'
+                                }`}
+                              >
+                                {etapa.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         {/* Checklist carpeta */}

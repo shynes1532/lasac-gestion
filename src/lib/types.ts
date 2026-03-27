@@ -517,6 +517,7 @@ export interface Ahorrista {
   doc_ceta: boolean
   doc_veraz: boolean
   doc_garante: boolean
+  etapa_adjudicacion: 'aprobado' | 'facturado' | 'esperando_unidad' | 'papeles_listos' | 'certificado_listo' | null
 
   observaciones: string | null
   created_at: string
