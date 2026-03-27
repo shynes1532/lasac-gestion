@@ -794,6 +794,58 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
               <p className="text-lg font-bold text-text-primary">{fmtMoney(totalPresupuesto)}</p>
             </div>
           </div>
+          {totalPresupuesto > 0 && (
+            <button
+              onClick={() => {
+                const w = window.open('', '_blank')
+                if (!w) return
+                w.document.write(`<!DOCTYPE html><html><head><title>Presupuesto ${exp.nro_siniestro_interno || ''}</title>
+                <style>body{font-family:Arial,sans-serif;padding:40px;color:#333}h1{font-size:18px;margin-bottom:4px}
+                .header{border-bottom:2px solid #333;padding-bottom:16px;margin-bottom:20px}
+                .sub{color:#666;font-size:13px}table{width:100%;border-collapse:collapse;margin:20px 0}
+                th,td{border:1px solid #ddd;padding:10px;text-align:left;font-size:13px}th{background:#f5f5f5;font-weight:600}
+                .total{font-size:16px;font-weight:bold;text-align:right;margin-top:16px}
+                .footer{margin-top:40px;padding-top:20px;border-top:1px solid #ddd;font-size:11px;color:#999}
+                .firma{margin-top:60px;display:flex;justify-content:space-between}
+                .firma div{text-align:center;width:200px;border-top:1px solid #333;padding-top:8px;font-size:12px}</style></head><body>
+                <div class="header">
+                  <h1>LIENDO AUTOMOTORES S.A. — FIAT</h1>
+                  <p class="sub">Presupuesto de reparación por siniestro</p>
+                  <p class="sub">Fecha: ${new Date().toLocaleDateString('es-AR')}</p>
+                </div>
+                <table>
+                  <tr><td><strong>Cliente</strong></td><td>${cli?.nombre || ''} ${cli?.apellido || ''}</td>
+                      <td><strong>DNI</strong></td><td>${cli?.dni || '—'}</td></tr>
+                  <tr><td><strong>Vehículo</strong></td><td>${cli?.marca || 'FIAT'} ${cli?.modelo || ''} ${cli?.anio || ''}</td>
+                      <td><strong>Dominio</strong></td><td>${cli?.dominio || '—'}</td></tr>
+                  <tr><td><strong>Siniestro</strong></td><td>${exp.nro_siniestro_interno || '—'}</td>
+                      <td><strong>Compañía</strong></td><td>${exp.compania_seguro || '—'}</td></tr>
+                  <tr><td><strong>Tipo daño</strong></td><td colspan="3">${exp.tipo_danio || '—'}</td></tr>
+                  ${exp.descripcion_siniestro ? `<tr><td><strong>Descripción</strong></td><td colspan="3">${exp.descripcion_siniestro}</td></tr>` : ''}
+                </table>
+                <h2 style="font-size:15px;margin-top:24px">Detalle del presupuesto</h2>
+                <table>
+                  <thead><tr><th>Concepto</th><th style="text-align:right">Monto</th></tr></thead>
+                  <tbody>
+                    <tr><td>Repuestos</td><td style="text-align:right">$ ${(exp.monto_presupuesto_repuestos || 0).toLocaleString('es-AR')}</td></tr>
+                    <tr><td>Mano de obra taller</td><td style="text-align:right">$ ${(exp.monto_presupuesto_mo_taller || 0).toLocaleString('es-AR')}</td></tr>
+                    <tr><td>Chapista</td><td style="text-align:right">$ ${(exp.monto_presupuesto_chapista || 0).toLocaleString('es-AR')}</td></tr>
+                    <tr><td>Pintura</td><td style="text-align:right">$ ${(exp.monto_presupuesto_pintura || 0).toLocaleString('es-AR')}</td></tr>
+                    <tr><td>Otros</td><td style="text-align:right">$ ${(exp.monto_presupuesto_otros || 0).toLocaleString('es-AR')}</td></tr>
+                    <tr style="font-weight:bold;background:#f0f0f0"><td>TOTAL</td><td style="text-align:right">$ ${totalPresupuesto.toLocaleString('es-AR')}</td></tr>
+                  </tbody>
+                </table>
+                <div class="firma"><div>Firma del cliente</div><div>Firma taller</div></div>
+                <div class="footer">LIENDO AUTOMOTORES S.A. — FIAT — Tierra del Fuego</div>
+                </body></html>`)
+                w.document.close()
+                w.print()
+              }}
+              className="mt-3 w-full py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-500 transition-colors cursor-pointer flex items-center justify-center gap-2"
+            >
+              <FileText className="h-4 w-4" /> Exportar presupuesto PDF
+            </button>
+          )}
         </Accordion>
 
         {/* 3. Aprobacion */}
@@ -1117,6 +1169,7 @@ function RepuestosTable({ expedienteId, repuestos, qc }: {
   const [form, setForm] = useState({
     nro_parte: '', descripcion: '', cantidad_solicitada: 1, estado: 'pendiente',
     tipo_pedido: '', nro_guia_tracking: '', monto_aprobado: '',
+    fecha_pedido: '', fecha_eta_estimada: '', fecha_recepcion: '',
   })
 
   const addRepuesto = useMutation({
@@ -1130,13 +1183,16 @@ function RepuestosTable({ expedienteId, repuestos, qc }: {
         tipo_pedido: form.tipo_pedido,
         nro_guia_tracking: form.nro_guia_tracking,
         monto_aprobado: form.monto_aprobado ? Number(form.monto_aprobado) : 0,
+        fecha_pedido: form.fecha_pedido || null,
+        fecha_eta_estimada: form.fecha_eta_estimada || null,
+        fecha_recepcion: form.fecha_recepcion || null,
       })
       if (error) throw error
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['siniestros_repuestos', expedienteId] })
       setShowAdd(false)
-      setForm({ nro_parte: '', descripcion: '', cantidad_solicitada: 1, estado: 'pendiente', tipo_pedido: '', nro_guia_tracking: '', monto_aprobado: '' })
+      setForm({ nro_parte: '', descripcion: '', cantidad_solicitada: 1, estado: 'pendiente', tipo_pedido: '', nro_guia_tracking: '', monto_aprobado: '', fecha_pedido: '', fecha_eta_estimada: '', fecha_recepcion: '' })
       notify.success('Repuesto agregado')
     },
     onError: () => notify.error('Error al agregar repuesto'),
@@ -1184,8 +1240,14 @@ function RepuestosTable({ expedienteId, repuestos, qc }: {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Select label="Estado" options={REPUESTO_ESTADOS} value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })} />
-            <Input label="Tipo pedido" value={form.tipo_pedido} onChange={e => setForm({ ...form, tipo_pedido: e.target.value })} />
+            <Input label="Tipo pedido" value={form.tipo_pedido} onChange={e => setForm({ ...form, tipo_pedido: e.target.value })} placeholder="normal / urgente / importado" />
             <Input label="Monto aprobado" type="number" value={form.monto_aprobado} onChange={e => setForm({ ...form, monto_aprobado: e.target.value })} />
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+            <Input label="Fecha pedido" type="date" value={form.fecha_pedido} onChange={e => setForm({ ...form, fecha_pedido: e.target.value })} />
+            <Input label="ETA estimada" type="date" value={form.fecha_eta_estimada} onChange={e => setForm({ ...form, fecha_eta_estimada: e.target.value })} />
+            <Input label="Fecha recepción" type="date" value={form.fecha_recepcion} onChange={e => setForm({ ...form, fecha_recepcion: e.target.value })} />
+            <Input label="Nro guía/tracking" value={form.nro_guia_tracking} onChange={e => setForm({ ...form, nro_guia_tracking: e.target.value })} />
           </div>
           <div className="flex gap-2 justify-end">
             <Button variant="secondary" size="sm" onClick={() => setShowAdd(false)}>Cancelar</Button>
@@ -1343,6 +1405,19 @@ function NuevoExpedienteForm({ clientes, qc, goBack, onCreated }: {
 
   const selectedClient = clientes.find(c => c.id === clienteId)
 
+  // Auto-rellenar compañía y póliza del cliente seleccionado
+  const handleSelectCliente = (id: string) => {
+    setClienteId(id)
+    const cli = clientes.find(c => c.id === id)
+    if (cli) {
+      setForm(f => ({
+        ...f,
+        compania_seguro: cli.compania_seguro || f.compania_seguro,
+        nro_poliza: cli.nro_poliza || f.nro_poliza,
+      }))
+    }
+  }
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div className="flex items-center gap-3">
@@ -1401,7 +1476,7 @@ function NuevoExpedienteForm({ clientes, qc, goBack, onCreated }: {
                   ) : clientesFiltered.slice(0, 10).map(c => (
                     <button
                       key={c.id}
-                      onClick={() => { setClienteId(c.id); setClienteSearch('') }}
+                      onClick={() => { handleSelectCliente(c.id); setClienteSearch('') }}
                       className="w-full text-left px-3 py-2 hover:bg-bg-tertiary text-sm cursor-pointer border-b border-border last:border-0"
                     >
                       <span className="text-text-primary font-medium">{c.apellido}, {c.nombre}</span>
