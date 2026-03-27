@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2,
+  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2, Pencil,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista, TipoPlan, CodigoPlan, VehiculoCodigo } from '../../lib/types'
@@ -25,6 +25,7 @@ export function AhorristasPage() {
   const [showAlta, setShowAlta] = useState(false)
   const [expandido, setExpandido] = useState<string | null>(null)
   const [eliminando, setEliminando] = useState<string | null>(null)
+  const [editandoId, setEditandoId] = useState<string | null>(null)
   const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([])
   const [vendedorId, setVendedorId] = useState('')
 
@@ -138,10 +139,73 @@ export function AhorristasPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
       toast.success('Alta registrada correctamente')
-      setShowAlta(false)
+      { setShowAlta(false); setEditandoId(null) }
     },
     onError: (e: Error) => toast.error(e.message),
   })
+
+  const actualizarAhorrista = useMutation({
+    mutationFn: async () => {
+      if (!editandoId) throw new Error('Sin ID')
+      const veh = CATALOGO_VEHICULOS.find(v => v.codigo === form.vehiculo_codigo)
+      const valorMovil = parseFloat(form.valor_movil) || 0
+      const { error } = await supabase.from('ahorristas').update({
+        numero_solicitud: form.numero_solicitud,
+        nombre_apellido: form.nombre_apellido,
+        dni_cuil: form.dni_cuil,
+        domicilio: form.domicilio || null,
+        localidad: form.localidad || null,
+        telefono: form.telefono || null,
+        email: form.email || null,
+        tipo_plan: form.tipo_plan,
+        codigo_plan: form.codigo_plan,
+        vehiculo_codigo: form.vehiculo_codigo,
+        vehiculo_modelo: veh?.modelo ?? '',
+        valor_movil: valorMovil,
+        cuota_pura: parseFloat(form.cuota_pura) || 0,
+        fecha_arranque: form.fecha_arranque,
+        nro_recibo_c1: form.nro_recibo_c1 || null,
+        es_subite: form.es_subite,
+        vendedor_id: vendedorId || perfil?.id || null,
+        vendedor_nombre: vendedorId ? (vendedores.find(v => v.id === vendedorId)?.nombre ?? null) : (perfil?.nombre_completo ?? null),
+        sucursal: form.sucursal,
+        observaciones: form.observaciones || null,
+      }).eq('id', editandoId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+      toast.success('Cliente actualizado')
+      { setShowAlta(false); setEditandoId(null) }
+      setEditandoId(null)
+    },
+    onError: (e: Error) => toast.error(e.message),
+  })
+
+  function abrirEdicion(a: Ahorrista) {
+    setForm({
+      numero_solicitud: a.numero_solicitud,
+      nombre_apellido: a.nombre_apellido,
+      dni_cuil: a.dni_cuil,
+      domicilio: a.domicilio || '',
+      localidad: a.localidad || '',
+      telefono: a.telefono || '',
+      email: a.email || '',
+      tipo_plan: a.tipo_plan as TipoPlan,
+      codigo_plan: a.codigo_plan as CodigoPlan | '',
+      vehiculo_codigo: a.vehiculo_codigo as VehiculoCodigo | '',
+      valor_movil: String(a.valor_movil || ''),
+      cuota_pura: String(a.cuota_pura || ''),
+      fecha_arranque: a.fecha_arranque || '',
+      nro_recibo_c1: a.nro_recibo_c1 || '',
+      es_subite: a.es_subite || false,
+      sucursal: a.sucursal as 'Ushuaia' | 'Rio Grande',
+      observaciones: a.observaciones || '',
+    })
+    setVendedorId(a.vendedor_id || '')
+    setEditandoId(a.id)
+    setShowAlta(true)
+  }
 
   const filtered = (ahorristas ?? []).filter(a => {
     if (!busqueda) return true
@@ -174,7 +238,12 @@ export function AhorristasPage() {
           </div>
         </div>
         <button
-          onClick={() => setShowAlta(true)}
+          onClick={() => {
+            setEditandoId(null)
+            setVendedorId('')
+            setForm({ numero_solicitud: '', nombre_apellido: '', dni_cuil: '', domicilio: '', localidad: '', telefono: '', email: '', tipo_plan: 'H' as TipoPlan, codigo_plan: '' as CodigoPlan | '', vehiculo_codigo: '' as VehiculoCodigo | '', valor_movil: '', cuota_pura: '', fecha_arranque: '', nro_recibo_c1: '', es_subite: false, sucursal: 'Ushuaia', observaciones: '' })
+            setShowAlta(true)
+          }}
           className="flex items-center gap-2 px-4 py-2 bg-action text-white rounded-lg text-sm font-medium hover:bg-action-hover transition-colors cursor-pointer"
         >
           <Plus className="h-4 w-4" /> Alta de cliente
@@ -303,6 +372,16 @@ export function AhorristasPage() {
                         </a>
                       )}
                       <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          abrirEdicion(a)
+                        }}
+                        className="p-2 text-text-muted hover:text-action hover:bg-action/10 rounded-lg transition-colors cursor-pointer"
+                        title="Editar"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
                         onClick={async (e) => {
                           e.stopPropagation()
                           if (eliminando === a.id) {
@@ -412,15 +491,15 @@ export function AhorristasPage() {
       {/* Modal Alta de Cliente */}
       {showAlta && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/60" onClick={() => setShowAlta(false)} />
+          <div className="absolute inset-0 bg-black/60" onClick={() => { setShowAlta(false); setEditandoId(null) }} />
           <div className="relative bg-bg-secondary border border-border rounded-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
-            <button onClick={() => setShowAlta(false)} className="absolute top-4 right-4 text-text-muted hover:text-text-primary cursor-pointer">
+            <button onClick={() => { setShowAlta(false); setEditandoId(null) }} className="absolute top-4 right-4 text-text-muted hover:text-text-primary cursor-pointer">
               <X className="h-5 w-5" />
             </button>
-            <h2 className="text-lg font-bold text-text-primary mb-1">Alta de cliente — FIAT Plan</h2>
-            <p className="text-sm text-text-secondary mb-4">Etapa 1: Suscripción</p>
+            <h2 className="text-lg font-bold text-text-primary mb-1">{editandoId ? 'Editar cliente — FIAT Plan' : 'Alta de cliente — FIAT Plan'}</h2>
+            <p className="text-sm text-text-secondary mb-4">{editandoId ? 'Modificar datos del suscriptor' : 'Etapa 1: Suscripción'}</p>
 
-            <form onSubmit={e => { e.preventDefault(); crearAhorrista.mutate() }} className="space-y-4">
+            <form onSubmit={e => { e.preventDefault(); editandoId ? actualizarAhorrista.mutate() : crearAhorrista.mutate() }} className="space-y-4">
               {/* Solicitud */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -606,9 +685,12 @@ export function AhorristasPage() {
                 </div>
               )}
 
-              <button type="submit" disabled={crearAhorrista.isPending}
+              <button type="submit" disabled={crearAhorrista.isPending || actualizarAhorrista.isPending}
                 className="w-full py-2.5 bg-action text-white rounded-lg text-sm font-medium hover:bg-action-hover transition-colors disabled:opacity-50 cursor-pointer">
-                {crearAhorrista.isPending ? 'Registrando...' : 'Registrar alta'}
+                {editandoId
+                  ? (actualizarAhorrista.isPending ? 'Guardando...' : 'Guardar cambios')
+                  : (crearAhorrista.isPending ? 'Registrando...' : 'Registrar alta')
+                }
               </button>
             </form>
           </div>
