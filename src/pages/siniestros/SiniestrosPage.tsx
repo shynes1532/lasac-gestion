@@ -1260,144 +1260,161 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
 }) {
   const items: PresupuestoItem[] = Array.isArray((exp as any).presupuesto_items) ? (exp as any).presupuesto_items : []
   const [addCat, setAddCat] = useState<string | null>(null)
-  const [newItem, setNewItem] = useState({ descripcion: '', cantidad: 1, precio_unitario: 0, panos: 1 })
+  const [desc, setDesc] = useState('')
+  const [cant, setCant] = useState('1')
+  const [precio, setPrecio] = useState('')
+  const [panos, setPanos] = useState('1')
+  const [saving, setSaving] = useState(false)
 
-  const saveItems = (updated: PresupuestoItem[]) => {
-    saveField('presupuesto_items', updated)
-    // Also update totals by category
+  async function saveItems(updated: PresupuestoItem[]) {
+    setSaving(true)
     const sumCat = (cat: string) => updated.filter(i => i.categoria === cat).reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
-    saveField('monto_presupuesto_repuestos', sumCat('repuestos'))
-    saveField('monto_presupuesto_mo_taller', sumCat('mo_taller'))
-    saveField('monto_presupuesto_chapista', sumCat('chapista'))
-    saveField('monto_presupuesto_pintura', sumCat('pintura'))
-    saveField('monto_presupuesto_otros', sumCat('otros'))
+    const { error } = await supabase.from('siniestros_expedientes').update({
+      presupuesto_items: updated,
+      monto_presupuesto_repuestos: sumCat('repuestos'),
+      monto_presupuesto_mo_taller: sumCat('mo_taller'),
+      monto_presupuesto_chapista: sumCat('chapista'),
+      monto_presupuesto_pintura: sumCat('pintura'),
+      monto_presupuesto_otros: sumCat('otros'),
+    }).eq('id', exp.id)
+    setSaving(false)
+    if (error) { notify.error(error.message); return }
+    // Force re-fetch
+    ;(exp as any).presupuesto_items = updated
+    ;(exp as any).monto_presupuesto_repuestos = sumCat('repuestos')
+    ;(exp as any).monto_presupuesto_mo_taller = sumCat('mo_taller')
+    ;(exp as any).monto_presupuesto_chapista = sumCat('chapista')
+    ;(exp as any).monto_presupuesto_pintura = sumCat('pintura')
+    ;(exp as any).monto_presupuesto_otros = sumCat('otros')
   }
 
-  const addItem = (cat: PresupuestoItem['categoria']) => {
-    if (!newItem.descripcion.trim()) { notify.error('Ingresá una descripción'); return }
+  function handleAdd(cat: PresupuestoItem['categoria']) {
+    if (!desc.trim()) { notify.error('Ingresá una descripción'); return }
+    const precioNum = parseFloat(precio) || 0
+    if (precioNum <= 0) { notify.error('Ingresá un precio mayor a 0'); return }
     const item: PresupuestoItem = {
       id: Date.now().toString(),
       categoria: cat,
-      descripcion: newItem.descripcion.trim(),
-      cantidad: newItem.cantidad || 1,
-      precio_unitario: newItem.precio_unitario || 0,
-      panos: cat === 'pintura' ? (newItem.panos || 1) : undefined,
+      descripcion: desc.trim(),
+      cantidad: parseInt(cant) || 1,
+      precio_unitario: precioNum,
+      panos: cat === 'pintura' ? (parseInt(panos) || 1) : undefined,
     }
     saveItems([...items, item])
-    setNewItem({ descripcion: '', cantidad: 1, precio_unitario: 0, panos: 1 })
+    setDesc(''); setCant('1'); setPrecio(''); setPanos('1')
     setAddCat(null)
+    notify.success('Ítem agregado')
   }
 
-  const removeItem = (id: string) => {
+  function handleRemove(id: string) {
     saveItems(items.filter(i => i.id !== id))
+    notify.success('Ítem eliminado')
   }
 
   const grandTotal = items.reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
 
   return (
     <div className="space-y-4">
-      {/* Fechas */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <EditableField label="Fecha presupuesto" type="date" value={exp.fecha_presupuesto || ''} onSave={v => saveField('fecha_presupuesto', v || null)} />
         <EditableField label="Fecha envio presupuesto" type="date" value={exp.fecha_envio_presupuesto || ''} onSave={v => saveField('fecha_envio_presupuesto', v || null)} />
       </div>
 
-      {/* Items por categoría */}
+      {saving && <p className="text-xs text-action animate-pulse">Guardando...</p>}
+
       {CATEGORIAS_PRESUPUESTO.map(cat => {
         const catItems = items.filter(i => i.categoria === cat.key)
         const catTotal = catItems.reduce((s, i) => s + (cat.key === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
 
         return (
-          <div key={cat.key} className={`border-l-4 ${cat.color} rounded-lg ${cat.bg} p-3`}>
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-text-primary uppercase tracking-wider">{cat.label}</p>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold text-text-primary">{fmtMoney(catTotal)}</span>
-                <button onClick={() => setAddCat(addCat === cat.key ? null : cat.key)}
-                  className="p-1 text-text-muted hover:text-rose-500 cursor-pointer">
-                  <Plus className="h-3.5 w-3.5" />
+          <div key={cat.key} className={`border-l-4 ${cat.color} rounded-lg ${cat.bg} p-4`}>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-sm font-bold text-text-primary uppercase tracking-wider">{cat.label}</p>
+              <div className="flex items-center gap-3">
+                <span className="text-sm font-bold text-text-primary font-mono">{fmtMoney(catTotal)}</span>
+                <button onClick={() => { setAddCat(addCat === cat.key ? null : cat.key); setDesc(''); setPrecio(''); setCant('1'); setPanos('1') }}
+                  className="flex items-center gap-1 px-2 py-1 bg-rose-600 text-white rounded text-xs font-medium hover:bg-rose-500 cursor-pointer">
+                  <Plus className="h-3 w-3" /> Agregar
                 </button>
               </div>
             </div>
 
             {catItems.length > 0 && (
-              <table className="w-full text-xs mb-2">
-                <thead>
-                  <tr className="text-text-muted border-b border-border/50">
-                    <th className="text-left py-1 font-medium">Descripción</th>
-                    {cat.key === 'pintura'
-                      ? <th className="text-right py-1 font-medium w-16">Paños</th>
-                      : <th className="text-right py-1 font-medium w-16">Cant.</th>
-                    }
-                    <th className="text-right py-1 font-medium w-24">Precio unit.</th>
-                    <th className="text-right py-1 font-medium w-24">Subtotal</th>
-                    <th className="w-8"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {catItems.map(item => {
-                    const sub = cat.key === 'pintura' ? (item.panos || 1) * item.precio_unitario : item.cantidad * item.precio_unitario
-                    return (
-                      <tr key={item.id} className="border-b border-border/30">
-                        <td className="py-1.5 text-text-primary">{item.descripcion}</td>
-                        <td className="py-1.5 text-right text-text-secondary">{cat.key === 'pintura' ? (item.panos || 1) : item.cantidad}</td>
-                        <td className="py-1.5 text-right text-text-secondary font-mono">{fmtMoney(item.precio_unitario)}</td>
-                        <td className="py-1.5 text-right text-text-primary font-semibold font-mono">{fmtMoney(sub)}</td>
-                        <td className="py-1.5 text-right">
-                          <button onClick={() => removeItem(item.id)} className="p-0.5 text-text-muted hover:text-red-500 cursor-pointer">
-                            <Trash2 className="h-3 w-3" />
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+              <div className="space-y-2 mb-3">
+                {catItems.map(item => {
+                  const sub = cat.key === 'pintura' ? (item.panos || 1) * item.precio_unitario : item.cantidad * item.precio_unitario
+                  return (
+                    <div key={item.id} className="flex items-center justify-between bg-bg-secondary rounded-lg px-3 py-2">
+                      <div className="flex-1">
+                        <p className="text-sm text-text-primary font-medium">{item.descripcion}</p>
+                        <p className="text-xs text-text-muted">
+                          {cat.key === 'pintura'
+                            ? `${item.panos || 1} paño${(item.panos || 1) > 1 ? 's' : ''} × ${fmtMoney(item.precio_unitario)}`
+                            : `${item.cantidad} × ${fmtMoney(item.precio_unitario)}`
+                          }
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <p className="text-sm font-bold text-text-primary font-mono">{fmtMoney(sub)}</p>
+                        <button onClick={() => handleRemove(item.id)} className="p-1 text-text-muted hover:text-red-500 cursor-pointer">
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
             )}
 
             {catItems.length === 0 && addCat !== cat.key && (
-              <p className="text-xs text-text-muted italic">Sin ítems</p>
+              <p className="text-xs text-text-muted italic mb-1">Sin ítems — hacé click en "Agregar"</p>
             )}
 
             {addCat === cat.key && (
-              <div className="flex items-end gap-2 mt-2 flex-wrap">
-                <div className="flex-1 min-w-[150px]">
-                  <label className="text-[10px] text-text-muted">Descripción</label>
-                  <input value={newItem.descripcion} onChange={e => setNewItem({ ...newItem, descripcion: e.target.value })}
-                    placeholder="Ej: Paragolpe delantero"
-                    className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary" />
+              <div className="bg-bg-secondary rounded-lg p-3 mt-2 space-y-3 border border-border">
+                <p className="text-xs font-semibold text-rose-400 uppercase">Nuevo ítem — {cat.label}</p>
+                <div>
+                  <label className="text-xs text-text-muted block mb-1">Descripción *</label>
+                  <input value={desc} onChange={e => setDesc(e.target.value)} autoFocus
+                    placeholder={cat.key === 'repuestos' ? 'Ej: Paragolpe delantero' : cat.key === 'mo_taller' ? 'Ej: Desarme y armado' : cat.key === 'chapista' ? 'Ej: Reparación guardabarro' : cat.key === 'pintura' ? 'Ej: Pintura paragolpe' : 'Ej: Acarreo'}
+                    className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary" />
                 </div>
-                {cat.key === 'pintura' ? (
-                  <div className="w-16">
-                    <label className="text-[10px] text-text-muted">Paños</label>
-                    <input type="number" value={newItem.panos} onChange={e => setNewItem({ ...newItem, panos: Number(e.target.value) })}
-                      className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary text-center" />
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">{cat.key === 'pintura' ? 'Paños *' : 'Cantidad *'}</label>
+                    <input type="number" min="1"
+                      value={cat.key === 'pintura' ? panos : cant}
+                      onChange={e => cat.key === 'pintura' ? setPanos(e.target.value) : setCant(e.target.value)}
+                      className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary text-center" />
                   </div>
-                ) : (
-                  <div className="w-16">
-                    <label className="text-[10px] text-text-muted">Cant.</label>
-                    <input type="number" value={newItem.cantidad} onChange={e => setNewItem({ ...newItem, cantidad: Number(e.target.value) })}
-                      className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary text-center" />
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">{cat.key === 'pintura' ? 'Precio por paño *' : 'Precio unitario *'}</label>
+                    <input type="number" min="1" value={precio} onChange={e => setPrecio(e.target.value)}
+                      placeholder="$ 0"
+                      className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary" />
                   </div>
-                )}
-                <div className="w-28">
-                  <label className="text-[10px] text-text-muted">{cat.key === 'pintura' ? 'Precio/paño' : 'Precio unit.'}</label>
-                  <input type="number" value={newItem.precio_unitario || ''} onChange={e => setNewItem({ ...newItem, precio_unitario: Number(e.target.value) })}
-                    placeholder="$"
-                    className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary" />
+                  <div>
+                    <label className="text-xs text-text-muted block mb-1">Subtotal</label>
+                    <p className="px-3 py-2 text-sm font-bold text-text-primary font-mono">
+                      {fmtMoney((parseFloat(precio) || 0) * (parseInt(cat.key === 'pintura' ? panos : cant) || 1))}
+                    </p>
+                  </div>
                 </div>
-                <button onClick={() => addItem(cat.key)} className="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-medium hover:bg-rose-500 cursor-pointer">Agregar</button>
-                <button onClick={() => setAddCat(null)} className="p-1.5 text-text-muted hover:text-text-primary cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                <div className="flex gap-2">
+                  <button onClick={() => setAddCat(null)} className="px-4 py-2 bg-bg-tertiary text-text-secondary rounded-lg text-xs font-medium hover:bg-bg-input cursor-pointer">Cancelar</button>
+                  <button onClick={() => handleAdd(cat.key)} className="flex-1 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-500 cursor-pointer">
+                    Agregar ítem
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )
       })}
 
-      {/* Grand total */}
-      <div className="bg-bg-tertiary rounded-lg p-4 flex justify-between items-center">
+      <div className="bg-rose-900/30 border border-rose-500/40 rounded-lg p-4 flex justify-between items-center">
         <p className="text-sm font-bold text-text-primary uppercase tracking-wider">Total presupuesto</p>
-        <p className="text-xl font-bold text-text-primary font-mono">{fmtMoney(grandTotal || totalPresupuesto)}</p>
+        <p className="text-2xl font-bold text-rose-400 font-mono">{fmtMoney(grandTotal || totalPresupuesto)}</p>
       </div>
     </div>
   )
