@@ -1300,8 +1300,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
       precio_unitario: precioNum,
     }
     saveItems([...items, item])
-    setCodigo(''); setDesc(''); setCant('1'); setPrecio(''); setPanos('1')
-    setAddCat(null)
+    setCodigo(''); setDesc(''); setCant('1'); setPrecio('');    setAddCat(null)
     notify.success('Ítem agregado')
   }
 
