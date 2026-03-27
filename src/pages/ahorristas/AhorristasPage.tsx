@@ -226,6 +226,9 @@ export function AhorristasPage() {
   const adjudicados = all.filter(a => a.adjudicado).length
   const enRiesgo = all.filter(a => a.en_riesgo_rescision).length
   const adjSinIntegrar = all.filter(a => a.adjudicado && !a.integracion_completa && a.tipo_plan === 'H').length
+  const mesActual = new Date().getMonth()
+  const anioActual = new Date().getFullYear()
+  const agrupadosMes = all.filter(a => a.estado === 'agrupado' && a.updated_at && new Date(a.updated_at).getMonth() === mesActual && new Date(a.updated_at).getFullYear() === anioActual).length
 
   if (isLoading) return <Skeleton className="h-64" />
 
@@ -254,10 +257,14 @@ export function AhorristasPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
         <div className="bg-bg-secondary border border-border rounded-xl p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Activos</p>
           <p className="text-2xl font-bold text-green-400 mt-1">{activos}</p>
+        </div>
+        <div className="bg-bg-secondary border border-border rounded-xl p-4">
+          <p className="text-xs text-text-muted uppercase tracking-wider">Agrupados del mes</p>
+          <p className="text-2xl font-bold text-cyan-400 mt-1">{agrupadosMes}</p>
         </div>
         <div className="bg-bg-secondary border border-border rounded-xl p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Adjudicados</p>
