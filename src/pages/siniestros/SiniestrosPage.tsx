@@ -728,7 +728,9 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
     const nroP = exp.nro_siniestro_interno ? `P-${exp.nro_siniestro_interno}` : `P-${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`
     const sucL = exp.sucursal === 'rio_grande' ? 'Río Grande' : 'Ushuaia'
     const repList = repuestos.filter(r => r.monto_aprobado && Number(r.monto_aprobado) > 0)
+    const pItems: PresupuestoItem[] = Array.isArray((exp as any).presupuesto_items) ? (exp as any).presupuesto_items : []
     const tp = totalPresupuesto
+    const catLabels: Record<string, string> = { repuestos: 'Repuestos originales FIAT', mo_taller: 'Mano de obra — Taller mecánico', chapista: 'Trabajos de chapa y carrocería', pintura: 'Pintura y acabado', otros: 'Otros conceptos' }
     const w = window.open('', '_blank')
     if (!w) { notify.error('Habilitá las ventanas emergentes para generar el PDF'); return }
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presupuesto ${nroP}</title>
@@ -795,13 +797,29 @@ tbody td{padding:10px 12px;border-bottom:1px solid #eee;font-size:12px}
 <div class="info-item"><div class="info-label">Tipo de daño</div><div class="info-value">${(exp.tipo_danio||'—').replace(/_/g,' ')}</div></div></div>
 ${exp.descripcion_siniestro?`<div class="desc-box"><strong>Descripción:</strong><br>${exp.descripcion_siniestro}</div>`:''}</div>
 <div class="section"><div class="section-title">Detalle del presupuesto</div>
-<table><thead><tr><th style="width:60%">Concepto</th><th class="text-right">Importe</th></tr></thead><tbody>
+${pItems.length > 0 ? (() => {
+  const cats = ['repuestos','mo_taller','chapista','pintura','otros'] as const
+  return cats.map(cat => {
+    const ci = pItems.filter(i => i.categoria === cat)
+    if (ci.length === 0) return ''
+    const catTotal = ci.reduce((s,i) => s + (cat === 'pintura' ? (i.panos||1)*i.precio_unitario : i.cantidad*i.precio_unitario), 0)
+    return `<h3 style="font-size:12px;color:#1a3a5c;margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px">${catLabels[cat]}</h3>
+    <table><thead><tr><th style="width:50%">Descripción</th><th class="text-right">${cat==='pintura'?'Paños':'Cant.'}</th><th class="text-right">Precio unit.</th><th class="text-right">Subtotal</th></tr></thead><tbody>
+    ${ci.map(i => {
+      const sub = cat === 'pintura' ? (i.panos||1)*i.precio_unitario : i.cantidad*i.precio_unitario
+      return `<tr><td>${i.descripcion}</td><td class="text-right">${cat==='pintura'?(i.panos||1):i.cantidad}</td><td class="text-right monto">$ ${i.precio_unitario.toLocaleString('es-AR')}</td><td class="text-right monto">$ ${sub.toLocaleString('es-AR')}</td></tr>`
+    }).join('')}
+    <tr style="font-weight:600;background:#f8f8f8"><td>Subtotal ${catLabels[cat]}</td><td></td><td></td><td class="text-right monto">$ ${catTotal.toLocaleString('es-AR')}</td></tr>
+    </tbody></table>`
+  }).join('')
+})() : `<table><thead><tr><th style="width:60%">Concepto</th><th class="text-right">Importe</th></tr></thead><tbody>
 ${n(exp.monto_presupuesto_repuestos)?`<tr><td>Repuestos originales FIAT</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_repuestos).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_mo_taller)?`<tr><td>Mano de obra — Taller mecánico</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_mo_taller).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_chapista)?`<tr><td>Trabajos de chapa y carrocería</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_chapista).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_pintura)?`<tr><td>Pintura y acabado</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_pintura).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_otros)?`<tr><td>Otros conceptos</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_otros).toLocaleString('es-AR')}</td></tr>`:''}
-</tbody></table></div>
+</tbody></table>`}
+</div>
 ${repList.length>0?`<div class="section"><div class="section-title">Detalle de repuestos</div>
 <table><thead><tr><th>Nro. Parte</th><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">Importe</th></tr></thead><tbody>
 ${repList.map(r=>`<tr><td>${r.nro_parte}</td><td>${r.descripcion}</td><td class="text-right">${r.cantidad_solicitada}</td><td class="text-right monto">$ ${Number(r.monto_aprobado||0).toLocaleString('es-AR')}</td></tr>`).join('')}
@@ -900,241 +918,8 @@ ${repList.map(r=>`<tr><td>${r.nro_parte}</td><td>${r.descripcion}</td><td class=
 
         {/* 2. Presupuesto */}
         <Accordion title="Presupuesto" icon={<Receipt className="h-4 w-4" />}>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EditableField label="Fecha presupuesto" type="date" value={exp.fecha_presupuesto || ''} onSave={v => saveField('fecha_presupuesto', v || null)} />
-            <EditableField label="Fecha envio presupuesto" type="date" value={exp.fecha_envio_presupuesto || ''} onSave={v => saveField('fecha_envio_presupuesto', v || null)} />
-            <EditableField label="Repuestos" type="number" value={String(exp.monto_presupuesto_repuestos || '')} onSave={v => saveField('monto_presupuesto_repuestos', v ? Number(v) : 0)} />
-            <EditableField label="MO Taller" type="number" value={String(exp.monto_presupuesto_mo_taller || '')} onSave={v => saveField('monto_presupuesto_mo_taller', v ? Number(v) : 0)} />
-            <EditableField label="Chapista" type="number" value={String(exp.monto_presupuesto_chapista || '')} onSave={v => saveField('monto_presupuesto_chapista', v ? Number(v) : 0)} />
-            <EditableField label="Pintura" type="number" value={String(exp.monto_presupuesto_pintura || '')} onSave={v => saveField('monto_presupuesto_pintura', v ? Number(v) : 0)} />
-            <EditableField label="Otros" type="number" value={String(exp.monto_presupuesto_otros || '')} onSave={v => saveField('monto_presupuesto_otros', v ? Number(v) : 0)} />
-            <div className="bg-bg-tertiary rounded-lg p-3">
-              <p className="text-xs text-text-muted">Total presupuesto</p>
-              <p className="text-lg font-bold text-text-primary">{fmtMoney(totalPresupuesto)}</p>
-            </div>
-          </div>
-          {totalPresupuesto > 0 && (
-            <button
-              onClick={() => {
-                const hoy = new Date()
-                const fechaStr = hoy.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
-                const validez = new Date(hoy.getTime() + 15 * 86400000).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
-                const nroPresup = exp.nro_siniestro_interno ? `P-${exp.nro_siniestro_interno}` : `P-${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`
-                const sucLabel = exp.sucursal === 'rio_grande' ? 'Río Grande' : 'Ushuaia'
-                const repList = repuestos.filter(r => r.monto_aprobado && r.monto_aprobado > 0)
-                const w = window.open('', '_blank')
-                if (!w) return
-                w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presupuesto ${nroPresup}</title>
-<style>
-  @page { margin: 20mm 15mm; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Segoe UI', Arial, sans-serif; color: #1a1a1a; font-size: 12px; line-height: 1.5; }
-
-  .page { max-width: 210mm; margin: 0 auto; }
-
-  /* Header */
-  .header { display: flex; justify-content: space-between; align-items: flex-start; padding-bottom: 20px; border-bottom: 3px solid #1a3a5c; margin-bottom: 24px; }
-  .company { }
-  .company h1 { font-size: 22px; color: #1a3a5c; letter-spacing: 1px; margin-bottom: 2px; }
-  .company h2 { font-size: 13px; color: #c0392b; font-weight: 600; margin-bottom: 4px; }
-  .company-info { font-size: 10px; color: #666; line-height: 1.6; }
-  .doc-info { text-align: right; }
-  .doc-info .doc-title { font-size: 18px; font-weight: 700; color: #1a3a5c; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 2px; }
-  .doc-info .doc-number { font-size: 14px; font-weight: 600; color: #c0392b; margin-bottom: 4px; }
-  .doc-info .doc-date { font-size: 11px; color: #666; }
-
-  /* Sections */
-  .section { margin-bottom: 20px; }
-  .section-title { font-size: 11px; font-weight: 700; color: #1a3a5c; text-transform: uppercase; letter-spacing: 1.5px; padding-bottom: 6px; border-bottom: 1.5px solid #ddd; margin-bottom: 10px; }
-
-  /* Info grid */
-  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 1px solid #ddd; border-radius: 4px; overflow: hidden; }
-  .info-item { padding: 8px 12px; border-bottom: 1px solid #eee; }
-  .info-item:nth-child(odd) { border-right: 1px solid #eee; }
-  .info-label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
-  .info-value { font-size: 12px; font-weight: 500; color: #1a1a1a; }
-
-  /* Description box */
-  .desc-box { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 12px; margin-top: 10px; font-size: 12px; color: #333; }
-
-  /* Table */
-  table { width: 100%; border-collapse: collapse; margin: 12px 0; }
-  thead th { background: #1a3a5c; color: white; padding: 10px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
-  thead th:first-child { text-align: left; border-radius: 4px 0 0 0; }
-  thead th:last-child { text-align: right; border-radius: 0 4px 0 0; }
-  tbody td { padding: 10px 12px; border-bottom: 1px solid #eee; font-size: 12px; }
-  tbody tr:hover { background: #fafafa; }
-  .text-right { text-align: right; }
-  .row-total { background: #f0f4f8; font-weight: 700; font-size: 13px; }
-  .row-total td { border-top: 2px solid #1a3a5c; padding: 12px; }
-  .monto { font-family: 'Courier New', monospace; font-weight: 600; }
-
-  /* Repuestos detail */
-  .repuestos-detail { margin-top: 12px; }
-  .repuestos-detail h4 { font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
-  .rep-table td { font-size: 11px; padding: 6px 10px; }
-  .rep-table th { font-size: 9px; padding: 6px 10px; }
-
-  /* Total box */
-  .total-box { background: #1a3a5c; color: white; border-radius: 6px; padding: 16px 20px; display: flex; justify-content: space-between; align-items: center; margin: 20px 0; }
-  .total-box .total-label { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; }
-  .total-box .total-amount { font-size: 24px; font-weight: 700; font-family: 'Courier New', monospace; }
-
-  /* Conditions */
-  .conditions { background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 4px; padding: 14px; margin: 16px 0; }
-  .conditions h4 { font-size: 10px; color: #1a3a5c; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; font-weight: 700; }
-  .conditions ul { list-style: none; font-size: 10px; color: #555; line-height: 1.8; }
-  .conditions ul li::before { content: "•"; color: #c0392b; font-weight: bold; margin-right: 6px; }
-
-  /* Signatures */
-  .signatures { display: flex; justify-content: space-between; margin-top: 60px; padding-top: 0; }
-  .sig-block { text-align: center; width: 200px; }
-  .sig-line { border-top: 1.5px solid #333; margin-bottom: 6px; padding-top: 60px; }
-  .sig-name { font-size: 11px; font-weight: 600; color: #333; }
-  .sig-role { font-size: 9px; color: #888; }
-
-  /* Footer */
-  .footer { margin-top: 30px; padding-top: 12px; border-top: 1px solid #ddd; display: flex; justify-content: space-between; font-size: 9px; color: #999; }
-</style></head><body>
-<div class="page">
-  <!-- Header -->
-  <div class="header">
-    <div class="company">
-      <h1>LIENDO AUTOMOTORES S.A.</h1>
-      <h2>Concesionario Oficial FIAT</h2>
-      <div class="company-info">
-        Sucursal ${sucLabel} — Tierra del Fuego, Argentina<br>
-        CUIT: 30-XXXXXXXX-X
-      </div>
-    </div>
-    <div class="doc-info">
-      <div class="doc-title">Presupuesto</div>
-      <div class="doc-number">${nroPresup}</div>
-      <div class="doc-date">Fecha: ${fechaStr}</div>
-      <div class="doc-date">Válido hasta: ${validez}</div>
-    </div>
-  </div>
-
-  <!-- Datos del cliente -->
-  <div class="section">
-    <div class="section-title">Datos del cliente / asegurado</div>
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Nombre y apellido</div><div class="info-value">${cli?.nombre || ''} ${cli?.apellido || ''}</div></div>
-      <div class="info-item"><div class="info-label">DNI / CUIL</div><div class="info-value">${cli?.dni || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Teléfono</div><div class="info-value">${cli?.telefono || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Email</div><div class="info-value">${cli?.email || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Dirección</div><div class="info-value">${cli?.direccion || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Localidad</div><div class="info-value">${cli?.localidad || sucLabel}</div></div>
-    </div>
-  </div>
-
-  <!-- Datos del vehículo -->
-  <div class="section">
-    <div class="section-title">Datos del vehículo</div>
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Marca / Modelo</div><div class="info-value">${cli?.marca || 'FIAT'} ${cli?.modelo || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Año</div><div class="info-value">${cli?.anio || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Dominio / Patente</div><div class="info-value">${cli?.dominio || '—'}</div></div>
-      <div class="info-item"><div class="info-label">VIN / Chasis</div><div class="info-value">${cli?.vin || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Color</div><div class="info-value">${cli?.color || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Km al ingreso</div><div class="info-value">${exp.km_ingreso ? exp.km_ingreso.toLocaleString('es-AR') + ' km' : '—'}</div></div>
-    </div>
-  </div>
-
-  <!-- Datos del siniestro -->
-  <div class="section">
-    <div class="section-title">Datos del siniestro</div>
-    <div class="info-grid">
-      <div class="info-item"><div class="info-label">Nro. siniestro</div><div class="info-value">${exp.nro_siniestro_interno || '—'} ${exp.nro_siniestro_compania ? '/ ' + exp.nro_siniestro_compania : ''}</div></div>
-      <div class="info-item"><div class="info-label">Compañía de seguros</div><div class="info-value">${exp.compania_seguro || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Fecha del siniestro</div><div class="info-value">${exp.fecha_siniestro || '—'}</div></div>
-      <div class="info-item"><div class="info-label">Tipo de daño</div><div class="info-value">${(exp.tipo_danio || '—').replace(/_/g, ' ')}</div></div>
-    </div>
-    ${exp.descripcion_siniestro ? `<div class="desc-box"><strong>Descripción del siniestro:</strong><br>${exp.descripcion_siniestro}</div>` : ''}
-  </div>
-
-  <!-- Presupuesto -->
-  <div class="section">
-    <div class="section-title">Detalle del presupuesto</div>
-    <table>
-      <thead>
-        <tr>
-          <th style="width:60%">Concepto</th>
-          <th class="text-right">Importe</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${exp.monto_presupuesto_repuestos ? `<tr><td>Repuestos originales FIAT</td><td class="text-right monto">$ ${exp.monto_presupuesto_repuestos.toLocaleString('es-AR')}</td></tr>` : ''}
-        ${exp.monto_presupuesto_mo_taller ? `<tr><td>Mano de obra — Taller mecánico</td><td class="text-right monto">$ ${exp.monto_presupuesto_mo_taller.toLocaleString('es-AR')}</td></tr>` : ''}
-        ${exp.monto_presupuesto_chapista ? `<tr><td>Trabajos de chapa y carrocería</td><td class="text-right monto">$ ${exp.monto_presupuesto_chapista.toLocaleString('es-AR')}</td></tr>` : ''}
-        ${exp.monto_presupuesto_pintura ? `<tr><td>Pintura y acabado</td><td class="text-right monto">$ ${exp.monto_presupuesto_pintura.toLocaleString('es-AR')}</td></tr>` : ''}
-        ${exp.monto_presupuesto_otros ? `<tr><td>Otros conceptos</td><td class="text-right monto">$ ${exp.monto_presupuesto_otros.toLocaleString('es-AR')}</td></tr>` : ''}
-      </tbody>
-    </table>
-  </div>
-
-  ${repList.length > 0 ? `
-  <div class="section repuestos-detail">
-    <h4>Detalle de repuestos</h4>
-    <table class="rep-table">
-      <thead><tr><th>Nro. Parte</th><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">Importe</th></tr></thead>
-      <tbody>
-        ${repList.map(r => `<tr><td>${r.nro_parte}</td><td>${r.descripcion}</td><td class="text-right">${r.cantidad_solicitada}</td><td class="text-right monto">$ ${(r.monto_aprobado || 0).toLocaleString('es-AR')}</td></tr>`).join('')}
-      </tbody>
-    </table>
-  </div>` : ''}
-
-  <!-- Total -->
-  <div class="total-box">
-    <div class="total-label">Total presupuesto</div>
-    <div class="total-amount">$ ${totalPresupuesto.toLocaleString('es-AR')}</div>
-  </div>
-
-  <!-- Condiciones -->
-  <div class="conditions">
-    <h4>Condiciones generales</h4>
-    <ul>
-      <li>El presente presupuesto tiene una validez de 15 (quince) días corridos desde la fecha de emisión.</li>
-      <li>Los precios incluyen IVA. Sujetos a modificación sin previo aviso por parte de la terminal.</li>
-      <li>Los repuestos utilizados son originales FIAT/Stellantis con garantía de fábrica.</li>
-      <li>El plazo estimado de reparación se informará una vez aprobado el presupuesto y confirmada la disponibilidad de repuestos.</li>
-      <li>Los repuestos importados o en tránsito a Tierra del Fuego pueden demorar entre 7 y 15 días hábiles.</li>
-      <li>Cualquier daño oculto detectado durante la reparación será informado mediante presupuesto suplementario.</li>
-      <li>La entrega del vehículo se realizará previa cancelación total del importe o presentación de orden de pago de la compañía aseguradora.</li>
-    </ul>
-  </div>
-
-  <!-- Firmas -->
-  <div class="signatures">
-    <div class="sig-block">
-      <div class="sig-line"></div>
-      <div class="sig-name">${cli?.nombre || ''} ${cli?.apellido || ''}</div>
-      <div class="sig-role">Cliente / Asegurado</div>
-    </div>
-    <div class="sig-block">
-      <div class="sig-line"></div>
-      <div class="sig-name">Liendo Automotores S.A.</div>
-      <div class="sig-role">Taller Oficial FIAT — ${sucLabel}</div>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    <span>LIENDO AUTOMOTORES S.A. — Concesionario Oficial FIAT — Tierra del Fuego, Argentina</span>
-    <span>Documento generado el ${fechaStr}</span>
-  </div>
-</div>
-</body></html>`)
-                w.document.close()
-                setTimeout(() => w.print(), 300)
-              }}
-              className="mt-3 w-full py-2 bg-rose-600 text-white rounded-lg text-sm font-medium hover:bg-rose-500 transition-colors cursor-pointer flex items-center justify-center gap-2"
-            >
-              <FileText className="h-4 w-4" /> Exportar presupuesto PDF
-            </button>
-          )}
+          <PresupuestoDetalle exp={exp} saveField={saveField} totalPresupuesto={totalPresupuesto} />
         </Accordion>
-
         {/* 3. Aprobacion */}
         <Accordion title="Aprobacion" icon={<CheckCircle2 className="h-4 w-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1447,6 +1232,176 @@ function EditableField({ label, value, type = 'text', onSave }: {
 // ═══════════════════════════════════════════════════════════════════════
 // REPUESTOS TABLE
 // ═══════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// PRESUPUESTO CON ITEMS DETALLADOS
+// ═══════════════════════════════════════════════════════════════
+
+interface PresupuestoItem {
+  id: string
+  categoria: 'repuestos' | 'mo_taller' | 'chapista' | 'pintura' | 'otros'
+  descripcion: string
+  cantidad: number
+  precio_unitario: number
+  panos?: number
+}
+
+const CATEGORIAS_PRESUPUESTO = [
+  { key: 'repuestos' as const, label: 'Repuestos', color: 'border-l-blue-500', bg: 'bg-blue-950/10' },
+  { key: 'mo_taller' as const, label: 'Mano de obra taller', color: 'border-l-green-500', bg: 'bg-green-950/10' },
+  { key: 'chapista' as const, label: 'Chapista', color: 'border-l-orange-500', bg: 'bg-orange-950/10' },
+  { key: 'pintura' as const, label: 'Pintura (por paño)', color: 'border-l-purple-500', bg: 'bg-purple-950/10' },
+  { key: 'otros' as const, label: 'Otros', color: 'border-l-gray-500', bg: 'bg-gray-950/10' },
+]
+
+function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
+  exp: SiniestroExpediente; saveField: (field: string, value: unknown) => void
+  totalPresupuesto: number
+}) {
+  const items: PresupuestoItem[] = Array.isArray((exp as any).presupuesto_items) ? (exp as any).presupuesto_items : []
+  const [addCat, setAddCat] = useState<string | null>(null)
+  const [newItem, setNewItem] = useState({ descripcion: '', cantidad: 1, precio_unitario: 0, panos: 1 })
+
+  const saveItems = (updated: PresupuestoItem[]) => {
+    saveField('presupuesto_items', updated)
+    // Also update totals by category
+    const sumCat = (cat: string) => updated.filter(i => i.categoria === cat).reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+    saveField('monto_presupuesto_repuestos', sumCat('repuestos'))
+    saveField('monto_presupuesto_mo_taller', sumCat('mo_taller'))
+    saveField('monto_presupuesto_chapista', sumCat('chapista'))
+    saveField('monto_presupuesto_pintura', sumCat('pintura'))
+    saveField('monto_presupuesto_otros', sumCat('otros'))
+  }
+
+  const addItem = (cat: PresupuestoItem['categoria']) => {
+    if (!newItem.descripcion.trim()) { notify.error('Ingresá una descripción'); return }
+    const item: PresupuestoItem = {
+      id: Date.now().toString(),
+      categoria: cat,
+      descripcion: newItem.descripcion.trim(),
+      cantidad: newItem.cantidad || 1,
+      precio_unitario: newItem.precio_unitario || 0,
+      panos: cat === 'pintura' ? (newItem.panos || 1) : undefined,
+    }
+    saveItems([...items, item])
+    setNewItem({ descripcion: '', cantidad: 1, precio_unitario: 0, panos: 1 })
+    setAddCat(null)
+  }
+
+  const removeItem = (id: string) => {
+    saveItems(items.filter(i => i.id !== id))
+  }
+
+  const grandTotal = items.reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+
+  return (
+    <div className="space-y-4">
+      {/* Fechas */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <EditableField label="Fecha presupuesto" type="date" value={exp.fecha_presupuesto || ''} onSave={v => saveField('fecha_presupuesto', v || null)} />
+        <EditableField label="Fecha envio presupuesto" type="date" value={exp.fecha_envio_presupuesto || ''} onSave={v => saveField('fecha_envio_presupuesto', v || null)} />
+      </div>
+
+      {/* Items por categoría */}
+      {CATEGORIAS_PRESUPUESTO.map(cat => {
+        const catItems = items.filter(i => i.categoria === cat.key)
+        const catTotal = catItems.reduce((s, i) => s + (cat.key === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+
+        return (
+          <div key={cat.key} className={`border-l-4 ${cat.color} rounded-lg ${cat.bg} p-3`}>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-bold text-text-primary uppercase tracking-wider">{cat.label}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-text-primary">{fmtMoney(catTotal)}</span>
+                <button onClick={() => setAddCat(addCat === cat.key ? null : cat.key)}
+                  className="p-1 text-text-muted hover:text-rose-500 cursor-pointer">
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {catItems.length > 0 && (
+              <table className="w-full text-xs mb-2">
+                <thead>
+                  <tr className="text-text-muted border-b border-border/50">
+                    <th className="text-left py-1 font-medium">Descripción</th>
+                    {cat.key === 'pintura'
+                      ? <th className="text-right py-1 font-medium w-16">Paños</th>
+                      : <th className="text-right py-1 font-medium w-16">Cant.</th>
+                    }
+                    <th className="text-right py-1 font-medium w-24">Precio unit.</th>
+                    <th className="text-right py-1 font-medium w-24">Subtotal</th>
+                    <th className="w-8"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {catItems.map(item => {
+                    const sub = cat.key === 'pintura' ? (item.panos || 1) * item.precio_unitario : item.cantidad * item.precio_unitario
+                    return (
+                      <tr key={item.id} className="border-b border-border/30">
+                        <td className="py-1.5 text-text-primary">{item.descripcion}</td>
+                        <td className="py-1.5 text-right text-text-secondary">{cat.key === 'pintura' ? (item.panos || 1) : item.cantidad}</td>
+                        <td className="py-1.5 text-right text-text-secondary font-mono">{fmtMoney(item.precio_unitario)}</td>
+                        <td className="py-1.5 text-right text-text-primary font-semibold font-mono">{fmtMoney(sub)}</td>
+                        <td className="py-1.5 text-right">
+                          <button onClick={() => removeItem(item.id)} className="p-0.5 text-text-muted hover:text-red-500 cursor-pointer">
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+
+            {catItems.length === 0 && addCat !== cat.key && (
+              <p className="text-xs text-text-muted italic">Sin ítems</p>
+            )}
+
+            {addCat === cat.key && (
+              <div className="flex items-end gap-2 mt-2 flex-wrap">
+                <div className="flex-1 min-w-[150px]">
+                  <label className="text-[10px] text-text-muted">Descripción</label>
+                  <input value={newItem.descripcion} onChange={e => setNewItem({ ...newItem, descripcion: e.target.value })}
+                    placeholder="Ej: Paragolpe delantero"
+                    className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary" />
+                </div>
+                {cat.key === 'pintura' ? (
+                  <div className="w-16">
+                    <label className="text-[10px] text-text-muted">Paños</label>
+                    <input type="number" value={newItem.panos} onChange={e => setNewItem({ ...newItem, panos: Number(e.target.value) })}
+                      className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary text-center" />
+                  </div>
+                ) : (
+                  <div className="w-16">
+                    <label className="text-[10px] text-text-muted">Cant.</label>
+                    <input type="number" value={newItem.cantidad} onChange={e => setNewItem({ ...newItem, cantidad: Number(e.target.value) })}
+                      className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary text-center" />
+                  </div>
+                )}
+                <div className="w-28">
+                  <label className="text-[10px] text-text-muted">{cat.key === 'pintura' ? 'Precio/paño' : 'Precio unit.'}</label>
+                  <input type="number" value={newItem.precio_unitario || ''} onChange={e => setNewItem({ ...newItem, precio_unitario: Number(e.target.value) })}
+                    placeholder="$"
+                    className="w-full px-2 py-1.5 bg-bg-input border border-border rounded text-xs text-text-primary" />
+                </div>
+                <button onClick={() => addItem(cat.key)} className="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-medium hover:bg-rose-500 cursor-pointer">Agregar</button>
+                <button onClick={() => setAddCat(null)} className="p-1.5 text-text-muted hover:text-text-primary cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {/* Grand total */}
+      <div className="bg-bg-tertiary rounded-lg p-4 flex justify-between items-center">
+        <p className="text-sm font-bold text-text-primary uppercase tracking-wider">Total presupuesto</p>
+        <p className="text-xl font-bold text-text-primary font-mono">{fmtMoney(grandTotal || totalPresupuesto)}</p>
+      </div>
+    </div>
+  )
+}
 
 function RepuestosTable({ expedienteId, repuestos, qc }: {
   expedienteId: string; repuestos: SiniestroRepuesto[]; qc: ReturnType<typeof useQueryClient>
