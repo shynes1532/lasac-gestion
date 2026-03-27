@@ -234,7 +234,17 @@ const PHASES = [
 const fmtMoney = (n: number) =>
   n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
 
-const fmtDate = (d: string | null) => d ? new Date(d + 'T12:00:00').toLocaleDateString('es-AR') : '-'
+const fmtDate = (d: string | null) => {
+  if (!d) return '-'
+  try {
+    const iso = d.includes('T') ? d : d + 'T12:00:00'
+    return new Date(iso).toLocaleDateString('es-AR')
+  } catch { return d }
+}
+const toDateInput = (d: string | null) => {
+  if (!d) return ''
+  return d.includes('T') ? d.split('T')[0] : d
+}
 
 const daysBetween = (from: string | null, to?: string | null) => {
   if (!from) return 0
@@ -716,8 +726,9 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
     && exp.estado_actual !== 'cancelado'
 
   // presupuesto total
-  const totalPresupuesto = (exp.monto_presupuesto_repuestos || 0) + (exp.monto_presupuesto_mo_taller || 0)
-    + (exp.monto_presupuesto_chapista || 0) + (exp.monto_presupuesto_pintura || 0) + (exp.monto_presupuesto_otros || 0)
+  const n = (v: unknown) => Number(v) || 0
+  const totalPresupuesto = n(exp.monto_presupuesto_repuestos) + n(exp.monto_presupuesto_mo_taller)
+    + n(exp.monto_presupuesto_chapista) + n(exp.monto_presupuesto_pintura) + n(exp.monto_presupuesto_otros)
 
   // repuestos summary
   const repRecibidos = repuestos.filter(r => r.estado === 'recibido_completo').length
@@ -1280,7 +1291,7 @@ function EditableField({ label, value, type = 'text', onSave }: {
     return (
       <div
         className="group cursor-pointer"
-        onClick={() => { setDraft(value); setEditing(true) }}
+        onClick={() => { setDraft(type === 'date' ? toDateInput(value) : value); setEditing(true) }}
       >
         {label && <p className="text-xs text-text-muted mb-0.5">{label}</p>}
         <div className="flex items-center gap-1">
