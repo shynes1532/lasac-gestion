@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2, Pencil,
+  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2, Pencil, Users,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista, TipoPlan, CodigoPlan, VehiculoCodigo } from '../../lib/types'
@@ -26,6 +26,9 @@ export function AhorristasPage() {
   const [expandido, setExpandido] = useState<string | null>(null)
   const [eliminando, setEliminando] = useState<string | null>(null)
   const [editandoId, setEditandoId] = useState<string | null>(null)
+  const [agrupandoId, setAgrupandoId] = useState<string | null>(null)
+  const [grupoInput, setGrupoInput] = useState('')
+  const [ordenInput, setOrdenInput] = useState('')
   const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([])
   const [vendedorId, setVendedorId] = useState('')
 
@@ -342,6 +345,7 @@ export function AhorristasPage() {
                         <span>Plan {a.tipo_plan} ({a.codigo_plan})</span>
                         <span>{a.cuotas_pagas} cuotas pagas</span>
                         <span>{a.sucursal}</span>
+                        {a.numero_orden && <span className="text-cyan-400 font-medium">Grupo: {(a as any).grupo?.numero_grupo || '—'} · Orden: {a.numero_orden}</span>}
                       </div>
                       <div className="flex items-center gap-4 mt-1 text-xs text-text-muted">
                         <span>Vendedor: <span className="text-text-secondary font-medium">{a.vendedor_nombre || '—'}</span></span>
@@ -370,6 +374,22 @@ export function AhorristasPage() {
                         >
                           <Mail className="h-4 w-4" />
                         </a>
+                      )}
+                      {a.estado === 'activo' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAgrupandoId(agrupandoId === a.id ? null : a.id)
+                            setGrupoInput('')
+                            setOrdenInput('')
+                          }}
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            agrupandoId === a.id ? 'bg-cyan-600 text-white' : 'text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10'
+                          }`}
+                          title="Agrupar"
+                        >
+                          <Users className="h-4 w-4" />
+                        </button>
                       )}
                       <button
                         onClick={(e) => {
@@ -406,6 +426,79 @@ export function AhorristasPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* Mini-form agrupar */}
+                {agrupandoId === a.id && (
+                  <div className="px-4 pb-3 border-t border-cyan-500/30 bg-cyan-950/20">
+                    <div className="flex items-end gap-3 pt-3">
+                      <div className="flex-1">
+                        <label className="block text-xs text-cyan-400 mb-1 font-medium">N° Grupo *</label>
+                        <input
+                          type="text"
+                          value={grupoInput}
+                          onChange={e => setGrupoInput(e.target.value)}
+                          placeholder="Ej: G-001"
+                          onClick={e => e.stopPropagation()}
+                          className="w-full px-3 py-2 bg-bg-input border border-cyan-500/40 rounded-lg text-sm text-text-primary focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-xs text-cyan-400 mb-1 font-medium">N° Orden *</label>
+                        <input
+                          type="number"
+                          value={ordenInput}
+                          onChange={e => setOrdenInput(e.target.value)}
+                          placeholder="Ej: 15"
+                          onClick={e => e.stopPropagation()}
+                          className="w-full px-3 py-2 bg-bg-input border border-cyan-500/40 rounded-lg text-sm text-text-primary focus:outline-none focus:border-cyan-400"
+                        />
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          if (!grupoInput.trim()) { toast.error('Ingresá el número de grupo'); return }
+                          if (!ordenInput.trim()) { toast.error('Ingresá el número de orden'); return }
+                          const { error } = await supabase.from('ahorristas').update({
+                            estado: 'agrupado',
+                            numero_orden: parseInt(ordenInput),
+                          }).eq('id', a.id)
+                          if (error) { toast.error(error.message); return }
+                          // Buscar o crear grupo
+                          const { data: grupoExistente } = await supabase
+                            .from('grupos_ahorro')
+                            .select('id')
+                            .eq('numero_grupo', grupoInput.trim())
+                            .maybeSingle()
+                          if (grupoExistente) {
+                            await supabase.from('ahorristas').update({ grupo_id: grupoExistente.id }).eq('id', a.id)
+                          } else {
+                            const { data: nuevoGrupo } = await supabase.from('grupos_ahorro').insert({
+                              numero_grupo: grupoInput.trim(),
+                              tipo_plan: a.tipo_plan,
+                              modelo: a.vehiculo_modelo,
+                              sucursal: a.sucursal,
+                            }).select('id').single()
+                            if (nuevoGrupo) {
+                              await supabase.from('ahorristas').update({ grupo_id: nuevoGrupo.id }).eq('id', a.id)
+                            }
+                          }
+                          toast.success(`${a.nombre_apellido} agrupado en ${grupoInput} orden ${ordenInput}`)
+                          setAgrupandoId(null)
+                          queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                        }}
+                        className="px-4 py-2 bg-cyan-600 text-white rounded-lg text-sm font-medium hover:bg-cyan-500 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Agrupar
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setAgrupandoId(null) }}
+                        className="p-2 text-text-muted hover:text-text-primary cursor-pointer"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Detalle expandido */}
                 {isExpanded && (
