@@ -187,6 +187,15 @@ export function DashboardPage() {
   const usadosMes = ops.filter(o => o.tipo_operacion === 'usados' && estesMes(o)).length
   const planMes = ops.filter(o => o.tipo_operacion === 'plan_ahorro' && estesMes(o)).length
 
+  // ── Entregas ──
+  const entregadas = ops.filter(o => o.estado_actual === 'entregado')
+  const entregadas0km = entregadas.filter(o => o.tipo_operacion === '0km').length
+  const entregadasUsados = entregadas.filter(o => o.tipo_operacion === 'usados').length
+  const entregadasPlan = entregadas.filter(o => o.tipo_operacion === 'plan_ahorro').length
+  const entregadasMes0km = entregadas.filter(o => o.tipo_operacion === '0km' && estesMes(o)).length
+  const entregadasMesUsados = entregadas.filter(o => o.tipo_operacion === 'usados' && estesMes(o)).length
+  const entregadasMesPlan = entregadas.filter(o => o.tipo_operacion === 'plan_ahorro' && estesMes(o)).length
+
   // ── KPIs generales ──
   const demoradas = ops.filter(o =>
     o.fecha_compromiso &&
@@ -242,6 +251,23 @@ export function DashboardPage() {
           <KPI label="Plan Ahorro" value={planMes} color="#534AB7" icon={CheckCircle2}
             sub={`este mes`}
             onClick={() => navigate('/operaciones?tipo=plan_ahorro')} />
+        </div>
+      </div>
+
+      {/* ── UNIDADES ENTREGADAS ── */}
+      <div>
+        <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider mb-3">
+          Unidades entregadas
+        </h2>
+        <div className="grid grid-cols-4 gap-3">
+          <KPI label="Total entregadas" value={entregadas.length} color="#10B981" icon={CheckCircle2}
+            sub="todas" />
+          <KPI label="0KM entregados" value={entregadas0km} color="#185FA5" icon={Car}
+            sub={`${entregadasMes0km} este mes`} />
+          <KPI label="Usados entregados" value={entregadasUsados} color="#854F0B" icon={Car}
+            sub={`${entregadasMesUsados} este mes`} />
+          <KPI label="Plan entregados" value={entregadasPlan} color="#534AB7" icon={Car}
+            sub={`${entregadasMesPlan} este mes`} />
         </div>
       </div>
 
