@@ -216,6 +216,8 @@ export interface Operacion {
   forma_pago_saldo: 'tarjeta' | 'transferencia' | 'efectivo' | null
   saldo_pagado: boolean
   fecha_cancelacion_total: string | null
+  banco_saldo_cancelado: boolean
+  banco_fecha_pago: string | null
 
   // Legado (compatibilidad)
   estado_gestoria: EstadoGestoria

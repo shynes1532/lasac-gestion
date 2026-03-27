@@ -1154,11 +1154,12 @@ function SaldoPagos({
 
   const saldoTotal = op.saldo_cliente ?? 0
   const totalPagado = pagos.reduce((sum, p) => sum + Number(p.monto), 0)
-  const saldoPendiente = saldoTotal - totalPagado
+  const bancoCancelado = !!(op as any).banco_saldo_cancelado
+  const saldoPendiente = bancoCancelado ? 0 : saldoTotal - totalPagado
   const montoNum = parseFloat(monto) || 0
 
-  const estaPagado = saldoPendiente <= 0
-  const tienePagosParciales = pagos.length > 0 && saldoPendiente > 0
+  const estaPagado = saldoPendiente <= 0 || bancoCancelado
+  const tienePagosParciales = !bancoCancelado && pagos.length > 0 && saldoPendiente > 0
   const pctPagado = saldoTotal > 0 ? Math.min(100, Math.round((totalPagado / saldoTotal) * 100)) : 0
 
   const montoExcede = montoNum > saldoPendiente
@@ -1256,8 +1257,64 @@ function SaldoPagos({
       {/* Saldo total destacado */}
       <div className="text-center p-3 bg-bg-secondary rounded-lg mb-3">
         <p className="text-xs text-text-muted">Saldo total</p>
-        <p className="text-2xl font-bold text-text-primary">{formatMoney(saldoTotal)}</p>
+        <p className={`text-2xl font-bold ${bancoCancelado ? 'text-green-400 line-through' : 'text-text-primary'}`}>{formatMoney(saldoTotal)}</p>
+        {bancoCancelado && <p className="text-xs text-green-400 font-medium mt-1">Saldo cancelado por administración</p>}
       </div>
+
+      {/* Sección Banco — solo para financiados */}
+      {(op.forma_pago === 'financiado_banco') && (
+        <div className={`rounded-lg border p-3 mb-3 ${bancoCancelado ? 'border-green-500/40 bg-green-950/20' : 'border-yellow-500/40 bg-yellow-950/20'}`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold uppercase tracking-wider text-text-muted">Estado del banco</p>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${bancoCancelado ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+              {bancoCancelado ? 'PAGADO' : 'PENDIENTE'}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-xs mb-2">
+            <div>
+              <p className="text-text-muted">Banco</p>
+              <p className="text-text-primary font-medium">{op.banco_entidad || '—'}</p>
+            </div>
+            <div>
+              <p className="text-text-muted">Crédito aprobado</p>
+              <p className="text-text-primary font-medium">{op.valor_credito ? formatMoney(op.valor_credito) : '—'}</p>
+            </div>
+            {op.quebranto_monto && (
+              <div>
+                <p className="text-text-muted">Quebranto ({op.quebranto_porcentaje}%)</p>
+                <p className="text-red-400 font-medium">– {formatMoney(op.quebranto_monto)}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-text-muted">Neto a recibir</p>
+              <p className="text-text-primary font-medium">{op.valor_credito && op.quebranto_monto ? formatMoney(op.valor_credito - op.quebranto_monto) : op.valor_credito ? formatMoney(op.valor_credito) : '—'}</p>
+            </div>
+          </div>
+          {!bancoCancelado ? (
+            <button
+              onClick={async () => {
+                const { error } = await supabase.from('operaciones').update({
+                  banco_saldo_cancelado: true,
+                  banco_fecha_pago: new Date().toISOString().split('T')[0],
+                  saldo_pagado: true,
+                }).eq('id', op.id)
+                if (error) notify.error(error.message)
+                else {
+                  notify.success('Banco marcado como pagado — saldo cancelado')
+                  onPagoRegistrado()
+                }
+              }}
+              className="w-full mt-1 px-3 py-2 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-500 transition-colors cursor-pointer"
+            >
+              Marcar banco como pagado — Cancelar saldo
+            </button>
+          ) : (
+            <div className="text-xs text-green-400 mt-1">
+              Pagado el {(op as any).banco_fecha_pago || '—'}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Tabla de pagos registrados */}
       {pagos.length > 0 && (
