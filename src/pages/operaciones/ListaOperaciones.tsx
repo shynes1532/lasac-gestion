@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Search, Filter, AlertTriangle } from 'lucide-react'
+import { Plus, Search, Filter, AlertTriangle, Trash2 } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import { notify } from '../../components/ui/Toast'
 import { COLORES_TIPO, TIPO_LABEL, ESTADO_LABEL, SEMAFORO_EMOJI, SUCURSALES_SELECT } from '../../lib/constants'
 import { getSemaforoCompromiso } from '../../lib/types'
 import type { EstadoActual, TipoOperacion } from '../../lib/types'
@@ -25,7 +27,7 @@ const ESTADOS: { value: EstadoActual | 'todas'; label: string }[] = [
 
 export function ListaOperaciones() {
   const navigate = useNavigate()
-  const { perfil } = useAuth()
+  useAuth()
   const [searchParams] = useSearchParams()
 
   const estadoValidos: (EstadoActual | 'todas')[] = ['todas','cierre','documentacion','gestoria','alistamiento','calidad','entrega','entregado','caida']
@@ -78,7 +80,23 @@ export function ListaOperaciones() {
     )
   })
 
-  const puedeCrear = perfil && ['director','asesor_ush','asesor_rg'].includes(perfil.rol)
+  const queryClient = useQueryClient()
+  const [eliminando, setEliminando] = useState<string | null>(null)
+
+  async function eliminarOp(e: React.MouseEvent, opId: string) {
+    e.stopPropagation()
+    if (eliminando === opId) {
+      // Segundo click = confirmar
+      const { error } = await supabase.from('operaciones').delete().eq('id', opId)
+      if (error) { notify.error(error.message); setEliminando(null); return }
+      notify.success('Operación eliminada')
+      setEliminando(null)
+      queryClient.invalidateQueries({ queryKey: ['operaciones'] })
+    } else {
+      setEliminando(opId)
+      setTimeout(() => setEliminando(null), 3000)
+    }
+  }
 
   return (
     <div>
@@ -88,11 +106,9 @@ export function ListaOperaciones() {
           <h1 className="text-xl font-bold text-text-primary">Operaciones</h1>
           <p className="text-sm text-text-secondary">Pipeline de gestión de entregas</p>
         </div>
-        {puedeCrear && (
-          <Button onClick={() => navigate('/operaciones/nueva')}>
-            <Plus className="h-4 w-4 mr-1" /> Nueva operación
-          </Button>
-        )}
+        <Button onClick={() => navigate('/operaciones/nueva')}>
+          <Plus className="h-4 w-4 mr-1" /> Nueva operación
+        </Button>
       </div>
 
       {/* Filtros */}
@@ -222,6 +238,20 @@ export function ListaOperaciones() {
                     {requierePrenda && op.estado_prenda === 'pendiente' && (
                       <span className="text-xs text-yellow-600 font-medium">🔒 Prenda</span>
                     )}
+
+                    {/* Eliminar */}
+                    <button
+                      onClick={e => eliminarOp(e, op.id)}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg cursor-pointer transition-colors ${
+                        eliminando === op.id
+                          ? 'bg-red-600 text-white'
+                          : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'
+                      }`}
+                      title={eliminando === op.id ? 'Click para confirmar' : 'Eliminar'}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                      {eliminando === op.id ? 'Confirmar' : ''}
+                    </button>
                   </div>
                 </div>
 

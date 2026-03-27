@@ -88,7 +88,7 @@ export function NuevaOperacion() {
       if (data) setModelos(data.map(m => ({ value: m.nombre, label: `${m.nombre}` })))
     })
 
-    supabase.from('usuarios').select('id, nombre_completo, rol').eq('activo', true).in('rol', ['director', 'asesor_ush', 'asesor_rg']).order('nombre_completo').then(({ data, error }) => {
+    supabase.from('usuarios').select('id, nombre_completo, rol').eq('activo', true).order('nombre_completo').then(({ data, error }) => {
       if (error) {
         console.error('Error cargando vendedores:', error)
         return
