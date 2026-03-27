@@ -721,6 +721,108 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
     updateExp.mutate({ [field]: value } as Partial<SiniestroExpediente>)
   }
 
+  function generarPDF() {
+    const hoy = new Date()
+    const fechaStr = hoy.toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    const validez = new Date(hoy.getTime() + 15 * 86400000).toLocaleDateString('es-AR', { day: '2-digit', month: 'long', year: 'numeric' })
+    const nroP = exp.nro_siniestro_interno ? `P-${exp.nro_siniestro_interno}` : `P-${hoy.getFullYear()}-${String(hoy.getMonth()+1).padStart(2,'0')}`
+    const sucL = exp.sucursal === 'rio_grande' ? 'Río Grande' : 'Ushuaia'
+    const repList = repuestos.filter(r => r.monto_aprobado && Number(r.monto_aprobado) > 0)
+    const tp = totalPresupuesto
+    const w = window.open('', '_blank')
+    if (!w) { notify.error('Habilitá las ventanas emergentes para generar el PDF'); return }
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Presupuesto ${nroP}</title>
+<style>
+@page{margin:20mm 15mm}*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1a1a1a;font-size:12px;line-height:1.5}
+.page{max-width:210mm;margin:0 auto}
+.header{display:flex;justify-content:space-between;align-items:flex-start;padding-bottom:20px;border-bottom:3px solid #1a3a5c;margin-bottom:24px}
+.company h1{font-size:22px;color:#1a3a5c;letter-spacing:1px;margin-bottom:2px}
+.company h2{font-size:13px;color:#c0392b;font-weight:600;margin-bottom:4px}
+.company-info{font-size:10px;color:#666;line-height:1.6}
+.doc-info{text-align:right}
+.doc-title{font-size:18px;font-weight:700;color:#1a3a5c;margin-bottom:8px;text-transform:uppercase;letter-spacing:2px}
+.doc-number{font-size:14px;font-weight:600;color:#c0392b;margin-bottom:4px}
+.doc-date{font-size:11px;color:#666}
+.section{margin-bottom:20px}
+.section-title{font-size:11px;font-weight:700;color:#1a3a5c;text-transform:uppercase;letter-spacing:1.5px;padding-bottom:6px;border-bottom:1.5px solid #ddd;margin-bottom:10px}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid #ddd;border-radius:4px;overflow:hidden}
+.info-item{padding:8px 12px;border-bottom:1px solid #eee}
+.info-item:nth-child(odd){border-right:1px solid #eee}
+.info-label{font-size:9px;color:#888;text-transform:uppercase;letter-spacing:.5px}
+.info-value{font-size:12px;font-weight:500;color:#1a1a1a}
+.desc-box{background:#f8f9fa;border:1px solid #e0e0e0;border-radius:4px;padding:12px;margin-top:10px;font-size:12px;color:#333}
+table{width:100%;border-collapse:collapse;margin:12px 0}
+thead th{background:#1a3a5c;color:#fff;padding:10px 12px;font-size:10px;text-transform:uppercase;letter-spacing:1px;font-weight:600}
+thead th:first-child{text-align:left;border-radius:4px 0 0 0}thead th:last-child{text-align:right;border-radius:0 4px 0 0}
+tbody td{padding:10px 12px;border-bottom:1px solid #eee;font-size:12px}
+.text-right{text-align:right}.monto{font-family:'Courier New',monospace;font-weight:600}
+.total-box{background:#1a3a5c;color:#fff;border-radius:6px;padding:16px 20px;display:flex;justify-content:space-between;align-items:center;margin:20px 0}
+.total-label{font-size:14px;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+.total-amount{font-size:24px;font-weight:700;font-family:'Courier New',monospace}
+.conditions{background:#f8f9fa;border:1px solid #e0e0e0;border-radius:4px;padding:14px;margin:16px 0}
+.conditions h4{font-size:10px;color:#1a3a5c;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px;font-weight:700}
+.conditions ul{list-style:none;font-size:10px;color:#555;line-height:1.8}
+.conditions ul li::before{content:"•";color:#c0392b;font-weight:bold;margin-right:6px}
+.signatures{display:flex;justify-content:space-between;margin-top:60px}
+.sig-block{text-align:center;width:200px}
+.sig-line{border-top:1.5px solid #333;margin-bottom:6px;padding-top:60px}
+.sig-name{font-size:11px;font-weight:600;color:#333}
+.sig-role{font-size:9px;color:#888}
+.footer{margin-top:30px;padding-top:12px;border-top:1px solid #ddd;display:flex;justify-content:space-between;font-size:9px;color:#999}
+</style></head><body><div class="page">
+<div class="header"><div class="company"><h1>LIENDO AUTOMOTORES S.A.</h1><h2>Concesionario Oficial FIAT</h2>
+<div class="company-info">Sucursal ${sucL} — Tierra del Fuego, Argentina</div></div>
+<div class="doc-info"><div class="doc-title">Presupuesto</div><div class="doc-number">${nroP}</div>
+<div class="doc-date">Fecha: ${fechaStr}</div><div class="doc-date">Válido hasta: ${validez}</div></div></div>
+<div class="section"><div class="section-title">Datos del cliente / asegurado</div><div class="info-grid">
+<div class="info-item"><div class="info-label">Nombre y apellido</div><div class="info-value">${cli?.nombre||''} ${cli?.apellido||''}</div></div>
+<div class="info-item"><div class="info-label">DNI / CUIL</div><div class="info-value">${cli?.dni||'—'}</div></div>
+<div class="info-item"><div class="info-label">Teléfono</div><div class="info-value">${cli?.telefono||'—'}</div></div>
+<div class="info-item"><div class="info-label">Email</div><div class="info-value">${cli?.email||'—'}</div></div>
+<div class="info-item"><div class="info-label">Dirección</div><div class="info-value">${cli?.direccion||'—'}</div></div>
+<div class="info-item"><div class="info-label">Localidad</div><div class="info-value">${cli?.localidad||sucL}</div></div></div></div>
+<div class="section"><div class="section-title">Datos del vehículo</div><div class="info-grid">
+<div class="info-item"><div class="info-label">Marca / Modelo</div><div class="info-value">${cli?.marca||'FIAT'} ${cli?.modelo||'—'}</div></div>
+<div class="info-item"><div class="info-label">Año</div><div class="info-value">${cli?.anio||'—'}</div></div>
+<div class="info-item"><div class="info-label">Dominio / Patente</div><div class="info-value">${cli?.dominio||'—'}</div></div>
+<div class="info-item"><div class="info-label">VIN / Chasis</div><div class="info-value">${cli?.vin||'—'}</div></div>
+<div class="info-item"><div class="info-label">Color</div><div class="info-value">${cli?.color||'—'}</div></div>
+<div class="info-item"><div class="info-label">Km al ingreso</div><div class="info-value">${exp.km_ingreso?exp.km_ingreso.toLocaleString('es-AR')+' km':'—'}</div></div></div></div>
+<div class="section"><div class="section-title">Datos del siniestro</div><div class="info-grid">
+<div class="info-item"><div class="info-label">Nro. siniestro</div><div class="info-value">${exp.nro_siniestro_interno||'—'} ${exp.nro_siniestro_compania?'/ '+exp.nro_siniestro_compania:''}</div></div>
+<div class="info-item"><div class="info-label">Compañía de seguros</div><div class="info-value">${exp.compania_seguro||'—'}</div></div>
+<div class="info-item"><div class="info-label">Fecha del siniestro</div><div class="info-value">${exp.fecha_siniestro||'—'}</div></div>
+<div class="info-item"><div class="info-label">Tipo de daño</div><div class="info-value">${(exp.tipo_danio||'—').replace(/_/g,' ')}</div></div></div>
+${exp.descripcion_siniestro?`<div class="desc-box"><strong>Descripción:</strong><br>${exp.descripcion_siniestro}</div>`:''}</div>
+<div class="section"><div class="section-title">Detalle del presupuesto</div>
+<table><thead><tr><th style="width:60%">Concepto</th><th class="text-right">Importe</th></tr></thead><tbody>
+${n(exp.monto_presupuesto_repuestos)?`<tr><td>Repuestos originales FIAT</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_repuestos).toLocaleString('es-AR')}</td></tr>`:''}
+${n(exp.monto_presupuesto_mo_taller)?`<tr><td>Mano de obra — Taller mecánico</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_mo_taller).toLocaleString('es-AR')}</td></tr>`:''}
+${n(exp.monto_presupuesto_chapista)?`<tr><td>Trabajos de chapa y carrocería</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_chapista).toLocaleString('es-AR')}</td></tr>`:''}
+${n(exp.monto_presupuesto_pintura)?`<tr><td>Pintura y acabado</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_pintura).toLocaleString('es-AR')}</td></tr>`:''}
+${n(exp.monto_presupuesto_otros)?`<tr><td>Otros conceptos</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_otros).toLocaleString('es-AR')}</td></tr>`:''}
+</tbody></table></div>
+${repList.length>0?`<div class="section"><div class="section-title">Detalle de repuestos</div>
+<table><thead><tr><th>Nro. Parte</th><th>Descripción</th><th class="text-right">Cant.</th><th class="text-right">Importe</th></tr></thead><tbody>
+${repList.map(r=>`<tr><td>${r.nro_parte}</td><td>${r.descripcion}</td><td class="text-right">${r.cantidad_solicitada}</td><td class="text-right monto">$ ${Number(r.monto_aprobado||0).toLocaleString('es-AR')}</td></tr>`).join('')}
+</tbody></table></div>`:''}
+<div class="total-box"><div class="total-label">Total presupuesto</div><div class="total-amount">$ ${tp.toLocaleString('es-AR')}</div></div>
+<div class="conditions"><h4>Condiciones generales</h4><ul>
+<li>Presupuesto válido por 15 días corridos desde la fecha de emisión.</li>
+<li>Precios incluyen IVA. Sujetos a modificación sin previo aviso por parte de la terminal.</li>
+<li>Repuestos originales FIAT/Stellantis con garantía de fábrica.</li>
+<li>Plazo de reparación sujeto a disponibilidad de repuestos.</li>
+<li>Repuestos importados o en tránsito a Tierra del Fuego: 7 a 15 días hábiles.</li>
+<li>Daños ocultos detectados durante la reparación se informarán mediante presupuesto suplementario.</li>
+<li>Entrega del vehículo previa cancelación total o presentación de orden de pago de la aseguradora.</li></ul></div>
+<div class="signatures"><div class="sig-block"><div class="sig-line"></div><div class="sig-name">${cli?.nombre||''} ${cli?.apellido||''}</div><div class="sig-role">Cliente / Asegurado</div></div>
+<div class="sig-block"><div class="sig-line"></div><div class="sig-name">Liendo Automotores S.A.</div><div class="sig-role">Taller Oficial FIAT — ${sucL}</div></div></div>
+<div class="footer"><span>LIENDO AUTOMOTORES S.A. — Concesionario Oficial FIAT — Tierra del Fuego</span><span>${fechaStr}</span></div>
+</div></body></html>`)
+    w.document.close()
+    setTimeout(() => w.print(), 300)
+  }
+
   const currentStateIdx = ESTADOS.indexOf(exp.estado_actual)
   const canAdvance = currentStateIdx >= 0 && currentStateIdx < ESTADOS.length - 1
     && exp.estado_actual !== 'cancelado'
@@ -759,6 +861,12 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
             <span className="text-xs text-text-muted">Cia: {exp.compania_seguro}</span>
           )}
           <Badge text={`Facturar a: ${exp.facturar_a === 'compania' ? 'COMPANIA' : 'CLIENTE'}`} color={exp.facturar_a === 'compania' ? 'purple' : 'blue'} />
+          <button
+            onClick={() => generarPDF()}
+            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-500 transition-colors cursor-pointer"
+          >
+            <Receipt className="h-3.5 w-3.5" /> Presupuesto PDF
+          </button>
           {canAdvance && (
             <Button size="sm" className="bg-rose-600 hover:bg-rose-700" onClick={advanceStage} loading={updateExp.isPending}>
               Avanzar etapa
