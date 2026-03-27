@@ -1330,7 +1330,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
               <p className="text-sm font-bold text-text-primary uppercase tracking-wider">{cat.label}</p>
               <div className="flex items-center gap-3">
                 <span className="text-sm font-bold text-text-primary font-mono">{fmtMoney(catTotal)}</span>
-                <button onClick={() => { setAddCat(addCat === cat.key ? null : cat.key); setCodigo(''); setDesc(''); setPrecio(''); setCant('1'); setPanos('1') }}
+                <button onClick={() => { setAddCat(addCat === cat.key ? null : cat.key); setCodigo(''); setDesc(''); setPrecio(''); setCant('1') }}
                   className="flex items-center gap-1 px-2 py-1 bg-rose-600 text-white rounded text-xs font-medium hover:bg-rose-500 cursor-pointer">
                   <Plus className="h-3 w-3" /> Agregar
                 </button>
