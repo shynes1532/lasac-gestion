@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
-  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2, Pencil, Users,
+  UserCheck, Plus, Search, X, Phone, Mail, Award, AlertTriangle, ChevronDown, ChevronUp, Trash2, Pencil, Users, Trophy, MessageCircle, FileCheck,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import type { Ahorrista, EstadoAhorrista, TipoPlan, CodigoPlan, VehiculoCodigo } from '../../lib/types'
@@ -29,6 +29,12 @@ export function AhorristasPage() {
   const [agrupandoId, setAgrupandoId] = useState<string | null>(null)
   const [grupoInput, setGrupoInput] = useState('')
   const [ordenInput, setOrdenInput] = useState('')
+  const [adjudicandoId, setAdjudicandoId] = useState<string | null>(null)
+  const [adjTipo, setAdjTipo] = useState<'sorteo' | 'licitacion'>('sorteo')
+  const [adjFecha, setAdjFecha] = useState(new Date().toISOString().split('T')[0])
+  const [adjMontoLic, setAdjMontoLic] = useState('')
+  const [moraId, setMoraId] = useState<string | null>(null)
+  const [moraCuotas, setMoraCuotas] = useState('1')
   const [vendedores, setVendedores] = useState<{ id: string; nombre: string }[]>([])
   const [vendedorId, setVendedorId] = useState('')
 
@@ -387,6 +393,7 @@ export function AhorristasPage() {
                           onClick={(e) => {
                             e.stopPropagation()
                             setAgrupandoId(agrupandoId === a.id ? null : a.id)
+                            setAdjudicandoId(null); setMoraId(null)
                             setGrupoInput('')
                             setOrdenInput('')
                           }}
@@ -396,6 +403,40 @@ export function AhorristasPage() {
                           title="Agrupar"
                         >
                           <Users className="h-4 w-4" />
+                        </button>
+                      )}
+                      {a.estado === 'agrupado' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setAdjudicandoId(adjudicandoId === a.id ? null : a.id)
+                            setAgrupandoId(null); setMoraId(null)
+                            setAdjFecha(new Date().toISOString().split('T')[0])
+                            setAdjTipo('sorteo')
+                            setAdjMontoLic('')
+                          }}
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            adjudicandoId === a.id ? 'bg-blue-600 text-white' : 'text-blue-400 hover:text-blue-300 hover:bg-blue-500/10'
+                          }`}
+                          title="Adjudicar"
+                        >
+                          <Trophy className="h-4 w-4" />
+                        </button>
+                      )}
+                      {['activo', 'agrupado', 'adjudicado'].includes(a.estado) && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setMoraId(moraId === a.id ? null : a.id)
+                            setAgrupandoId(null); setAdjudicandoId(null)
+                            setMoraCuotas(String(a.cuotas_impagas_consecutivas || 1))
+                          }}
+                          className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                            moraId === a.id ? 'bg-orange-600 text-white' : 'text-orange-400 hover:text-orange-300 hover:bg-orange-500/10'
+                          }`}
+                          title="Gestionar mora"
+                        >
+                          <AlertTriangle className="h-4 w-4" />
                         </button>
                       )}
                       <button
@@ -507,6 +548,113 @@ export function AhorristasPage() {
                   </div>
                 )}
 
+                {/* Mini-form adjudicar */}
+                {adjudicandoId === a.id && (
+                  <div className="px-4 pb-3 border-t border-blue-500/30 bg-blue-950/20">
+                    <div className="flex items-end gap-3 pt-3 flex-wrap">
+                      <div>
+                        <label className="block text-xs text-blue-400 mb-1 font-medium">Tipo *</label>
+                        <select value={adjTipo} onChange={e => setAdjTipo(e.target.value as any)}
+                          onClick={e => e.stopPropagation()}
+                          className="px-3 py-2 bg-bg-input border border-blue-500/40 rounded-lg text-sm text-text-primary cursor-pointer">
+                          <option value="sorteo">Sorteo</option>
+                          <option value="licitacion">Licitación</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-blue-400 mb-1 font-medium">Fecha *</label>
+                        <input type="date" value={adjFecha} onChange={e => setAdjFecha(e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="px-3 py-2 bg-bg-input border border-blue-500/40 rounded-lg text-sm text-text-primary" />
+                      </div>
+                      {adjTipo === 'licitacion' && (
+                        <div>
+                          <label className="block text-xs text-blue-400 mb-1 font-medium">Monto licitación</label>
+                          <input type="number" value={adjMontoLic} onChange={e => setAdjMontoLic(e.target.value)}
+                            onClick={e => e.stopPropagation()} placeholder="$"
+                            className="px-3 py-2 bg-bg-input border border-blue-500/40 rounded-lg text-sm text-text-primary w-32" />
+                        </div>
+                      )}
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const derAdj = a.valor_movil * 0.02 * 1.21
+                          const { error } = await supabase.from('ahorristas').update({
+                            estado: 'adjudicado',
+                            adjudicado: true,
+                            tipo_adjudicacion: adjTipo,
+                            fecha_adjudicacion: adjFecha,
+                            monto_licitacion: adjTipo === 'licitacion' && adjMontoLic ? parseFloat(adjMontoLic) : null,
+                            derecho_adjudicacion: derAdj,
+                          }).eq('id', a.id)
+                          if (error) { toast.error(error.message); return }
+                          toast.success(`${a.nombre_apellido} adjudicado por ${adjTipo}`)
+                          setAdjudicandoId(null)
+                          queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                        }}
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-500 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Adjudicar
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); setAdjudicandoId(null) }}
+                        className="p-2 text-text-muted hover:text-text-primary cursor-pointer">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Mini-form mora */}
+                {moraId === a.id && (
+                  <div className="px-4 pb-3 border-t border-orange-500/30 bg-orange-950/20">
+                    <div className="flex items-end gap-3 pt-3 flex-wrap">
+                      <div>
+                        <label className="block text-xs text-orange-400 mb-1 font-medium">Cuotas impagas consecutivas</label>
+                        <input type="number" value={moraCuotas} onChange={e => setMoraCuotas(e.target.value)}
+                          onClick={e => e.stopPropagation()} min="0" max="84"
+                          className="px-3 py-2 bg-bg-input border border-orange-500/40 rounded-lg text-sm text-text-primary w-24" />
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation()
+                          const cuotas = parseInt(moraCuotas) || 0
+                          const { error } = await supabase.from('ahorristas').update({
+                            cuotas_impagas_consecutivas: cuotas,
+                            cuotas_impagas_total: Math.max(a.cuotas_impagas_total, cuotas),
+                            en_riesgo_rescision: cuotas >= 3,
+                          }).eq('id', a.id)
+                          if (error) { toast.error(error.message); return }
+                          toast.success(cuotas >= 3 ? `⚠️ ${a.nombre_apellido} en riesgo de rescisión (${cuotas} cuotas)` : `Mora actualizada: ${cuotas} cuotas`)
+                          setMoraId(null)
+                          queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                        }}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg text-sm font-medium hover:bg-orange-500 transition-colors cursor-pointer whitespace-nowrap"
+                      >
+                        Actualizar mora
+                      </button>
+                      {a.telefono && (
+                        <a
+                          href={`https://wa.me/${a.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Hola ${a.nombre_apellido.split(' ')[0]}, nos comunicamos de Liendo Automotores. Detectamos que tenés ${moraCuotas} cuota/s impaga/s en tu plan FIAT (${a.vehiculo_modelo}). ¿Podemos coordinar la regularización?`
+                          )}`}
+                          target="_blank" rel="noopener noreferrer"
+                          onClick={e => e.stopPropagation()}
+                          className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-500 transition-colors whitespace-nowrap"
+                        >
+                          <MessageCircle className="h-4 w-4" /> WhatsApp mora
+                        </a>
+                      )}
+                      <button onClick={(e) => { e.stopPropagation(); setMoraId(null) }}
+                        className="p-2 text-text-muted hover:text-text-primary cursor-pointer">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {parseInt(moraCuotas) >= 3 && (
+                      <p className="text-xs text-red-400 mt-2 font-medium">⚠️ Con 3+ cuotas consecutivas impagas se activa riesgo de rescisión</p>
+                    )}
+                  </div>
+                )}
+
                 {/* Detalle expandido */}
                 {isExpanded && (
                   <div className="px-4 pb-4 border-t border-border pt-3">
@@ -580,6 +728,89 @@ export function AhorristasPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* Checklist documentación para adjudicados */}
+                    {a.adjudicado && (
+                      <div className="mt-4 border-t border-border pt-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileCheck className="h-4 w-4 text-blue-400" />
+                          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Documentación adjudicación</p>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                          {[
+                            { key: 'acepto_adjudicacion', label: 'Aceptó adjudicación' },
+                            { key: 'integracion_completa', label: a.tipo_plan === 'H' ? 'Integración 24 cuotas completa' : 'Integración completa' },
+                            { key: 'cambio_modelo', label: 'Cambio de modelo' },
+                            { key: 'vehiculo_retirado', label: 'Vehículo retirado' },
+                          ].map(doc => (
+                            <label key={doc.key} className="flex items-center gap-2 text-xs cursor-pointer bg-bg-tertiary rounded-lg px-3 py-2 hover:bg-bg-tertiary/80">
+                              <input
+                                type="checkbox"
+                                checked={!!(a as any)[doc.key]}
+                                onChange={async (e) => {
+                                  const { error } = await supabase.from('ahorristas')
+                                    .update({ [doc.key]: e.target.checked })
+                                    .eq('id', a.id)
+                                  if (error) toast.error(error.message)
+                                  else queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                                }}
+                                className="rounded cursor-pointer"
+                              />
+                              <span className={`${(a as any)[doc.key] ? 'text-green-400' : 'text-text-secondary'}`}>{doc.label}</span>
+                            </label>
+                          ))}
+                        </div>
+                        {a.tipo_plan === 'H' && !a.integracion_completa && (
+                          <div className="mt-2 flex items-center gap-2">
+                            <label className="text-xs text-text-muted">Cuotas integradas:</label>
+                            <input type="number" min="0" max="24" value={a.cuotas_integradas || 0}
+                              onChange={async (e) => {
+                                const val = parseInt(e.target.value) || 0
+                                const { error } = await supabase.from('ahorristas').update({
+                                  cuotas_integradas: val,
+                                  integracion_completa: val >= 24,
+                                }).eq('id', a.id)
+                                if (error) toast.error(error.message)
+                                else queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                              }}
+                              className="w-16 px-2 py-1 bg-bg-input border border-border rounded text-sm text-text-primary text-center"
+                            />
+                            <span className="text-xs text-text-muted">/ 24</span>
+                            <div className="flex-1 bg-bg-tertiary rounded-full h-2">
+                              <div className="bg-yellow-500 rounded-full h-2 transition-all" style={{ width: `${Math.min(100, ((a.cuotas_integradas || 0) / 24) * 100)}%` }} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* WhatsApp rápido */}
+                    {a.telefono && (
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        <a href={`https://wa.me/${a.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
+                          `Hola ${a.nombre_apellido.split(' ')[0]}, nos comunicamos de Liendo Automotores respecto a tu plan FIAT ${a.vehiculo_modelo}. ¿Tenés un momento?`
+                        )}`} target="_blank" rel="noopener noreferrer"
+                          className="flex items-center gap-1 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-500 transition-colors">
+                          <MessageCircle className="h-3 w-3" /> WhatsApp
+                        </a>
+                        {a.adjudicado && !a.acepto_adjudicacion && (
+                          <a href={`https://wa.me/${a.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Hola ${a.nombre_apellido.split(' ')[0]}! Te informamos que fuiste adjudicado/a en tu plan FIAT ${a.vehiculo_modelo} por ${a.tipo_adjudicacion || 'sorteo'} el ${a.fecha_adjudicacion || 'día de hoy'}. Necesitamos que te acerques a la sucursal para aceptar la adjudicación y presentar la documentación. ¿Podemos coordinar?`
+                          )}`} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-lg text-xs font-medium hover:bg-blue-500 transition-colors">
+                            <MessageCircle className="h-3 w-3" /> WA: Notificar adjudicación
+                          </a>
+                        )}
+                        {a.cuotas_impagas_consecutivas > 0 && (
+                          <a href={`https://wa.me/${a.telefono.replace(/\D/g, '')}?text=${encodeURIComponent(
+                            `Hola ${a.nombre_apellido.split(' ')[0]}, nos comunicamos de Liendo Automotores. Detectamos que tenés ${a.cuotas_impagas_consecutivas} cuota/s impaga/s en tu plan FIAT (${a.vehiculo_modelo}). ¿Podemos coordinar la regularización?`
+                          )}`} target="_blank" rel="noopener noreferrer"
+                            className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 text-white rounded-lg text-xs font-medium hover:bg-orange-500 transition-colors">
+                            <MessageCircle className="h-3 w-3" /> WA: Gestión mora
+                          </a>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
