@@ -267,6 +267,7 @@ export const ESTADOS_GRUPO: Record<EstadoGrupo, { label: string; color: string }
 
 export const ESTADOS_AHORRISTA: Record<EstadoAhorrista, { label: string; color: string }> = {
   activo:       { label: 'Activo', color: 'bg-green-100 text-green-800' },
+  agrupado:     { label: 'Agrupado', color: 'bg-cyan-100 text-cyan-800' },
   adjudicado:   { label: 'Adjudicado', color: 'bg-blue-100 text-blue-800' },
   entregado:    { label: 'Entregado', color: 'bg-emerald-100 text-emerald-800' },
   renunciado:   { label: 'Renunciado', color: 'bg-orange-100 text-orange-800' },
