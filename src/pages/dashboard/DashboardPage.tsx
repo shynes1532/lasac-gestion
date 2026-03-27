@@ -198,14 +198,14 @@ export function DashboardPage() {
     o.estado_prenda === 'pendiente'
   ).length
 
-  // ── Registro / Gestoría ──
-  const enGestoria = ops.filter(o => o.estado_actual === 'gestoria')
-  const noIngresadosRegistro = enGestoria.filter(o => !o.ingresado_registro)
-  const enRegistro = enGestoria.filter(o => o.ingresado_registro && !o.egresado_registro)
+  // ── Registro / Gestoría — todas las ops activas (no solo paso gestoria) ──
+  const opsActivas = ops.filter(o => !['entregado','caida'].includes(o.estado_actual))
+  const noIngresadosRegistro = opsActivas.filter(o => !o.ingresado_registro && !o.egresado_registro)
+  const enRegistro = opsActivas.filter(o => o.ingresado_registro && !o.egresado_registro)
   const demoradosRegistro = enRegistro.filter(o =>
     o.fecha_ingreso_registro && diasDesde(o.fecha_ingreso_registro) > 4
   )
-  const egresadosRegistro = enGestoria.filter(o => o.egresado_registro)
+  const egresadosRegistro = opsActivas.filter(o => o.egresado_registro)
 
   // Entregas para calendario
   const entregasCalendario = ops.filter(o =>
@@ -262,7 +262,7 @@ export function DashboardPage() {
         <div className="flex items-center gap-2 mb-4">
           <Building2 className="h-4 w-4 text-purple-500" />
           <h2 className="text-sm font-bold text-text-primary">Estado de Registro</h2>
-          <span className="text-xs text-text-muted">({enGestoria.length} en gestoría)</span>
+          <span className="text-xs text-text-muted">({opsActivas.length} operaciones activas)</span>
         </div>
 
         <div className="grid grid-cols-4 gap-3 mb-4">
@@ -285,19 +285,21 @@ export function DashboardPage() {
         </div>
 
         {/* Lista detallada de trámites en gestoría */}
-        {enGestoria.length > 0 && (
+        {opsActivas.length > 0 && (
           <div className="border border-border rounded-lg overflow-hidden">
             <table className="w-full text-xs">
               <thead>
                 <tr className="bg-bg-tertiary text-text-muted">
                   <th className="text-left px-3 py-2 font-medium">Cliente</th>
-                  <th className="text-left px-3 py-2 font-medium">Estado trámite</th>
+                  <th className="text-left px-3 py-2 font-medium">Tipo</th>
+                  <th className="text-left px-3 py-2 font-medium">Paso</th>
+                  <th className="text-left px-3 py-2 font-medium">Estado registro</th>
                   <th className="text-left px-3 py-2 font-medium">O2</th>
                   <th className="text-right px-3 py-2 font-medium">Días en reg.</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {enGestoria.map(o => {
+                {opsActivas.map(o => {
                   const diasEnReg = o.fecha_ingreso_registro ? diasDesde(o.fecha_ingreso_registro) : null
                   const demorado = diasEnReg !== null && diasEnReg > 4
 
@@ -325,6 +327,16 @@ export function DashboardPage() {
                       <td className="px-3 py-2 font-medium text-text-primary">
                         {o.cliente_nombre || '—'}
                       </td>
+                      <td className="px-3 py-2">
+                        <span className={`text-xs px-1.5 py-0.5 rounded ${
+                          o.tipo_operacion === '0km' ? 'bg-blue-100 text-blue-800' :
+                          o.tipo_operacion === 'usados' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-violet-100 text-violet-800'
+                        }`}>
+                          {o.tipo_operacion === '0km' ? '0KM' : o.tipo_operacion === 'usados' ? 'Usado' : 'Plan'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-text-muted capitalize">{o.estado_actual}</td>
                       <td className={`px-3 py-2 ${estadoColor}`}>
                         {estadoLabel}
                         {demorado && <span className="ml-1 text-red-500">⚠</span>}
