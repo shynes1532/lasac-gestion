@@ -27,6 +27,7 @@ const AhorristasPage = lazy(() => import('./pages/ahorristas/AhorristasPage').th
 const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m => ({ default: m.GestionMoraPage })))
 const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
 const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(m => ({ default: m.GarantiasPage })))
+const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').then(m => ({ default: m.SiniestrosPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -113,6 +114,9 @@ export default function App() {
                 } />
                 <Route path="/garantias" element={
                   <ProtectedRoute><GarantiasPage /></ProtectedRoute>
+                } />
+                <Route path="/siniestros" element={
+                  <ProtectedRoute><SiniestrosPage /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}

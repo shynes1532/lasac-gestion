@@ -20,6 +20,7 @@ const navItems = [
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
   { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
   { path: '/garantias',             label: 'Garantias',    icon: Wrench },
+  { path: '/siniestros',            label: 'Siniestros',   icon: AlertTriangle },
   { path: '/calibre',              label: 'Calibre',      icon: Shield },
   { path: '/reportes',            label: 'Reportes',     icon: Printer },
 ]
