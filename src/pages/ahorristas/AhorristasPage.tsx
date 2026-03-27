@@ -729,18 +729,48 @@ export function AhorristasPage() {
                       )}
                     </div>
 
-                    {/* Checklist documentación para adjudicados */}
+                    {/* Checklist carpeta + documentación para adjudicados */}
                     {a.adjudicado && (
                       <div className="mt-4 border-t border-border pt-3">
-                        <div className="flex items-center gap-2 mb-2">
-                          <FileCheck className="h-4 w-4 text-blue-400" />
-                          <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Documentación adjudicación</p>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <FileCheck className="h-4 w-4 text-blue-400" />
+                            <p className="text-xs font-bold text-text-muted uppercase tracking-wider">Carpeta de adjudicación</p>
+                          </div>
+                          <button
+                            onClick={async () => {
+                              if (!confirm(`¿Desadjudicar a ${a.nombre_apellido}? Vuelve a estado "agrupado".`)) return
+                              const { error } = await supabase.from('ahorristas').update({
+                                estado: 'desadjudicado',
+                                adjudicado: false,
+                                acepto_adjudicacion: false,
+                              }).eq('id', a.id)
+                              if (error) toast.error(error.message)
+                              else {
+                                toast.success(`${a.nombre_apellido} desadjudicado — no completó la carpeta`)
+                                queryClient.invalidateQueries({ queryKey: ['ahorristas'] })
+                              }
+                            }}
+                            className="text-xs px-3 py-1 bg-gray-600 text-white rounded-lg hover:bg-gray-500 transition-colors cursor-pointer"
+                          >
+                            Desadjudicar
+                          </button>
                         </div>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+
+                        {/* Checklist carpeta */}
+                        <p className="text-xs text-blue-400 font-medium mb-2">Documentación requerida:</p>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-3">
                           {[
                             { key: 'acepto_adjudicacion', label: 'Aceptó adjudicación' },
-                            { key: 'integracion_completa', label: a.tipo_plan === 'H' ? 'Integración 24 cuotas completa' : 'Integración completa' },
-                            { key: 'cambio_modelo', label: 'Cambio de modelo' },
+                            { key: 'doc_dni', label: 'DNI frente y dorso' },
+                            { key: 'doc_domicilio', label: 'Comprobante de domicilio' },
+                            { key: 'doc_ingresos', label: 'Comprobante de ingresos' },
+                            { key: 'doc_cbu', label: 'CBU / Cuenta bancaria' },
+                            { key: 'doc_seguro', label: 'Póliza de seguro' },
+                            { key: 'doc_formulario08', label: 'Formulario 08 firmado' },
+                            { key: 'doc_ceta', label: 'CETA' },
+                            { key: 'integracion_completa', label: a.tipo_plan === 'H' ? 'Integración 24 cuotas' : 'Integración completa' },
+                            { key: 'cambio_modelo', label: 'Cambio de modelo (si aplica)' },
                             { key: 'vehiculo_retirado', label: 'Vehículo retirado' },
                           ].map(doc => (
                             <label key={doc.key} className="flex items-center gap-2 text-xs cursor-pointer bg-bg-tertiary rounded-lg px-3 py-2 hover:bg-bg-tertiary/80">
@@ -760,6 +790,8 @@ export function AhorristasPage() {
                             </label>
                           ))}
                         </div>
+
+                        {/* Integración Plan H */}
                         {a.tipo_plan === 'H' && !a.integracion_completa && (
                           <div className="mt-2 flex items-center gap-2">
                             <label className="text-xs text-text-muted">Cuotas integradas:</label>
@@ -780,6 +812,13 @@ export function AhorristasPage() {
                               <div className="bg-yellow-500 rounded-full h-2 transition-all" style={{ width: `${Math.min(100, ((a.cuotas_integradas || 0) / 24) * 100)}%` }} />
                             </div>
                           </div>
+                        )}
+
+                        {/* Alerta carpeta incompleta */}
+                        {a.fecha_limite_aceptacion && !a.acepto_adjudicacion && (
+                          <p className="text-xs text-red-400 mt-2 font-medium">
+                            Fecha límite para aceptar: {a.fecha_limite_aceptacion} — Si no completa la carpeta, se desadjudica.
+                          </p>
                         )}
                       </div>
                     )}

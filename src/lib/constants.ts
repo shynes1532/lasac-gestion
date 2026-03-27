@@ -269,6 +269,7 @@ export const ESTADOS_AHORRISTA: Record<EstadoAhorrista, { label: string; color: 
   activo:       { label: 'Activo', color: 'bg-green-100 text-green-800' },
   agrupado:     { label: 'Agrupado', color: 'bg-cyan-100 text-cyan-800' },
   adjudicado:   { label: 'Adjudicado', color: 'bg-blue-100 text-blue-800' },
+  desadjudicado: { label: 'Desadjudicado', color: 'bg-gray-100 text-gray-800' },
   entregado:    { label: 'Entregado', color: 'bg-emerald-100 text-emerald-800' },
   renunciado:   { label: 'Renunciado', color: 'bg-orange-100 text-orange-800' },
   rescindido:   { label: 'Rescindido', color: 'bg-red-100 text-red-800' },
