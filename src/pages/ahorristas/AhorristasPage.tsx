@@ -231,10 +231,14 @@ export function AhorristasPage() {
   const activos = all.filter(a => a.estado === 'activo').length
   const adjudicados = all.filter(a => a.adjudicado).length
   const enRiesgo = all.filter(a => a.en_riesgo_rescision).length
-  const adjSinIntegrar = all.filter(a => a.adjudicado && !a.integracion_completa && a.tipo_plan === 'H').length
   const mesActual = new Date().getMonth()
   const anioActual = new Date().getFullYear()
   const agrupadosMes = all.filter(a => a.estado === 'agrupado' && a.updated_at && new Date(a.updated_at).getMonth() === mesActual && new Date(a.updated_at).getFullYear() === anioActual).length
+  const aprobados = all.filter(a => a.adjudicado && (a as any).etapa_adjudicacion === 'aprobado').length
+  const facturados = all.filter(a => a.adjudicado && (a as any).etapa_adjudicacion === 'facturado').length
+  const esperandoUnidad = all.filter(a => a.adjudicado && (a as any).etapa_adjudicacion === 'esperando_unidad').length
+  const papelesListos = all.filter(a => a.adjudicado && (a as any).etapa_adjudicacion === 'papeles_listos').length
+  const certificadoListo = all.filter(a => a.adjudicado && (a as any).etapa_adjudicacion === 'certificado_listo').length
 
   if (isLoading) return <Skeleton className="h-64" />
 
@@ -263,7 +267,7 @@ export function AhorristasPage() {
       </div>
 
       {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
         <div className="bg-bg-secondary border border-border rounded-xl p-4">
           <p className="text-xs text-text-muted uppercase tracking-wider">Activos</p>
           <p className="text-2xl font-bold text-green-400 mt-1">{activos}</p>
@@ -277,14 +281,30 @@ export function AhorristasPage() {
           <p className="text-2xl font-bold text-blue-400 mt-1">{adjudicados}</p>
         </div>
         <div className="bg-bg-secondary border border-border rounded-xl p-4">
-          <p className="text-xs text-text-muted uppercase tracking-wider">Adj. sin integrar (H)</p>
-          <p className="text-2xl font-bold text-yellow-400 mt-1">{adjSinIntegrar}</p>
-        </div>
-        <div className="bg-bg-secondary border border-border rounded-xl p-4">
-          <p className="text-xs text-text-muted uppercase tracking-wider flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3 text-red-400" /> Riesgo rescisión
-          </p>
+          <p className="text-xs text-text-muted uppercase tracking-wider">En mora</p>
           <p className="text-2xl font-bold text-red-400 mt-1">{enRiesgo}</p>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-6">
+        <div className="bg-bg-secondary border-l-4 border-l-green-500 border border-border rounded-xl p-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider">Aprobados</p>
+          <p className="text-xl font-bold text-green-400 mt-0.5">{aprobados}</p>
+        </div>
+        <div className="bg-bg-secondary border-l-4 border-l-blue-500 border border-border rounded-xl p-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider">Facturados</p>
+          <p className="text-xl font-bold text-blue-400 mt-0.5">{facturados}</p>
+        </div>
+        <div className="bg-bg-secondary border-l-4 border-l-yellow-500 border border-border rounded-xl p-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider">Esperando unidad</p>
+          <p className="text-xl font-bold text-yellow-400 mt-0.5">{esperandoUnidad}</p>
+        </div>
+        <div className="bg-bg-secondary border-l-4 border-l-purple-500 border border-border rounded-xl p-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider">Papeles listos</p>
+          <p className="text-xl font-bold text-purple-400 mt-0.5">{papelesListos}</p>
+        </div>
+        <div className="bg-bg-secondary border-l-4 border-l-emerald-500 border border-border rounded-xl p-3">
+          <p className="text-[10px] text-text-muted uppercase tracking-wider">Certificado listo</p>
+          <p className="text-xl font-bold text-emerald-400 mt-0.5">{certificadoListo}</p>
         </div>
       </div>
 
