@@ -515,6 +515,8 @@ export interface Ahorrista {
   doc_seguro: boolean
   doc_formulario08: boolean
   doc_ceta: boolean
+  doc_veraz: boolean
+  doc_garante: boolean
 
   observaciones: string | null
   created_at: string

@@ -766,12 +766,10 @@ export function AhorristasPage() {
                             { key: 'doc_domicilio', label: 'Comprobante de domicilio' },
                             { key: 'doc_ingresos', label: 'Comprobante de ingresos' },
                             { key: 'doc_cbu', label: 'CBU / Cuenta bancaria' },
-                            { key: 'doc_seguro', label: 'Póliza de seguro' },
-                            { key: 'doc_formulario08', label: 'Formulario 08 firmado' },
-                            { key: 'doc_ceta', label: 'CETA' },
+                            { key: 'doc_veraz', label: 'Veraz apto' },
+                            { key: 'doc_garante', label: 'Garante presentado' },
                             { key: 'integracion_completa', label: a.tipo_plan === 'H' ? 'Integración 24 cuotas' : 'Integración completa' },
                             { key: 'cambio_modelo', label: 'Cambio de modelo (si aplica)' },
-                            { key: 'vehiculo_retirado', label: 'Vehículo retirado' },
                           ].map(doc => (
                             <label key={doc.key} className="flex items-center gap-2 text-xs cursor-pointer bg-bg-tertiary rounded-lg px-3 py-2 hover:bg-bg-tertiary/80">
                               <input
