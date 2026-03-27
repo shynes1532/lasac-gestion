@@ -1251,7 +1251,6 @@ const CATEGORIAS_PRESUPUESTO = [
   { key: 'repuestos' as const, label: 'Repuestos', color: 'border-l-blue-500', bg: 'bg-blue-950/10' },
   { key: 'mo_taller' as const, label: 'Mano de obra taller', color: 'border-l-green-500', bg: 'bg-green-950/10' },
   { key: 'chapista' as const, label: 'Chapista', color: 'border-l-orange-500', bg: 'bg-orange-950/10' },
-  { key: 'pintura' as const, label: 'Pintura (por paño)', color: 'border-l-purple-500', bg: 'bg-purple-950/10' },
   { key: 'otros' as const, label: 'Otros', color: 'border-l-gray-500', bg: 'bg-gray-950/10' },
 ]
 
