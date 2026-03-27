@@ -798,16 +798,16 @@ tbody td{padding:10px 12px;border-bottom:1px solid #eee;font-size:12px}
 ${exp.descripcion_siniestro?`<div class="desc-box"><strong>Descripción:</strong><br>${exp.descripcion_siniestro}</div>`:''}</div>
 <div class="section"><div class="section-title">Detalle del presupuesto</div>
 ${pItems.length > 0 ? (() => {
-  const cats = ['repuestos','mo_taller','chapista','pintura','otros'] as const
+  const cats = ['repuestos','mo_taller','chapista','otros'] as const
   return cats.map(cat => {
     const ci = pItems.filter(i => i.categoria === cat)
     if (ci.length === 0) return ''
-    const catTotal = ci.reduce((s,i) => s + (cat === 'pintura' ? (i.panos||1)*i.precio_unitario : i.cantidad*i.precio_unitario), 0)
+    const catTotal = ci.reduce((s,i) => s + (i.cantidad*i.precio_unitario), 0)
     return `<h3 style="font-size:12px;color:#1a3a5c;margin:16px 0 6px;text-transform:uppercase;letter-spacing:1px">${catLabels[cat]}</h3>
-    <table><thead><tr><th style="width:15%">Código</th><th style="width:35%">Descripción</th><th class="text-right">${cat==='pintura'?'Paños':'Cant.'}</th><th class="text-right">Precio unit.</th><th class="text-right">Subtotal</th></tr></thead><tbody>
+    <table><thead><tr><th style="width:15%">Código</th><th style="width:35%">Descripción</th><th class="text-right">Cant.</th><th class="text-right">Precio unit.</th><th class="text-right">Subtotal</th></tr></thead><tbody>
     ${ci.map(i => {
-      const sub = cat === 'pintura' ? (i.panos||1)*i.precio_unitario : i.cantidad*i.precio_unitario
-      return `<tr><td style="font-family:monospace;font-size:11px">${i.codigo||'—'}</td><td>${i.descripcion}</td><td class="text-right">${cat==='pintura'?(i.panos||1):i.cantidad}</td><td class="text-right monto">$ ${i.precio_unitario.toLocaleString('es-AR')}</td><td class="text-right monto">$ ${sub.toLocaleString('es-AR')}</td></tr>`
+      const sub = i.cantidad*i.precio_unitario
+      return `<tr><td style="font-family:monospace;font-size:11px">${i.codigo||'—'}</td><td>${i.descripcion}</td><td class="text-right">${i.cantidad}</td><td class="text-right monto">$ ${i.precio_unitario.toLocaleString('es-AR')}</td><td class="text-right monto">$ ${sub.toLocaleString('es-AR')}</td></tr>`
     }).join('')}
     <tr style="font-weight:600;background:#f8f8f8"><td>Subtotal ${catLabels[cat]}</td><td></td><td></td><td class="text-right monto">$ ${catTotal.toLocaleString('es-AR')}</td></tr>
     </tbody></table>`
@@ -816,7 +816,6 @@ ${pItems.length > 0 ? (() => {
 ${n(exp.monto_presupuesto_repuestos)?`<tr><td>Repuestos originales FIAT</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_repuestos).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_mo_taller)?`<tr><td>Mano de obra — Taller mecánico</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_mo_taller).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_chapista)?`<tr><td>Trabajos de chapa y carrocería</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_chapista).toLocaleString('es-AR')}</td></tr>`:''}
-${n(exp.monto_presupuesto_pintura)?`<tr><td>Pintura y acabado</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_pintura).toLocaleString('es-AR')}</td></tr>`:''}
 ${n(exp.monto_presupuesto_otros)?`<tr><td>Otros conceptos</td><td class="text-right monto">$ ${n(exp.monto_presupuesto_otros).toLocaleString('es-AR')}</td></tr>`:''}
 </tbody></table>`}
 </div>
@@ -1240,7 +1239,7 @@ function EditableField({ label, value, type = 'text', onSave }: {
 interface PresupuestoItem {
   id: string
   codigo?: string
-  categoria: 'repuestos' | 'mo_taller' | 'chapista' | 'pintura' | 'otros'
+  categoria: 'repuestos' | 'mo_taller' | 'chapista' | 'otros'
   descripcion: string
   cantidad: number
   precio_unitario: number
@@ -1269,7 +1268,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
 
   async function saveItems(updated: PresupuestoItem[]) {
     setSaving(true)
-    const sumCat = (cat: string) => updated.filter(i => i.categoria === cat).reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+    const sumCat = (cat: string) => updated.filter(i => i.categoria === cat).reduce((s, i) => s + (i.cantidad * i.precio_unitario), 0)
     const { error } = await supabase.from('siniestros_expedientes').update({
       presupuesto_items: updated,
       monto_presupuesto_repuestos: sumCat('repuestos'),
@@ -1300,7 +1299,6 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
       descripcion: desc.trim(),
       cantidad: parseInt(cant) || 1,
       precio_unitario: precioNum,
-      panos: cat === 'pintura' ? (parseInt(panos) || 1) : undefined,
     }
     saveItems([...items, item])
     setCodigo(''); setDesc(''); setCant('1'); setPrecio(''); setPanos('1')
@@ -1313,7 +1311,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
     notify.success('Ítem eliminado')
   }
 
-  const grandTotal = items.reduce((s, i) => s + (i.categoria === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+  const grandTotal = items.reduce((s, i) => s + (i.cantidad * i.precio_unitario), 0)
 
   return (
     <div className="space-y-4">
@@ -1326,7 +1324,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
 
       {CATEGORIAS_PRESUPUESTO.map(cat => {
         const catItems = items.filter(i => i.categoria === cat.key)
-        const catTotal = catItems.reduce((s, i) => s + (cat.key === 'pintura' ? (i.panos || 1) * i.precio_unitario : i.cantidad * i.precio_unitario), 0)
+        const catTotal = catItems.reduce((s, i) => s + (i.cantidad * i.precio_unitario), 0)
 
         return (
           <div key={cat.key} className={`border-l-4 ${cat.color} rounded-lg ${cat.bg} p-4`}>
@@ -1344,7 +1342,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
             {catItems.length > 0 && (
               <div className="space-y-2 mb-3">
                 {catItems.map(item => {
-                  const sub = cat.key === 'pintura' ? (item.panos || 1) * item.precio_unitario : item.cantidad * item.precio_unitario
+                  const sub = item.cantidad * item.precio_unitario
                   return (
                     <div key={item.id} className="flex items-center justify-between bg-bg-secondary rounded-lg px-3 py-2">
                       <div className="flex-1">
@@ -1353,10 +1351,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
                           {item.descripcion}
                         </p>
                         <p className="text-xs text-text-muted">
-                          {cat.key === 'pintura'
-                            ? `${item.panos || 1} paño${(item.panos || 1) > 1 ? 's' : ''} × ${fmtMoney(item.precio_unitario)}`
-                            : `${item.cantidad} × ${fmtMoney(item.precio_unitario)}`
-                          }
+                          {`${item.cantidad} × ${fmtMoney(item.precio_unitario)}`}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1388,20 +1383,20 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
                   <div className="col-span-2">
                     <label className="text-xs text-text-muted block mb-1">Descripción *</label>
                     <input value={desc} onChange={e => setDesc(e.target.value)} autoFocus
-                      placeholder={cat.key === 'repuestos' ? 'Ej: Paragolpe delantero' : cat.key === 'mo_taller' ? 'Ej: Desarme y armado' : cat.key === 'chapista' ? 'Ej: Reparación guardabarro' : cat.key === 'pintura' ? 'Ej: Pintura paragolpe' : 'Ej: Acarreo'}
+                      placeholder={cat.key === 'repuestos' ? 'Ej: Paragolpe delantero' : cat.key === 'mo_taller' ? 'Ej: Desarme y armado' : cat.key === 'chapista' ? 'Ej: Reparación guardabarro' : 'Ej: Acarreo'}
                       className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary" />
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   <div>
-                    <label className="text-xs text-text-muted block mb-1">{cat.key === 'pintura' ? 'Paños *' : 'Cantidad *'}</label>
+                    <label className="text-xs text-text-muted block mb-1">Cantidad *</label>
                     <input type="number" min="1"
-                      value={cat.key === 'pintura' ? panos : cant}
-                      onChange={e => cat.key === 'pintura' ? setPanos(e.target.value) : setCant(e.target.value)}
+                      value={cant}
+                      onChange={e => setCant(e.target.value)}
                       className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary text-center" />
                   </div>
                   <div>
-                    <label className="text-xs text-text-muted block mb-1">{cat.key === 'pintura' ? 'Precio por paño *' : 'Precio unitario *'}</label>
+                    <label className="text-xs text-text-muted block mb-1">Precio unitario *</label>
                     <input type="number" min="1" value={precio} onChange={e => setPrecio(e.target.value)}
                       placeholder="$ 0"
                       className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary" />
@@ -1409,7 +1404,7 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
                   <div>
                     <label className="text-xs text-text-muted block mb-1">Subtotal</label>
                     <p className="px-3 py-2 text-sm font-bold text-text-primary font-mono">
-                      {fmtMoney((parseFloat(precio) || 0) * (parseInt(cat.key === 'pintura' ? panos : cant) || 1))}
+                      {fmtMoney((parseFloat(precio) || 0) * (parseInt(cant) || 1))}
                     </p>
                   </div>
                 </div>
