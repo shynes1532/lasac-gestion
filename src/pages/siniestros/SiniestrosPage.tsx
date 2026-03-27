@@ -1263,7 +1263,6 @@ function PresupuestoDetalle({ exp, saveField, totalPresupuesto }: {
   const [desc, setDesc] = useState('')
   const [cant, setCant] = useState('1')
   const [precio, setPrecio] = useState('')
-  const [panos, setPanos] = useState('1')
   const [saving, setSaving] = useState(false)
 
   async function saveItems(updated: PresupuestoItem[]) {
