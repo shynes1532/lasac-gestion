@@ -10,6 +10,14 @@ import type {
   BancoEntidad,
   FormaPago,
   Semaforo,
+  EstadoGrupo,
+  EstadoAhorrista,
+  EstadoCuota,
+  TipoGestionMora,
+  ResultadoGestionMora,
+  TipoPlan,
+  CodigoPlan,
+  VehiculoCodigo,
 } from './types'
 
 // ============================================================
@@ -163,6 +171,148 @@ export const ESTADOS_ALISTAMIENTO: Record<EstadoAlistamiento, { label: string; c
   aprobado:   { label: 'Aprobado', color: 'bg-green-100 text-green-800' },
   rechazado:  { label: 'Rechazado', color: 'bg-red-100 text-red-800' },
 }
+
+// ============================================================
+// SGA — Planes de Ahorro FIAT Plan
+// ============================================================
+
+// --- Tipos de plan ---
+export const TIPOS_PLAN: { value: TipoPlan; label: string; cuotas: number; integrantes: number; pct_cuota: number; integracion_minima: number }[] = [
+  { value: 'H', label: 'Plan H — 84 cuotas', cuotas: 84, integrantes: 168, pct_cuota: 1.19, integracion_minima: 24 },
+  { value: 'E', label: 'Plan E — 50 cuotas', cuotas: 50, integrantes: 100, pct_cuota: 2.0, integracion_minima: 0 },
+]
+
+// --- Códigos de condición del plan ---
+export const CODIGOS_PLAN: { value: CodigoPlan; label: string }[] = [
+  { value: 'B72', label: 'B72 — 70/30 Sin diferimiento' },
+  { value: 'B90', label: 'B90 — 90/10 Sin diferimiento' },
+  { value: 'M81', label: 'M81 — 80/20 Sin diferimiento' },
+  { value: 'M80', label: 'M80 — 80/20 Cuota variable' },
+  { value: 'B70', label: 'B70 — 70/30 Sin diferimientos' },
+  { value: 'B71', label: 'B71 — 70/30 Cuota variable' },
+  { value: 'B61', label: 'B61 — 60/40 84 Cuota variable' },
+]
+
+// --- Catálogo de vehículos con precios vigentes (04/03/2026) ---
+export const CATALOGO_VEHICULOS: {
+  codigo: VehiculoCodigo
+  modelo: string
+  condiciones: { codigo_plan: CodigoPlan; plan: string; precio_lista: number; cuota1_susc: number; cuota2_sin_iva: number; cuota2_sellado_tdf: number }[]
+}[] = [
+  {
+    codigo: 'AR2', modelo: 'ARGO DRIVE 1.3L MT',
+    condiciones: [
+      { codigo_plan: 'B72', plan: '70/30 Sin diferimiento', precio_lista: 29930000, cuota1_susc: 279596, cuota2_sin_iva: 296579, cuota2_sellado_tdf: 327447 },
+    ],
+  },
+  {
+    codigo: 'DP1', modelo: 'CRONOS DRIVE 1.3L MT5 PACK PLUS',
+    condiciones: [
+      { codigo_plan: 'B72', plan: '70/30 Sin diferimiento', precio_lista: 37210000, cuota1_susc: 347603, cuota2_sin_iva: 347362, cuota2_sellado_tdf: 372946 },
+      { codigo_plan: 'B90', plan: '90/10 Sin diferimiento', precio_lista: 37210000, cuota1_susc: 446919, cuota2_sin_iva: 449258, cuota2_sellado_tdf: 487634 },
+      { codigo_plan: 'M81', plan: '80/20 Sin diferimiento', precio_lista: 37210000, cuota1_susc: 397261, cuota2_sin_iva: 408988, cuota2_sellado_tdf: 447364 },
+    ],
+  },
+  {
+    codigo: 'MB1', modelo: 'MOBI TREKKING 1.0',
+    condiciones: [
+      { codigo_plan: 'M80', plan: '80/20 Cuota variable', precio_lista: 27210000, cuota1_susc: 232399, cuota2_sin_iva: 236341, cuota2_sellado_tdf: 255050 },
+    ],
+  },
+  {
+    codigo: 'FP1', modelo: 'PULSE DRIVE 1.3L MT',
+    condiciones: [
+      { codigo_plan: 'B70', plan: '70/30 Sin diferimientos', precio_lista: 36860000, cuota1_susc: 344334, cuota2_sin_iva: 365249, cuota2_sellado_tdf: 403264 },
+    ],
+  },
+  {
+    codigo: 'FS1', modelo: 'STRADA FREEDOM CD 1.3 8V MT',
+    condiciones: [
+      { codigo_plan: 'B70', plan: '70/30 Sin diferimientos', precio_lista: 37710000, cuota1_susc: 352274, cuota2_sin_iva: 409179, cuota2_sellado_tdf: 448071 },
+    ],
+  },
+  {
+    codigo: 'NT1', modelo: 'TORO FREEDOM T270 AT6 4X2',
+    condiciones: [
+      { codigo_plan: 'B71', plan: '70/30 Cuota variable', precio_lista: 47490000, cuota1_susc: 399272, cuota2_sin_iva: 475903, cuota2_sellado_tdf: 524881 },
+    ],
+  },
+  {
+    codigo: 'FO1', modelo: 'FIORINO ENDURANCE 1.4L MT',
+    condiciones: [
+      { codigo_plan: 'B70', plan: '70/30 Sin diferimientos', precio_lista: 29460000, cuota1_susc: 275206, cuota2_sin_iva: 319661, cuota2_sellado_tdf: 350044 },
+    ],
+  },
+  {
+    codigo: 'FT1', modelo: 'FASTBACK TURBO 270 AT6',
+    condiciones: [
+      { codigo_plan: 'B71', plan: '70/30 Cuota variable', precio_lista: 45540000, cuota1_susc: 382878, cuota2_sin_iva: 416760, cuota2_sellado_tdf: 463727 },
+    ],
+  },
+  {
+    codigo: 'DT1', modelo: 'TITANO FREEDOM MT 4W',
+    condiciones: [
+      { codigo_plan: 'B61', plan: '60/40 84 Cuota variable', precio_lista: 58540000, cuota1_susc: 421864, cuota2_sin_iva: 487409, cuota2_sellado_tdf: 527659 },
+    ],
+  },
+]
+
+// --- Estados ---
+export const ESTADOS_GRUPO: Record<EstadoGrupo, { label: string; color: string }> = {
+  formando:  { label: 'Formando', color: 'bg-blue-100 text-blue-800' },
+  activo:    { label: 'Activo', color: 'bg-green-100 text-green-800' },
+  cerrado:   { label: 'Cerrado', color: 'bg-gray-100 text-gray-800' },
+  disuelto:  { label: 'Disuelto', color: 'bg-red-100 text-red-800' },
+}
+
+export const ESTADOS_AHORRISTA: Record<EstadoAhorrista, { label: string; color: string }> = {
+  activo:       { label: 'Activo', color: 'bg-green-100 text-green-800' },
+  adjudicado:   { label: 'Adjudicado', color: 'bg-blue-100 text-blue-800' },
+  entregado:    { label: 'Entregado', color: 'bg-emerald-100 text-emerald-800' },
+  renunciado:   { label: 'Renunciado', color: 'bg-orange-100 text-orange-800' },
+  rescindido:   { label: 'Rescindido', color: 'bg-red-100 text-red-800' },
+  transferido:  { label: 'Transferido', color: 'bg-purple-100 text-purple-800' },
+}
+
+export const ESTADOS_CUOTA: Record<EstadoCuota, { label: string; color: string }> = {
+  pendiente:  { label: 'Pendiente', color: 'bg-gray-100 text-gray-800' },
+  pagada:     { label: 'Pagada', color: 'bg-green-100 text-green-800' },
+  vencida:    { label: 'Vencida', color: 'bg-orange-100 text-orange-800' },
+  en_mora:    { label: 'En Mora', color: 'bg-red-100 text-red-800' },
+  bonificada: { label: 'Bonificada', color: 'bg-blue-100 text-blue-800' },
+}
+
+export const TIPOS_GESTION_MORA: { value: TipoGestionMora; label: string }[] = [
+  { value: 'llamada', label: 'Llamada telefónica' },
+  { value: 'whatsapp', label: 'WhatsApp' },
+  { value: 'email', label: 'Email' },
+  { value: 'carta_documento', label: 'Carta documento' },
+  { value: 'visita', label: 'Visita' },
+  { value: 'otro', label: 'Otro' },
+]
+
+export const RESULTADOS_GESTION_MORA: { value: ResultadoGestionMora; label: string }[] = [
+  { value: 'sin_contacto', label: 'Sin contacto' },
+  { value: 'promesa_pago', label: 'Promesa de pago' },
+  { value: 'pago_parcial', label: 'Pago parcial' },
+  { value: 'pago_total', label: 'Pago total' },
+  { value: 'rechazo', label: 'Rechazo' },
+  { value: 'otro', label: 'Otro' },
+]
+
+// --- Reglas de negocio FIAT Plan ---
+export const REGLAS_FIAT_PLAN = {
+  DERECHO_ADMISION_PCT: 2.5,          // % del valor móvil al suscribir
+  DERECHO_ADJUDICACION_PCT: 2.0,      // % + IVA del valor móvil al adjudicarse
+  CUOTAS_RESCISION: 3,                // 3 cuotas impagas = rescisión
+  DIAS_ACEPTAR_ADJUDICACION: 5,       // 5 días para aceptar
+  DIAS_RETIRAR_VEHICULO: 15,          // 15 días para retirar o cobra estadía
+  INTEGRACION_PLAN_H: 24,             // 24 cuotas mínimo para retirar en Plan H
+  SELLADO_CONTRATO_PCT: 3,            // 3% valor factura (sellado TDF)
+  ARANCEL_INSCRIPCION_PCT: 1,         // 1% valor auto (registro automotor)
+  ARANCEL_PRENDA_PCT: 0.1,            // 0.1% contrato prendario
+  SELLADO_PRENDA_PCT: 1.2,            // 1.2% contrato prendario
+} as const
 
 // ============================================================
 // Template Checklist Documentación 0KM

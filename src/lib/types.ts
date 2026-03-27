@@ -415,6 +415,141 @@ export function getSemaforoCompromiso(fechaCompromiso: string): Semaforo {
   return 'rojo'
 }
 
+// ============================================================
+// SGA — Planes de Ahorro FIAT Plan
+// ============================================================
+
+export type TipoPlan = 'H' | 'E'
+export type CodigoPlan = 'B72' | 'B90' | 'M81' | 'M80' | 'B70' | 'B71' | 'B61'
+export type VehiculoCodigo = 'AR2' | 'DP1' | 'MB1' | 'FP1' | 'FS1' | 'NT1' | 'FO1' | 'FT1' | 'DT1'
+export type EstadoGrupo = 'formando' | 'activo' | 'cerrado' | 'disuelto'
+export type EstadoAhorrista = 'activo' | 'adjudicado' | 'entregado' | 'renunciado' | 'rescindido' | 'transferido'
+export type TipoAdjudicacion = 'sorteo' | 'licitacion'
+export type EstadoCuota = 'pendiente' | 'pagada' | 'vencida' | 'en_mora' | 'bonificada'
+export type TipoGestionMora = 'llamada' | 'whatsapp' | 'email' | 'carta_documento' | 'visita' | 'otro'
+export type ResultadoGestionMora = 'sin_contacto' | 'promesa_pago' | 'pago_parcial' | 'pago_total' | 'rechazo' | 'otro'
+
+export interface GrupoAhorro {
+  id: string
+  numero_grupo: string
+  tipo_plan: TipoPlan
+  modelo: string
+  valor_movil: number
+  cantidad_integrantes: number
+  cantidad_cuotas: number
+  cuotas_acto: number
+  fecha_formacion: string | null
+  estado: EstadoGrupo
+  sucursal: Sucursal
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface Ahorrista {
+  id: string
+  // Alta
+  numero_solicitud: string
+  grupo_id: string | null
+  operacion_id: string | null
+  nombre_apellido: string
+  dni_cuil: string
+  domicilio: string | null
+  localidad: string | null
+  telefono: string | null
+  email: string | null
+  numero_orden: number | null
+  tipo_plan: TipoPlan
+  codigo_plan: CodigoPlan
+  vehiculo_codigo: VehiculoCodigo
+  vehiculo_modelo: string
+  valor_movil: number
+  cuota_pura: number
+  fecha_arranque: string
+  nro_recibo_c1: string | null
+  es_subite: boolean
+  vendedor_id: string | null
+  vendedor_nombre: string | null
+
+  // Estado
+  estado: EstadoAhorrista
+  sucursal: Sucursal
+
+  // Cuotas
+  cuotas_pagas: number
+  cuotas_impagas_consecutivas: number
+  cuotas_impagas_total: number
+  en_riesgo_rescision: boolean
+
+  // Adjudicacion
+  adjudicado: boolean
+  fecha_adjudicacion: string | null
+  tipo_adjudicacion: TipoAdjudicacion | null
+  monto_licitacion: number | null
+  acepto_adjudicacion: boolean | null
+  fecha_limite_aceptacion: string | null
+
+  // Integracion (Plan H = 24 cuotas minimo)
+  integracion_completa: boolean
+  cuotas_integradas: number
+
+  // Gastos
+  derecho_admision: number | null
+  derecho_adjudicacion: number | null
+  gastos_entrega: number | null
+  cambio_modelo: boolean
+  modelo_elegido: string | null
+  diferencia_modelo: number | null
+
+  // Entrega
+  vehiculo_retirado: boolean
+  fecha_retiro: string | null
+  fecha_notificacion_retiro: string | null
+  cobra_estadia: boolean
+
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+  // Joins
+  grupo?: GrupoAhorro | null
+  cuotas?: CuotaAhorro[]
+  vendedor?: Usuario | null
+}
+
+export interface CuotaAhorro {
+  id: string
+  ahorrista_id: string
+  numero_cuota: number
+  monto: number
+  valor_movil_vigente: number | null
+  fecha_vencimiento: string
+  fecha_pago: string | null
+  monto_pagado: number
+  nro_recibo: string | null
+  estado: EstadoCuota
+  dias_mora: number
+  interes_mora: number
+  observaciones: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GestionMora {
+  id: string
+  ahorrista_id: string
+  cuota_id: string | null
+  tipo_gestion: TipoGestionMora
+  fecha_gestion: string
+  resultado: ResultadoGestionMora
+  fecha_promesa: string | null
+  monto_prometido: number | null
+  observaciones: string | null
+  gestionado_por: string | null
+  created_at: string
+  // Joins
+  ahorrista?: Ahorrista | null
+}
+
 // Requiere prenda?
 export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion'>): boolean {
   return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
