@@ -1271,16 +1271,17 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
   const repTransito = allRepuestos.filter((r: any) => r.estado === 'en_transito')
   const repRecibidos = allRepuestos.filter((r: any) => ['recibido_completo', 'recibido_parcial'].includes(r.estado))
   const repIncidencia = allRepuestos.filter((r: any) => r.estado === 'incidencia')
-  const repSinMovimiento = allRepuestos.filter((r: any) => {
-    if (!r.fecha_pedido || ['recibido_completo', 'incidencia'].includes(r.estado)) return false
+  const repDemorados = allRepuestos.filter((r: any) => {
+    if (!r.fecha_pedido || ['recibido_completo', 'recibido_parcial', 'incidencia'].includes(r.estado)) return false
     return daysBetween(r.fecha_pedido) > 5
   })
 
+  // Facturas: 15 días corridos para pagar
   const facturados = activos.filter(e => e.estado_actual === 'facturado' && Number(e.monto_facturado) > 0)
   const cobrados = expedientes.filter(e => e.estado_actual === 'cobrado' || e.fecha_cobro_efectivo)
-  const porVencer = facturados.filter(e => { const d = daysBetween(e.fecha_facturacion); return d >= 25 && d <= 30 })
-  const vencidos = facturados.filter(e => daysBetween(e.fecha_facturacion) > 30)
-  const enPlazo = facturados.filter(e => daysBetween(e.fecha_facturacion) < 25)
+  const enPlazo = facturados.filter(e => daysBetween(e.fecha_facturacion) < 12)
+  const porVencer = facturados.filter(e => { const d = daysBetween(e.fecha_facturacion); return d >= 12 && d <= 15 })
+  const demoradas = facturados.filter(e => daysBetween(e.fecha_facturacion) > 15)
   const montoTotalFacturado = facturados.reduce((s, e) => s + Number(e.monto_facturado || 0), 0)
 
   const porCompania: Record<string, { facturado: number; cobrado: number; expedientes: number; vencidos: number }> = {}
@@ -1289,7 +1290,7 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
     if (!porCompania[cia]) porCompania[cia] = { facturado: 0, cobrado: 0, expedientes: 0, vencidos: 0 }
     porCompania[cia].facturado += Number(e.monto_facturado || 0)
     porCompania[cia].expedientes++
-    if (daysBetween(e.fecha_facturacion) > 30) porCompania[cia].vencidos++
+    if (daysBetween(e.fecha_facturacion) > 15) porCompania[cia].vencidos++
   })
   cobrados.forEach(e => {
     const cia = e.compania_seguro || 'Sin compañía'
@@ -1307,33 +1308,103 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
           <span className="text-xs text-text-muted">({allRepuestos.length} total)</span>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
-          <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-2xl font-bold text-gray-600">{repPendientes.length}</p>
-            <p className="text-xs text-gray-500 font-medium">Sin pedir</p>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-4">
+          <div className="text-center p-3 bg-red-50 rounded-lg border-2 border-red-300">
+            <p className="text-3xl font-bold text-red-600">{repPendientes.length}</p>
+            <p className="text-xs text-red-500 font-bold uppercase">Sin pedir</p>
           </div>
-          <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-            <p className="text-2xl font-bold text-yellow-600">{repPedidos.length}</p>
-            <p className="text-xs text-yellow-500 font-medium">Pedidos</p>
+          <div className="text-center p-3 bg-orange-50 rounded-lg border-2 border-orange-300">
+            <p className="text-3xl font-bold text-orange-600">{repDemorados.length}</p>
+            <p className="text-xs text-orange-500 font-bold uppercase">Demorados (+5 días)</p>
           </div>
           <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
-            <p className="text-2xl font-bold text-blue-600">{repTransito.length}</p>
+            <p className="text-3xl font-bold text-blue-600">{repTransito.length}</p>
             <p className="text-xs text-blue-500 font-medium">En tránsito</p>
           </div>
-          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
-            <p className="text-2xl font-bold text-green-600">{repRecibidos.length}</p>
-            <p className="text-xs text-green-500 font-medium">Recibidos</p>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="text-center p-2 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-xl font-bold text-yellow-600">{repPedidos.length}</p>
+            <p className="text-[10px] text-yellow-500 font-medium">Pedidos</p>
           </div>
-          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-2xl font-bold text-red-600">{repIncidencia.length}</p>
-            <p className="text-xs text-red-500 font-medium">Incidencia</p>
+          <div className="text-center p-2 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-xl font-bold text-green-600">{repRecibidos.length}</p>
+            <p className="text-[10px] text-green-500 font-medium">Recibidos</p>
+          </div>
+          <div className="text-center p-2 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-xl font-bold text-red-600">{repIncidencia.length}</p>
+            <p className="text-[10px] text-red-500 font-medium">Incidencia</p>
+          </div>
+          <div className="text-center p-2 bg-bg-tertiary rounded-lg">
+            <p className="text-xl font-bold text-text-primary">{allRepuestos.length}</p>
+            <p className="text-[10px] text-text-muted font-medium">Total</p>
           </div>
         </div>
 
-        {repSinMovimiento.length > 0 && (
-          <div className="bg-yellow-900/20 border border-yellow-600/40 rounded-lg p-3 mb-4 flex items-start gap-2">
-            <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
-            <p className="text-xs text-yellow-300">{repSinMovimiento.length} repuesto{repSinMovimiento.length > 1 ? 's' : ''} sin movimiento hace +5 días</p>
+        {/* Tabla SIN PEDIR */}
+        {repPendientes.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2">Repuestos sin pedir ({repPendientes.length})</p>
+            <div className="border border-red-500/30 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead><tr className="bg-red-900/20 text-red-300">
+                  <th className="text-left px-3 py-2 font-medium">Nro parte</th>
+                  <th className="text-left px-3 py-2 font-medium">Descripción</th>
+                  <th className="text-left px-3 py-2 font-medium">Siniestro</th>
+                  <th className="text-right px-3 py-2 font-medium">Cant.</th>
+                </tr></thead>
+                <tbody className="divide-y divide-border">
+                  {repPendientes.map((r: any) => {
+                    const exp = r.siniestros_expedientes
+                    const cli = exp?.siniestros_clientes
+                    return (
+                      <tr key={r.id} className="hover:bg-red-900/10 cursor-pointer" onClick={() => r.expediente_id && openDetail(r.expediente_id)}>
+                        <td className="px-3 py-2 font-mono text-text-primary">{r.nro_parte}</td>
+                        <td className="px-3 py-2 text-text-secondary">{r.descripcion}</td>
+                        <td className="px-3 py-2 text-text-muted">{exp?.nro_siniestro_interno || '—'} {cli ? `(${cli.apellido})` : ''}</td>
+                        <td className="px-3 py-2 text-right">{r.cantidad_solicitada}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tabla DEMORADOS */}
+        {repDemorados.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-orange-400 uppercase tracking-wider mb-2">Repuestos demorados — +5 días sin recibir ({repDemorados.length})</p>
+            <div className="border border-orange-500/30 rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead><tr className="bg-orange-900/20 text-orange-300">
+                  <th className="text-left px-3 py-2 font-medium">Nro parte</th>
+                  <th className="text-left px-3 py-2 font-medium">Descripción</th>
+                  <th className="text-left px-3 py-2 font-medium">Siniestro</th>
+                  <th className="text-left px-3 py-2 font-medium">Estado</th>
+                  <th className="text-left px-3 py-2 font-medium">ETA</th>
+                  <th className="text-right px-3 py-2 font-medium">Días</th>
+                </tr></thead>
+                <tbody className="divide-y divide-border">
+                  {repDemorados.map((r: any) => {
+                    const exp = r.siniestros_expedientes
+                    const cli = exp?.siniestros_clientes
+                    const dias = r.fecha_pedido ? daysBetween(r.fecha_pedido) : 0
+                    return (
+                      <tr key={r.id} className="hover:bg-orange-900/10 cursor-pointer" onClick={() => r.expediente_id && openDetail(r.expediente_id)}>
+                        <td className="px-3 py-2 font-mono text-text-primary">{r.nro_parte}</td>
+                        <td className="px-3 py-2 text-text-secondary">{r.descripcion}</td>
+                        <td className="px-3 py-2 text-text-muted">{exp?.nro_siniestro_interno || '—'} {cli ? `(${cli.apellido})` : ''}</td>
+                        <td className="px-3 py-2"><span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getRepuestoColor(r.estado)}`}>{REPUESTO_ESTADOS.find((o: any) => o.value === r.estado)?.label || r.estado}</span></td>
+                        <td className="px-3 py-2 text-text-muted">{r.fecha_eta_estimada ? fmtDate(r.fecha_eta_estimada) : '—'}</td>
+                        <td className="px-3 py-2 text-right font-bold text-orange-400">{dias}d</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -1392,15 +1463,15 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
           </div>
           <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
             <p className="text-2xl font-bold text-green-600">{enPlazo.length}</p>
-            <p className="text-xs text-green-500 font-medium">En plazo (&lt;25d)</p>
+            <p className="text-xs text-green-500 font-medium">En plazo (&lt;12d)</p>
           </div>
           <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
             <p className="text-2xl font-bold text-yellow-600">{porVencer.length}</p>
-            <p className="text-xs text-yellow-500 font-medium">Por vencer (25-30d)</p>
+            <p className="text-xs text-yellow-500 font-medium">Por vencer (12-15d)</p>
           </div>
-          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
-            <p className="text-2xl font-bold text-red-600">{vencidos.length}</p>
-            <p className="text-xs text-red-500 font-medium">Vencidos (&gt;30d)</p>
+          <div className="text-center p-3 bg-red-50 rounded-lg border-2 border-red-300">
+            <p className="text-3xl font-bold text-red-600">{demoradas.length}</p>
+            <p className="text-xs text-red-500 font-bold uppercase">Demoradas (&gt;15d)</p>
           </div>
         </div>
 
@@ -1424,9 +1495,9 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
                   {facturados.sort((a, b) => daysBetween(b.fecha_facturacion) - daysBetween(a.fecha_facturacion)).map(e => {
                     const cli = e.siniestros_clientes
                     const dias = daysBetween(e.fecha_facturacion)
-                    const semColor = dias > 30 ? 'bg-red-500' : dias >= 25 ? 'bg-yellow-500' : 'bg-green-500'
+                    const semColor = dias > 15 ? 'bg-red-500' : dias >= 12 ? 'bg-yellow-500' : 'bg-green-500'
                     return (
-                      <tr key={e.id} className={`hover:bg-bg-secondary/50 cursor-pointer ${dias > 30 ? 'bg-red-900/10' : ''}`}
+                      <tr key={e.id} className={`hover:bg-bg-secondary/50 cursor-pointer ${dias > 15 ? 'bg-red-900/15' : ''}`}
                         onClick={() => openDetail(e.id)}>
                         <td className="px-3 py-2 font-mono text-text-primary">{e.nro_factura || '—'}</td>
                         <td className="px-3 py-2 text-text-muted">{e.nro_siniestro_interno || '—'}</td>
@@ -1434,7 +1505,9 @@ function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
                         <td className="px-3 py-2 text-text-secondary">{e.compania_seguro || '—'}</td>
                         <td className="px-3 py-2 text-right font-semibold font-mono">{fmtMoney(Number(e.monto_facturado))}</td>
                         <td className="px-3 py-2 text-center"><span className={`inline-block w-3 h-3 rounded-full ${semColor}`} /></td>
-                        <td className={`px-3 py-2 text-right font-medium ${dias > 30 ? 'text-red-400' : dias >= 25 ? 'text-yellow-400' : 'text-green-400'}`}>{dias}d</td>
+                        <td className={`px-3 py-2 text-right font-medium ${dias > 15 ? 'text-red-400' : dias >= 12 ? 'text-yellow-400' : 'text-green-400'}`}>
+                          {dias}d {dias > 15 && <span className="text-red-500 font-bold ml-1">DEMORADA</span>}
+                        </td>
                       </tr>
                     )
                   })}
