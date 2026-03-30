@@ -118,8 +118,8 @@ const ESTADO_LABELS: Record<string, string> = {
   esperando_repuesto: 'Esperando Repuesto',
   repuesto_recibido: 'Repuesto Recibido',
   en_reparacion: 'En Reparacion',
-  control_calidad: 'Control Calidad',
-  qc_aprobado: 'QC Aprobado',
+  control_calidad: 'Control de Calidad',
+  qc_aprobado: 'Calidad Aprobada',
   cierre_os: 'Cierre OS',
   facturacion_garantia: 'Facturacion Garantia',
   entrega_cliente: 'Entrega Cliente',
@@ -160,7 +160,7 @@ const PHASES = [
   { key: 'ingreso', label: 'Ingreso', states: ['recepcion', 'diagnostico'] },
   { key: 'cobertura', label: 'Cobertura', states: ['verificacion_cobertura'] },
   { key: 'repuestos', label: 'Repuestos', states: ['esperando_repuesto', 'repuesto_recibido'] },
-  { key: 'reparacion', label: 'Reparacion', states: ['en_reparacion', 'control_calidad', 'qc_aprobado'] },
+  { key: 'reparacion', label: 'Reparación y Calidad', states: ['en_reparacion', 'control_calidad', 'qc_aprobado'] },
   { key: 'cierre', label: 'Cierre', states: ['cierre_os', 'facturacion_garantia', 'entrega_cliente'] },
   { key: 'stellantis', label: 'Stellantis', states: ['transmision_stellantis', 'estado_21', 'estado_24'] },
   { key: 'cobro', label: 'Cobro', states: ['cobro_cap', 'cerrado'] },
@@ -708,15 +708,15 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
           <RepuestosTable expedienteId={exp.id} repuestos={repuestos} qc={qc} />
         </Accordion>
 
-        {/* 4. Reparacion y QC */}
-        <Accordion title="Reparacion y QC" icon={<Wrench className="h-4 w-4" />}>
+        {/* 4. Reparación y Control de Calidad */}
+        <Accordion title="Reparación y Control de Calidad" icon={<Wrench className="h-4 w-4" />}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <EditableField label="Fecha inicio reparacion" type="date" value={exp.fecha_inicio_reparacion || ''} onSave={v => saveField('fecha_inicio_reparacion', v || null)} />
-            <EditableField label="Fecha fin reparacion" type="date" value={exp.fecha_fin_reparacion || ''} onSave={v => saveField('fecha_fin_reparacion', v || null)} />
-            <EditableField label="Tecnico reparacion" value={exp.tecnico_reparacion || ''} onSave={v => saveField('tecnico_reparacion', v)} />
-            <EditableField label="Descripcion reparacion" type="textarea" value={exp.descripcion_reparacion || ''} onSave={v => saveField('descripcion_reparacion', v)} />
+            <EditableField label="Fecha inicio reparación" type="date" value={exp.fecha_inicio_reparacion || ''} onSave={v => saveField('fecha_inicio_reparacion', v || null)} />
+            <EditableField label="Fecha fin reparación" type="date" value={exp.fecha_fin_reparacion || ''} onSave={v => saveField('fecha_fin_reparacion', v || null)} />
+            <EditableField label="Técnico reparación" value={exp.tecnico_reparacion || ''} onSave={v => saveField('tecnico_reparacion', v)} />
+            <EditableField label="Descripción reparación" type="textarea" value={exp.descripcion_reparacion || ''} onSave={v => saveField('descripcion_reparacion', v)} />
             <div className="flex items-center gap-3">
-              <label className="text-sm text-text-secondary">QC aprobado:</label>
+              <label className="text-sm text-text-secondary">Control de calidad:</label>
               <button
                 onClick={() => saveField('qc_aprobado', !exp.qc_aprobado)}
                 className={`px-3 py-1 rounded-full text-xs font-medium cursor-pointer ${exp.qc_aprobado ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}
@@ -724,7 +724,7 @@ function ExpedienteDetail({ exp, repuestos, qc, goBack }: {
                 {exp.qc_aprobado ? 'Aprobado' : 'Pendiente'}
               </button>
             </div>
-            <EditableField label="Fecha control calidad" type="date" value={exp.fecha_control_calidad || ''} onSave={v => saveField('fecha_control_calidad', v || null)} />
+            <EditableField label="Fecha control de calidad" type="date" value={exp.fecha_control_calidad || ''} onSave={v => saveField('fecha_control_calidad', v || null)} />
           </div>
         </Accordion>
 
