@@ -961,7 +961,7 @@ ${repList.map(r=>`<tr><td>${r.nro_parte}</td><td>${r.descripcion}</td><td class=
             <EditableField label="Monto aprobado chapista" type="number" value={String(exp.monto_aprobado_chapista || '')} onSave={v => saveField('monto_aprobado_chapista', v ? Number(v) : 0)} />
             <div className="bg-bg-tertiary rounded-lg p-3">
               <p className="text-xs text-text-muted">Total aprobado</p>
-              <p className="text-lg font-bold text-green-600">{fmtMoney(exp.monto_aprobado_total || 0)}</p>
+              <p className="text-lg font-bold text-green-600">{fmtMoney(n(exp.monto_aprobado_repuestos) + n(exp.monto_aprobado_mo) + n(exp.monto_aprobado_chapista))}</p>
             </div>
             <EditableField label="Orden aprobacion Nro" value={exp.orden_aprobacion_nro || ''} onSave={v => saveField('orden_aprobacion_nro', v)} />
           </div>
