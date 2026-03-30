@@ -406,7 +406,7 @@ export function SiniestrosPage() {
 
   // ─── View state ──────────────────────────────────────────────────
   const [view, setView] = useState<View>('list')
-  const [tab, setTab] = useState<'expedientes' | 'clientes'>('expedientes')
+  const [tab, setTab] = useState<'expedientes' | 'clientes' | 'dashboard'>('expedientes')
   const [selectedExpId, setSelectedExpId] = useState<string | null>(null)
 
   // ─── Filters ─────────────────────────────────────────────────────
@@ -451,6 +451,19 @@ export function SiniestrosPage() {
         .order('created_at')
       if (error) throw error
       return data as SiniestroRepuesto[]
+    },
+  })
+
+  // Query todos los repuestos para dashboard
+  const { data: allRepuestos = [] } = useQuery({
+    queryKey: ['siniestros_repuestos_all'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('siniestros_repuestos')
+        .select('*, siniestros_expedientes(nro_siniestro_interno, siniestros_clientes(nombre, apellido))')
+        .order('created_at', { ascending: false })
+      if (error) throw error
+      return data || []
     },
   })
 
@@ -559,11 +572,21 @@ export function SiniestrosPage() {
           >
             <Users className="h-4 w-4" /> Clientes
           </Button>
+          <Button
+            variant={tab === 'dashboard' ? 'primary' : 'secondary'}
+            size="sm"
+            className={tab === 'dashboard' ? 'bg-rose-600 hover:bg-rose-700' : ''}
+            onClick={() => setTab('dashboard')}
+          >
+            <Activity className="h-4 w-4" /> Dashboard
+          </Button>
         </div>
       </div>
 
       {tab === 'clientes' ? (
         <ClientesList clientes={clientes} loading={loadingCli} qc={qc} />
+      ) : tab === 'dashboard' ? (
+        <SiniestrosDashboard expedientes={expedientes} allRepuestos={allRepuestos} openDetail={openDetail} />
       ) : (
         <>
           {/* KPIs */}
@@ -1231,6 +1254,235 @@ function EditableField({ label, value, type = 'text', onSave }: {
 // ═══════════════════════════════════════════════════════════════════════
 // REPUESTOS TABLE
 // ═══════════════════════════════════════════════════════════════════════
+
+// ═══════════════════════════════════════════════════════════════
+// DASHBOARD: REPUESTOS + FACTURACION/COBRO
+// ═══════════════════════════════════════════════════════════════
+
+function SiniestrosDashboard({ expedientes, allRepuestos, openDetail }: {
+  expedientes: SiniestroExpediente[]
+  allRepuestos: any[]
+  openDetail: (id: string) => void
+}) {
+  const activos = expedientes.filter(e => !['cerrado', 'cancelado', 'cobrado'].includes(e.estado_actual))
+
+  const repPendientes = allRepuestos.filter((r: any) => r.estado === 'pendiente')
+  const repPedidos = allRepuestos.filter((r: any) => r.estado === 'pedido_realizado')
+  const repTransito = allRepuestos.filter((r: any) => r.estado === 'en_transito')
+  const repRecibidos = allRepuestos.filter((r: any) => ['recibido_completo', 'recibido_parcial'].includes(r.estado))
+  const repIncidencia = allRepuestos.filter((r: any) => r.estado === 'incidencia')
+  const repSinMovimiento = allRepuestos.filter((r: any) => {
+    if (!r.fecha_pedido || ['recibido_completo', 'incidencia'].includes(r.estado)) return false
+    return daysBetween(r.fecha_pedido) > 5
+  })
+
+  const facturados = activos.filter(e => e.estado_actual === 'facturado' && Number(e.monto_facturado) > 0)
+  const cobrados = expedientes.filter(e => e.estado_actual === 'cobrado' || e.fecha_cobro_efectivo)
+  const porVencer = facturados.filter(e => { const d = daysBetween(e.fecha_facturacion); return d >= 25 && d <= 30 })
+  const vencidos = facturados.filter(e => daysBetween(e.fecha_facturacion) > 30)
+  const enPlazo = facturados.filter(e => daysBetween(e.fecha_facturacion) < 25)
+  const montoTotalFacturado = facturados.reduce((s, e) => s + Number(e.monto_facturado || 0), 0)
+
+  const porCompania: Record<string, { facturado: number; cobrado: number; expedientes: number; vencidos: number }> = {}
+  facturados.forEach(e => {
+    const cia = e.compania_seguro || 'Sin compañía'
+    if (!porCompania[cia]) porCompania[cia] = { facturado: 0, cobrado: 0, expedientes: 0, vencidos: 0 }
+    porCompania[cia].facturado += Number(e.monto_facturado || 0)
+    porCompania[cia].expedientes++
+    if (daysBetween(e.fecha_facturacion) > 30) porCompania[cia].vencidos++
+  })
+  cobrados.forEach(e => {
+    const cia = e.compania_seguro || 'Sin compañía'
+    if (!porCompania[cia]) porCompania[cia] = { facturado: 0, cobrado: 0, expedientes: 0, vencidos: 0 }
+    porCompania[cia].cobrado += Number(e.monto_cobrado || 0)
+  })
+
+  return (
+    <div className="space-y-6">
+      {/* REPUESTOS */}
+      <div className="bg-bg-secondary rounded-xl border border-border p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <Package className="h-5 w-5 text-orange-400" />
+          <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">Estado de repuestos</h2>
+          <span className="text-xs text-text-muted">({allRepuestos.length} total)</span>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+          <div className="text-center p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-2xl font-bold text-gray-600">{repPendientes.length}</p>
+            <p className="text-xs text-gray-500 font-medium">Sin pedir</p>
+          </div>
+          <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-2xl font-bold text-yellow-600">{repPedidos.length}</p>
+            <p className="text-xs text-yellow-500 font-medium">Pedidos</p>
+          </div>
+          <div className="text-center p-3 bg-blue-50 rounded-lg border border-blue-200">
+            <p className="text-2xl font-bold text-blue-600">{repTransito.length}</p>
+            <p className="text-xs text-blue-500 font-medium">En tránsito</p>
+          </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-2xl font-bold text-green-600">{repRecibidos.length}</p>
+            <p className="text-xs text-green-500 font-medium">Recibidos</p>
+          </div>
+          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-2xl font-bold text-red-600">{repIncidencia.length}</p>
+            <p className="text-xs text-red-500 font-medium">Incidencia</p>
+          </div>
+        </div>
+
+        {repSinMovimiento.length > 0 && (
+          <div className="bg-yellow-900/20 border border-yellow-600/40 rounded-lg p-3 mb-4 flex items-start gap-2">
+            <AlertTriangle className="h-4 w-4 text-yellow-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-yellow-300">{repSinMovimiento.length} repuesto{repSinMovimiento.length > 1 ? 's' : ''} sin movimiento hace +5 días</p>
+          </div>
+        )}
+
+        {[...repPendientes, ...repPedidos, ...repTransito].length > 0 && (
+          <div className="border border-border rounded-lg overflow-hidden">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="bg-bg-tertiary text-text-muted">
+                  <th className="text-left px-3 py-2 font-medium">Nro parte</th>
+                  <th className="text-left px-3 py-2 font-medium">Descripción</th>
+                  <th className="text-left px-3 py-2 font-medium">Siniestro</th>
+                  <th className="text-left px-3 py-2 font-medium">Estado</th>
+                  <th className="text-left px-3 py-2 font-medium">ETA</th>
+                  <th className="text-right px-3 py-2 font-medium">Días</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {[...repPendientes, ...repPedidos, ...repTransito].map((r: any) => {
+                  const exp = r.siniestros_expedientes
+                  const cli = exp?.siniestros_clientes
+                  const dias = r.fecha_pedido ? daysBetween(r.fecha_pedido) : null
+                  const demorado = dias !== null && dias > 5
+                  return (
+                    <tr key={r.id} className={`hover:bg-bg-secondary/50 cursor-pointer ${demorado ? 'bg-yellow-900/10' : ''}`}
+                      onClick={() => r.expediente_id && openDetail(r.expediente_id)}>
+                      <td className="px-3 py-2 font-mono text-text-primary">{r.nro_parte}</td>
+                      <td className="px-3 py-2 text-text-secondary">{r.descripcion}</td>
+                      <td className="px-3 py-2 text-text-muted">{exp?.nro_siniestro_interno || '—'} {cli ? `(${cli.apellido})` : ''}</td>
+                      <td className="px-3 py-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${getRepuestoColor(r.estado)}`}>
+                          {REPUESTO_ESTADOS.find((o: any) => o.value === r.estado)?.label || r.estado}
+                        </span>
+                      </td>
+                      <td className="px-3 py-2 text-text-muted">{r.fecha_eta_estimada ? fmtDate(r.fecha_eta_estimada) : '—'}</td>
+                      <td className={`px-3 py-2 text-right font-medium ${demorado ? 'text-yellow-400' : 'text-text-secondary'}`}>{dias !== null ? `${dias}d` : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* FACTURACION Y COBRO */}
+      <div className="bg-bg-secondary rounded-xl border border-border p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <DollarSign className="h-5 w-5 text-green-400" />
+          <h2 className="text-sm font-bold text-text-primary uppercase tracking-wider">Facturación y cobro</h2>
+        </div>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="text-center p-3 bg-bg-tertiary rounded-lg">
+            <p className="text-xl font-bold text-text-primary">{fmtMoney(montoTotalFacturado)}</p>
+            <p className="text-xs text-text-muted font-medium">Facturado pendiente</p>
+          </div>
+          <div className="text-center p-3 bg-green-50 rounded-lg border border-green-200">
+            <p className="text-2xl font-bold text-green-600">{enPlazo.length}</p>
+            <p className="text-xs text-green-500 font-medium">En plazo (&lt;25d)</p>
+          </div>
+          <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
+            <p className="text-2xl font-bold text-yellow-600">{porVencer.length}</p>
+            <p className="text-xs text-yellow-500 font-medium">Por vencer (25-30d)</p>
+          </div>
+          <div className="text-center p-3 bg-red-50 rounded-lg border border-red-200">
+            <p className="text-2xl font-bold text-red-600">{vencidos.length}</p>
+            <p className="text-xs text-red-500 font-medium">Vencidos (&gt;30d)</p>
+          </div>
+        </div>
+
+        {facturados.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Facturas pendientes de cobro</p>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-bg-tertiary text-text-muted">
+                    <th className="text-left px-3 py-2 font-medium">Nro factura</th>
+                    <th className="text-left px-3 py-2 font-medium">Siniestro</th>
+                    <th className="text-left px-3 py-2 font-medium">Cliente</th>
+                    <th className="text-left px-3 py-2 font-medium">Compañía</th>
+                    <th className="text-right px-3 py-2 font-medium">Monto</th>
+                    <th className="text-center px-3 py-2 font-medium">Semáforo</th>
+                    <th className="text-right px-3 py-2 font-medium">Días</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {facturados.sort((a, b) => daysBetween(b.fecha_facturacion) - daysBetween(a.fecha_facturacion)).map(e => {
+                    const cli = e.siniestros_clientes
+                    const dias = daysBetween(e.fecha_facturacion)
+                    const semColor = dias > 30 ? 'bg-red-500' : dias >= 25 ? 'bg-yellow-500' : 'bg-green-500'
+                    return (
+                      <tr key={e.id} className={`hover:bg-bg-secondary/50 cursor-pointer ${dias > 30 ? 'bg-red-900/10' : ''}`}
+                        onClick={() => openDetail(e.id)}>
+                        <td className="px-3 py-2 font-mono text-text-primary">{e.nro_factura || '—'}</td>
+                        <td className="px-3 py-2 text-text-muted">{e.nro_siniestro_interno || '—'}</td>
+                        <td className="px-3 py-2 text-text-primary">{cli ? `${cli.nombre} ${cli.apellido}` : '—'}</td>
+                        <td className="px-3 py-2 text-text-secondary">{e.compania_seguro || '—'}</td>
+                        <td className="px-3 py-2 text-right font-semibold font-mono">{fmtMoney(Number(e.monto_facturado))}</td>
+                        <td className="px-3 py-2 text-center"><span className={`inline-block w-3 h-3 rounded-full ${semColor}`} /></td>
+                        <td className={`px-3 py-2 text-right font-medium ${dias > 30 ? 'text-red-400' : dias >= 25 ? 'text-yellow-400' : 'text-green-400'}`}>{dias}d</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {Object.keys(porCompania).length > 0 && (
+          <div>
+            <p className="text-xs font-bold text-text-muted uppercase tracking-wider mb-2">Desglose por compañía de seguros</p>
+            <div className="border border-border rounded-lg overflow-hidden">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="bg-bg-tertiary text-text-muted">
+                    <th className="text-left px-3 py-2 font-medium">Compañía</th>
+                    <th className="text-right px-3 py-2 font-medium">Exp.</th>
+                    <th className="text-right px-3 py-2 font-medium">Facturado</th>
+                    <th className="text-right px-3 py-2 font-medium">Cobrado</th>
+                    <th className="text-right px-3 py-2 font-medium">Pendiente</th>
+                    <th className="text-right px-3 py-2 font-medium">Vencidos</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {Object.entries(porCompania).sort((a, b) => b[1].facturado - a[1].facturado).map(([cia, d]) => (
+                    <tr key={cia}>
+                      <td className="px-3 py-2 text-text-primary font-medium">{cia}</td>
+                      <td className="px-3 py-2 text-right text-text-secondary">{d.expedientes}</td>
+                      <td className="px-3 py-2 text-right font-mono">{fmtMoney(d.facturado)}</td>
+                      <td className="px-3 py-2 text-right font-mono text-green-400">{fmtMoney(d.cobrado)}</td>
+                      <td className="px-3 py-2 text-right font-mono font-semibold">{fmtMoney(d.facturado - d.cobrado)}</td>
+                      <td className="px-3 py-2 text-right">{d.vencidos > 0 ? <span className="text-red-400 font-semibold">{d.vencidos}</span> : '0'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {facturados.length === 0 && cobrados.length === 0 && (
+          <p className="text-sm text-text-muted text-center py-8">No hay facturas emitidas todavía</p>
+        )}
+      </div>
+    </div>
+  )
+}
 
 // ═══════════════════════════════════════════════════════════════
 // PRESUPUESTO CON ITEMS DETALLADOS
