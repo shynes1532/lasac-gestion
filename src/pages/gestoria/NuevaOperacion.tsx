@@ -531,12 +531,29 @@ export function NuevaOperacion() {
         {/* VEHÍCULO */}
         <section className="bg-bg-secondary rounded-xl border border-border p-5 space-y-4">
           <h2 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Vehículo</h2>
-          <Select
-            label="Modelo / Versión *"
-            value={form.modelo_version}
-            onChange={e => set('modelo_version', e.target.value)}
-            options={[{ value: '', label: modelos.length ? 'Seleccionar modelo...' : 'Cargando...' }, ...modelos]}
-          />
+          {form.tipo_operacion === 'usados' ? (
+            <div>
+              <label className="block text-sm text-text-secondary mb-1">Modelo / Versión *</label>
+              <input
+                list="modelos-list"
+                value={form.modelo_version}
+                onChange={e => set('modelo_version', e.target.value)}
+                placeholder="Seleccioná o escribí el modelo (ej: Toyota Hilux 2.8)"
+                className="w-full px-3 py-2 bg-bg-input border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:border-action"
+              />
+              <datalist id="modelos-list">
+                {modelos.map(m => <option key={m.value} value={m.value} />)}
+              </datalist>
+              <p className="text-xs text-text-muted mt-1">Podés escribir cualquier marca y modelo</p>
+            </div>
+          ) : (
+            <Select
+              label="Modelo / Versión *"
+              value={form.modelo_version}
+              onChange={e => set('modelo_version', e.target.value)}
+              options={[{ value: '', label: modelos.length ? 'Seleccionar modelo...' : 'Cargando...' }, ...modelos]}
+            />
+          )}
           <div className="grid grid-cols-2 gap-3">
             <Input
               label="VIN / Chasis *"
