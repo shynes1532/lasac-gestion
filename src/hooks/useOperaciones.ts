@@ -32,6 +32,9 @@ export function useOperaciones(filtros: FiltrosOperaciones = {}) {
         .order('created_at', { ascending: false })
         .range((page - 1) * pageSize, page * pageSize - 1)
 
+      // Excluir entregadas completas (se ven en /unidades-entregadas)
+      query = query.not('estado_actual', 'eq', 'entregado')
+
       if (filtros.estado_gestoria) {
         query = query.eq('estado_gestoria', filtros.estado_gestoria)
       }

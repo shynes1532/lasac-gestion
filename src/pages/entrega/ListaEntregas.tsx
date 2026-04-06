@@ -26,7 +26,7 @@ export function ListaEntregas() {
         .select(`
           *,
           operacion:operaciones(
-            id, numero_operacion, sucursal,
+            id, numero_operacion, sucursal, cliente_nombre,
             unidad:unidades(modelo, color, vin_chasis),
             titular:titulares(nombre_apellido, telefono)
           )
@@ -114,7 +114,7 @@ export function ListaEntregas() {
                       {isTomorrow(entrega.fecha_programada) && <Badge color="yellow" size="sm">Mañana</Badge>}
                     </div>
                     <p className="text-sm font-medium text-text-primary">
-                      {titular?.nombre_apellido || 'Sin titular'}
+                      {titular?.nombre_apellido || op?.cliente_nombre || 'Sin titular'}
                     </p>
                     <p className="text-sm text-text-secondary">
                       {unidad?.modelo || ''} — {unidad?.color || ''}

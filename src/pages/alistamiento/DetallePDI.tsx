@@ -27,7 +27,7 @@ export function DetallePDI() {
         .select(`
           *,
           operacion:operaciones(
-            id, numero_operacion, sucursal,
+            id, numero_operacion, sucursal, cliente_nombre,
             unidad:unidades(*),
             titular:titulares(nombre_apellido, telefono)
           )
@@ -176,7 +176,7 @@ export function DetallePDI() {
             <EstadoBadge estado={estadoPDI} tipo="alistamiento" size="md" />
           </div>
           <p className="text-sm text-text-secondary">
-            VIN: {unidad?.vin_chasis || 'N/A'} | {unidad?.color} | {titular?.nombre_apellido}
+            VIN: {unidad?.vin_chasis || 'N/A'} | {unidad?.color} | {titular?.nombre_apellido || op?.cliente_nombre || 'Sin titular'}
           </p>
         </div>
       </div>

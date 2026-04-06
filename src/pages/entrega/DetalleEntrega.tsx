@@ -22,7 +22,7 @@ export function DetalleEntrega() {
         .select(`
           *,
           operacion:operaciones(
-            id, numero_operacion, sucursal, tipo_operacion,
+            id, numero_operacion, sucursal, tipo_operacion, cliente_nombre,
             unidad:unidades(*),
             titular:titulares(*),
             alistamiento:alistamiento_pdi(aprobado, no_conformidades),
@@ -92,6 +92,7 @@ export function DetalleEntrega() {
   const op = entrega.operacion as any
   const unidad = op?.unidad?.[0]
   const titular = op?.titular?.[0]
+  const nombreCliente = titular?.nombre_apellido || op?.cliente_nombre || 'Sin titular'
   const encuesta = op?.encuesta?.[0]
   const entregado = !!entrega.acto_entregado_at
 
@@ -104,23 +105,23 @@ export function DetalleEntrega() {
   const waTemplates = [
     {
       label: 'Confirmación de entrega',
-      msg: `Hola ${titular?.nombre_apellido}! 👋 Te confirmamos la entrega de tu ${unidad?.modelo} ${unidad?.color} para el día ${formatDate(entrega.fecha_programada)} a las ${entrega.hora_programada?.slice(0,5) || ''} en nuestra sucursal de ${op?.sucursal}. Por favor traé: DNI original, comprobante de seguro vigente. ¡Te esperamos! 🚗 - Liendo Automotores`,
+      msg: `Hola ${nombreCliente}! 👋 Te confirmamos la entrega de tu ${unidad?.modelo} ${unidad?.color} para el día ${formatDate(entrega.fecha_programada)} a las ${entrega.hora_programada?.slice(0,5) || ''} en nuestra sucursal de ${op?.sucursal}. Por favor traé: DNI original, comprobante de seguro vigente. ¡Te esperamos! 🚗 - Liendo Automotores`,
     },
     {
       label: 'Recordatorio 24hs',
-      msg: `Hola ${titular?.nombre_apellido}! Te recordamos que mañana ${formatDate(entrega.fecha_programada)} a las ${entrega.hora_programada?.slice(0,5) || ''} es la entrega de tu ${unidad?.modelo}. Recordá traer: ✅ DNI original ✅ Comprobante de seguro vigente ✅ Forma de pago del saldo (si aplica). ¡Nos vemos! - Liendo Automotores ${op?.sucursal}`,
+      msg: `Hola ${nombreCliente}! Te recordamos que mañana ${formatDate(entrega.fecha_programada)} a las ${entrega.hora_programada?.slice(0,5) || ''} es la entrega de tu ${unidad?.modelo}. Recordá traer: ✅ DNI original ✅ Comprobante de seguro vigente ✅ Forma de pago del saldo (si aplica). ¡Nos vemos! - Liendo Automotores ${op?.sucursal}`,
     },
     {
       label: 'Bienvenida post-entrega',
-      msg: `¡Felicitaciones ${titular?.nombre_apellido}! 🎉 Ya sos parte de la familia FIAT. Tu ${unidad?.modelo} ${unidad?.color} ya es tuyo. ¡Disfrutá tu FIAT! 🚗 - Liendo Automotores`,
+      msg: `¡Felicitaciones ${nombreCliente}! 🎉 Ya sos parte de la familia FIAT. Tu ${unidad?.modelo} ${unidad?.color} ya es tuyo. ¡Disfrutá tu FIAT! 🚗 - Liendo Automotores`,
     },
     {
       label: 'Encuesta de satisfacción',
-      msg: `Hola ${titular?.nombre_apellido}! Queremos saber cómo fue tu experiencia con la entrega de tu ${unidad?.modelo}. ¿Podés completar esta breve encuesta? Nos ayuda mucho a mejorar: https://docs.google.com/forms/d/e/1FAIpQLSdW-MGx5YdZ7yPYG28YSM0RB92URIc_4pZo_LBNVg-DFM5qTg/viewform ¡Muchas gracias! - Liendo Automotores`,
+      msg: `Hola ${nombreCliente}! Queremos saber cómo fue tu experiencia con la entrega de tu ${unidad?.modelo}. ¿Podés completar esta breve encuesta? Nos ayuda mucho a mejorar: https://docs.google.com/forms/d/e/1FAIpQLSdW-MGx5YdZ7yPYG28YSM0RB92URIc_4pZo_LBNVg-DFM5qTg/viewform ¡Muchas gracias! - Liendo Automotores`,
     },
     {
       label: 'Seguimiento T+7',
-      msg: `Hola ${titular?.nombre_apellido}! Ya pasó una semana con tu ${unidad?.modelo}. ¿Cómo viene todo? ¿Alguna consulta sobre el vehículo? Estamos para ayudarte. - Liendo Automotores ${op?.sucursal}`,
+      msg: `Hola ${nombreCliente}! Ya pasó una semana con tu ${unidad?.modelo}. ¿Cómo viene todo? ¿Alguna consulta sobre el vehículo? Estamos para ayudarte. - Liendo Automotores ${op?.sucursal}`,
     },
   ]
 
@@ -143,7 +144,7 @@ export function DetalleEntrega() {
             <EstadoBadge estado={entregado ? 'entregada' : 'programada'} tipo="entrega" size="md" />
           </div>
           <p className="text-sm text-text-secondary">
-            {titular?.nombre_apellido} — {unidad?.modelo} {unidad?.color}
+            {nombreCliente} — {unidad?.modelo} {unidad?.color}
           </p>
         </div>
       </div>
@@ -192,7 +193,7 @@ export function DetalleEntrega() {
           <Card>
             <h3 className="text-sm font-semibold text-text-primary mb-3">Titular</h3>
             <div className="space-y-2 text-sm">
-              <p><span className="text-text-muted">Nombre:</span> <span className="text-text-primary">{titular?.nombre_apellido}</span></p>
+              <p><span className="text-text-muted">Nombre:</span> <span className="text-text-primary">{nombreCliente}</span></p>
               <p><span className="text-text-muted">DNI:</span> <span className="text-text-primary">{titular?.dni_cuil}</span></p>
               <p><span className="text-text-muted">Teléfono:</span> <span className="text-text-primary">{titular?.telefono}</span></p>
               <p><span className="text-text-muted">Email:</span> <span className="text-text-primary">{titular?.email || '—'}</span></p>
@@ -298,7 +299,7 @@ export function DetalleEntrega() {
         onClose={() => setConfirmEntrega(false)}
         onConfirm={() => confirmarEntrega.mutate()}
         title="Confirmar entrega"
-        message={`¿Confirmar que ${titular?.nombre_apellido} recibió su ${unidad?.modelo} ${unidad?.color}?`}
+        message={`¿Confirmar que ${nombreCliente} recibió su ${unidad?.modelo} ${unidad?.color}?`}
         confirmText="Confirmar entrega"
         loading={confirmarEntrega.isPending}
       />

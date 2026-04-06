@@ -27,7 +27,7 @@ export function ColaPDI() {
         .select(`
           *,
           operacion:operaciones(
-            id, numero_operacion, sucursal, tipo_operacion,
+            id, numero_operacion, sucursal, tipo_operacion, cliente_nombre,
             unidad:unidades(*),
             titular:titulares(nombre_apellido)
           )
@@ -130,7 +130,7 @@ export function ColaPDI() {
                       {unidad?.modelo || 'Sin modelo'} — {unidad?.color || ''}
                     </p>
                     <p className="text-xs text-text-secondary">
-                      VIN: ...{unidad?.vin_chasis?.slice(-6) || 'N/A'} | {titular?.nombre_apellido || 'Sin titular'}
+                      VIN: ...{unidad?.vin_chasis?.slice(-6) || 'N/A'} | {titular?.nombre_apellido || op?.cliente_nombre || 'Sin titular'}
                     </p>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-text-muted">

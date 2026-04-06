@@ -106,7 +106,7 @@ export function ListaOperaciones() {
                     <EstadoBadge estado={op.estado_gestoria} tipo="gestoria" />
                   </div>
                   <p className="text-sm font-medium text-text-primary truncate">
-                    {(op as any).titular?.[0]?.nombre_apellido || 'Sin titular'}
+                    {(op as any).titular?.[0]?.nombre_apellido || op.cliente_nombre || 'Sin titular'}
                   </p>
                   <p className="text-sm text-text-secondary truncate">
                     {(op as any).unidad?.[0]?.modelo || 'Sin unidad'} — {(op as any).unidad?.[0]?.color || ''}
