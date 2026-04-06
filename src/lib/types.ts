@@ -574,6 +574,7 @@ export type SubareaAdmin = 'plan' | 'convencional'
 export type SubareaVentas = 'plan' | '0km'
 export type SubareaRecepcion = SubareaPosventa | SubareaAdmin | SubareaVentas
 export type EstadoRecepcion = 'en_espera' | 'atendido' | 'contactado'
+export type OrigenRecepcion = 'redes_sociales' | 'recomendacion' | 'paso_por_puerta' | 'llamada' | 'whatsapp' | 'web' | 'otro'
 
 export interface Recepcion {
   id: string
@@ -581,6 +582,8 @@ export interface Recepcion {
   telefono: string
   area: AreaRecepcion
   subarea: SubareaRecepcion
+  origen: OrigenRecepcion | null
+  modelo_interes: string | null
   notas: string | null
   estado: EstadoRecepcion
   atendido_por: string | null

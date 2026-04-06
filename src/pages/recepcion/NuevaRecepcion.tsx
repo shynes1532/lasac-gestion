@@ -20,6 +20,31 @@ const SUBAREAS: Record<string, { label: string; value: string }[]> = {
   ],
 }
 
+const ORIGENES = [
+  { label: 'Seleccionar...', value: '' },
+  { label: 'Redes sociales', value: 'redes_sociales' },
+  { label: 'Recomendación', value: 'recomendacion' },
+  { label: 'Pasó por la puerta', value: 'paso_por_puerta' },
+  { label: 'Llamada telefónica', value: 'llamada' },
+  { label: 'WhatsApp', value: 'whatsapp' },
+  { label: 'Web / Internet', value: 'web' },
+  { label: 'Otro', value: 'otro' },
+]
+
+const MODELOS_FIAT = [
+  'MOBI TREKKING 1.0', 'ARGO DRIVE 1.3L MT', 'ARGO DRIVE 1.3L CVT',
+  'CRONOS LIKE 1.3 GSE', 'CRONOS DRIVE 1.3 GSE', 'CRONOS PRECISION 1.3 GSE CVT',
+  'PULSE DRIVE 1.3 MT5', 'PULSE DRIVE 1.3 CVT', 'PULSE AUDACE 1.0T CVT',
+  'PULSE IMPETUS 1.0T CVT', 'PULSE ABARTH TURBO 270',
+  'FASTBACK TURBO 270 AT', 'FASTBACK ABARTH TURBO 270',
+  '600 HYBRID 1.2 eDCT',
+  'FIORINO ENDURANCE 1.3',
+  'STRADA FREEDOM CS 1.3', 'STRADA FREEDOM CD 1.3', 'STRADA VOLCANO CD CVT',
+  'STRADA RANCH T200 CD CVT', 'STRADA ULTRA T200 CD CVT',
+  'TORO FREEDOM T270 4X2', 'TORO VOLCANO T270 4X2', 'TORO VOLCANO TD350 4X4', 'TORO ULTRA TD350 4X4',
+  'TITANO ENDURANCE MT', 'TITANO FREEDOM MT 4X4', 'TITANO FREEDOM PLUS AT', 'TITANO RANCH AT 4X4',
+]
+
 export function NuevaRecepcion() {
   const navigate = useNavigate()
   const crearRecepcion = useCrearRecepcion()
@@ -29,6 +54,8 @@ export function NuevaRecepcion() {
     telefono: '',
     area: '',
     subarea: '',
+    origen: '',
+    modelo_interes: '',
     notas: '',
   })
 
@@ -41,6 +68,7 @@ export function NuevaRecepcion() {
       ...prev,
       area,
       subarea: subareas?.[0]?.value || '',
+      modelo_interes: '',
     }))
   }
 
@@ -52,6 +80,8 @@ export function NuevaRecepcion() {
         telefono: form.telefono,
         area: form.area,
         subarea: form.subarea,
+        origen: form.origen || undefined,
+        modelo_interes: form.area === 'ventas' && form.modelo_interes ? form.modelo_interes : undefined,
         notas: form.notas || undefined,
       })
       notify.success('Cliente registrado')
@@ -62,6 +92,7 @@ export function NuevaRecepcion() {
   }
 
   const subareasDisponibles = form.area ? SUBAREAS[form.area] || [] : []
+  const esVentas = form.area === 'ventas'
 
   return (
     <div className="max-w-lg mx-auto">
@@ -96,6 +127,13 @@ export function NuevaRecepcion() {
           />
 
           <Select
+            label="¿Cómo nos conoció?"
+            value={form.origen}
+            onChange={(e) => update('origen', e.target.value)}
+            options={ORIGENES}
+          />
+
+          <Select
             label="Área"
             value={form.area}
             onChange={(e) => handleAreaChange(e.target.value)}
@@ -116,6 +154,18 @@ export function NuevaRecepcion() {
               onChange={(e) => update('subarea', e.target.value)}
               options={subareasDisponibles}
               required
+            />
+          )}
+
+          {esVentas && (
+            <Select
+              label="Modelo de interés"
+              value={form.modelo_interes}
+              onChange={(e) => update('modelo_interes', e.target.value)}
+              options={[
+                { label: 'Sin especificar', value: '' },
+                ...MODELOS_FIAT.map(m => ({ label: m, value: m })),
+              ]}
             />
           )}
 

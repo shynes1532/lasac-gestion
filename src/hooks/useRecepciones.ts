@@ -21,7 +21,6 @@ export function useRecepciones(filtros: FiltrosRecepcion = {}) {
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
 
-      // Filtrar por sucursal si no es Ambas
       if (perfil?.sucursal && perfil.sucursal !== 'Ambas') {
         query = query.eq('sucursal', perfil.sucursal)
       }
@@ -48,11 +47,43 @@ export function useRecepciones(filtros: FiltrosRecepcion = {}) {
   })
 }
 
+// Hook para traer recepciones de un mes completo (para dashboard)
+export function useRecepcionesMes(anio: number, mes: number) {
+  const { perfil } = useAuth()
+
+  const desde = `${anio}-${String(mes).padStart(2, '0')}-01T00:00:00`
+  const ultimoDia = new Date(anio, mes, 0).getDate()
+  const hasta = `${anio}-${String(mes).padStart(2, '0')}-${ultimoDia}T23:59:59`
+
+  return useQuery({
+    queryKey: ['recepciones-mes', anio, mes, perfil?.sucursal],
+    queryFn: async () => {
+      let query = supabase
+        .from('recepciones')
+        .select('*')
+        .gte('created_at', desde)
+        .lte('created_at', hasta)
+        .order('created_at', { ascending: false })
+
+      if (perfil?.sucursal && perfil.sucursal !== 'Ambas') {
+        query = query.eq('sucursal', perfil.sucursal)
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      return data as Recepcion[]
+    },
+    enabled: !!perfil,
+  })
+}
+
 interface NuevaRecepcionData {
   nombre: string
   telefono: string
   area: string
   subarea: string
+  origen?: string
+  modelo_interes?: string
   notas?: string
 }
 
@@ -78,6 +109,7 @@ export function useCrearRecepcion() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recepciones'] })
+      queryClient.invalidateQueries({ queryKey: ['recepciones-mes'] })
     },
   })
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Phone, Check, MessageCircle, Clock, UserCheck, Send } from 'lucide-react'
+import { Plus, Phone, Check, MessageCircle, Clock, UserCheck, Send, BarChart3 } from 'lucide-react'
 import { useRecepciones, useMarcarAtendido, useMarcarContactado } from '../../hooks/useRecepciones'
 import { Button, Badge, Card, SearchInput, Select, EmptyState, notify } from '../../components/ui'
 import type { Recepcion, AreaRecepcion } from '../../lib/types'
@@ -159,12 +159,20 @@ export function ListaRecepcion() {
           <h1 className="text-2xl font-bold text-text-primary">Recepción</h1>
           <p className="text-sm text-text-muted">Control de ingreso de clientes</p>
         </div>
-        <Link to="/recepcion/nueva">
-          <Button>
-            <Plus className="h-4 w-4" />
-            Nuevo ingreso
-          </Button>
-        </Link>
+        <div className="flex gap-2">
+          <Link to="/recepcion/reporte">
+            <Button variant="secondary">
+              <BarChart3 className="h-4 w-4" />
+              Reporte
+            </Button>
+          </Link>
+          <Link to="/recepcion/nueva">
+            <Button>
+              <Plus className="h-4 w-4" />
+              Nuevo ingreso
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats rápidos */}

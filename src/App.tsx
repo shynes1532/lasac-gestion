@@ -31,6 +31,7 @@ const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').th
 const UnidadesEntregadas = lazy(() => import('./pages/archivo/UnidadesEntregadas').then(m => ({ default: m.UnidadesEntregadas })))
 const ListaRecepcion = lazy(() => import('./pages/recepcion/ListaRecepcion').then(m => ({ default: m.ListaRecepcion })))
 const NuevaRecepcion = lazy(() => import('./pages/recepcion/NuevaRecepcion').then(m => ({ default: m.NuevaRecepcion })))
+const DashboardRecepcion = lazy(() => import('./pages/recepcion/DashboardRecepcion').then(m => ({ default: m.DashboardRecepcion })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -127,6 +128,9 @@ export default function App() {
                 } />
                 <Route path="/recepcion/nueva" element={
                   <ProtectedRoute><NuevaRecepcion /></ProtectedRoute>
+                } />
+                <Route path="/recepcion/reporte" element={
+                  <ProtectedRoute><DashboardRecepcion /></ProtectedRoute>
                 } />
 
                 <Route path="/unidades-entregadas" element={
