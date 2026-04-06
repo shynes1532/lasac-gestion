@@ -1,0 +1,4 @@
+recepcion-app/.env
+recepcion-app/node_modules
+recepcion-app/dist
+recepcion-app/tsconfig.tsbuildinfo
