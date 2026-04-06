@@ -18,6 +18,8 @@ import type {
   TipoPlan,
   CodigoPlan,
   VehiculoCodigo,
+  TipoConsulta,
+  EstadoVisita,
 } from './types'
 
 // ============================================================
@@ -465,3 +467,35 @@ Estuvimos intentando comunicarnos telefónicamente. Por favor, respóndanos por 
 
 Su opinión nos ayuda a mejorar. ¡Gracias por confiar en nosotros!`
 }
+
+// ============================================================
+// Recepcion — Registro de Visitas
+// ============================================================
+
+export const TIPOS_CONSULTA: { value: TipoConsulta; label: string }[] = [
+  { value: 'administracion', label: 'Administración' },
+  { value: 'ventas', label: 'Ventas' },
+  { value: 'postventa', label: 'Postventa' },
+  { value: 'repuestos', label: 'Repuestos' },
+]
+
+export const ESTADOS_VISITA: Record<EstadoVisita, { label: string; color: string }> = {
+  en_espera:  { label: 'En espera',  color: 'bg-yellow-100 text-yellow-800' },
+  atendido:   { label: 'Atendido',   color: 'bg-blue-100 text-blue-800' },
+  finalizado: { label: 'Finalizado', color: 'bg-green-100 text-green-800' },
+}
+
+export const COLORES_TIPO_CONSULTA: Record<TipoConsulta, { bg: string; text: string }> = {
+  administracion: { bg: 'bg-purple-100', text: 'text-purple-800' },
+  ventas:         { bg: 'bg-blue-100',   text: 'text-blue-800' },
+  postventa:      { bg: 'bg-orange-100', text: 'text-orange-800' },
+  repuestos:      { bg: 'bg-gray-100',   text: 'text-gray-800' },
+}
+
+export const CALIFICACIONES_ATENCION: { value: number; label: string }[] = [
+  { value: 1, label: '1 - Muy mala' },
+  { value: 2, label: '2 - Mala' },
+  { value: 3, label: '3 - Regular' },
+  { value: 4, label: '4 - Buena' },
+  { value: 5, label: '5 - Excelente' },
+]

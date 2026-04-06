@@ -28,6 +28,7 @@ const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m
 const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
 const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(m => ({ default: m.GarantiasPage })))
 const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').then(m => ({ default: m.SiniestrosPage })))
+const RecepcionPage = lazy(() => import('./pages/recepcion/RecepcionPage').then(m => ({ default: m.RecepcionPage })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +118,9 @@ export default function App() {
                 } />
                 <Route path="/siniestros" element={
                   <ProtectedRoute><SiniestrosPage /></ProtectedRoute>
+                } />
+                <Route path="/recepcion" element={
+                  <ProtectedRoute><RecepcionPage /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}
