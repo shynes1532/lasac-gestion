@@ -28,6 +28,9 @@ const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m
 const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
 const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(m => ({ default: m.GarantiasPage })))
 const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').then(m => ({ default: m.SiniestrosPage })))
+const UnidadesEntregadas = lazy(() => import('./pages/archivo/UnidadesEntregadas').then(m => ({ default: m.UnidadesEntregadas })))
+const ListaRecepcion = lazy(() => import('./pages/recepcion/ListaRecepcion').then(m => ({ default: m.ListaRecepcion })))
+const NuevaRecepcion = lazy(() => import('./pages/recepcion/NuevaRecepcion').then(m => ({ default: m.NuevaRecepcion })))
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -117,6 +120,17 @@ export default function App() {
                 } />
                 <Route path="/siniestros" element={
                   <ProtectedRoute><SiniestrosPage /></ProtectedRoute>
+                } />
+
+                <Route path="/recepcion" element={
+                  <ProtectedRoute><ListaRecepcion /></ProtectedRoute>
+                } />
+                <Route path="/recepcion/nueva" element={
+                  <ProtectedRoute><NuevaRecepcion /></ProtectedRoute>
+                } />
+
+                <Route path="/unidades-entregadas" element={
+                  <ProtectedRoute><UnidadesEntregadas /></ProtectedRoute>
                 } />
 
                 {/* Rutas legado — redirigen a nuevas */}

@@ -564,6 +564,33 @@ export interface GestionMora {
   ahorrista?: Ahorrista | null
 }
 
+// ============================================================
+// Recepción — Control de ingreso de clientes
+// ============================================================
+
+export type AreaRecepcion = 'posventa' | 'administracion' | 'ventas'
+export type SubareaPosventa = 'repuestos' | 'taller' | 'siniestro'
+export type SubareaAdmin = 'plan' | 'convencional'
+export type SubareaVentas = 'plan' | '0km'
+export type SubareaRecepcion = SubareaPosventa | SubareaAdmin | SubareaVentas
+export type EstadoRecepcion = 'en_espera' | 'atendido' | 'contactado'
+
+export interface Recepcion {
+  id: string
+  nombre: string
+  telefono: string
+  area: AreaRecepcion
+  subarea: SubareaRecepcion
+  notas: string | null
+  estado: EstadoRecepcion
+  atendido_por: string | null
+  contactado_at: string | null
+  created_by: string
+  sucursal: Sucursal
+  created_at: string
+  updated_at: string
+}
+
 // Requiere prenda?
 export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion'>): boolean {
   return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'
