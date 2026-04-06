@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS visitas_recepcion (
 
   -- General
   observaciones TEXT,
-  created_by UUID NOT NULL,
+  created_by UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
