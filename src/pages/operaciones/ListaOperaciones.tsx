@@ -148,7 +148,7 @@ export function ListaOperaciones() {
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold text-text-primary">Operaciones</h1>
-          <p className="text-sm text-text-secondary">Pipeline de gestión de entregas</p>
+          <p className="text-sm text-text-secondary">Gestión de operaciones en curso</p>
         </div>
         <Button onClick={() => navigate('/operaciones/nueva')}>
           <Plus className="h-4 w-4 mr-1" /> Nueva operación
