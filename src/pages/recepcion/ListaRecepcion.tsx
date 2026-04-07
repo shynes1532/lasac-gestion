@@ -5,7 +5,6 @@ import { useRecepciones, useMarcarAtendido, useMarcarContactado } from '../../ho
 import { Button, Badge, Card, SearchInput, Select, EmptyState, notify } from '../../components/ui'
 import type { Recepcion, AreaRecepcion } from '../../lib/types'
 import { cleanPhone } from '../../utils/whatsapp'
-import { useAuth } from '../../context/AuthContext'
 
 const AREA_LABELS: Record<AreaRecepcion, string> = {
   posventa: 'Posventa',
@@ -34,28 +33,27 @@ const ESTADO_LABELS: Record<string, string> = {
   contactado: 'Contactado',
 }
 
-function getWhatsAppFollowUp(rec: Recepcion, agente: string): string {
+function getWhatsAppFollowUp(rec: Recepcion): string {
   const nombre = rec.nombre.split(' ')[0]
-  const primerNombreAgente = agente.split(' ')[0] || 'el equipo'
   const phone = cleanPhone(rec.telefono)
   const link = 'https://lasac-pwa.vercel.app/'
   const cierre = `\n\nTe dejamos nuestra plataforma donde podés consultar nuestros precios o comunicarte con nosotros: ${link}`
+  const presentacion = 'Te escribe Daniela, responsable de Calidad de Liendo Automotores'
 
   let mensaje = ''
 
   if (rec.area === 'ventas') {
-    mensaje = `Hola ${nombre}! 👋 Te escribe ${primerNombreAgente} del área de Calidad de Liendo Automotores. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\nQueremos saber cómo fue tu experiencia: ¿el asesor te explicó todo lo que necesitabas? ¿Te quedó alguna duda o querés que nos comuniquemos de nuevo para ampliar información?${cierre}`
+    mensaje = `Hola ${nombre}! 👋 ${presentacion}. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\nQueremos saber cómo fue tu experiencia: ¿el asesor te explicó todo lo que necesitabas? ¿Te quedó alguna duda o querés que nos comuniquemos de nuevo para ampliar información?${cierre}`
   } else if (rec.area === 'posventa') {
-    mensaje = `Hola ${nombre}! 👋 Te escribe ${primerNombreAgente} del área de Calidad de Liendo Automotores. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\n¿Pudiste solucionar lo que necesitabas? ¿Cómo fue el trato que recibiste? ¿Necesitás algo más de nuestra parte?${cierre}`
+    mensaje = `Hola ${nombre}! 👋 ${presentacion}. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\n¿Pudiste solucionar lo que necesitabas? ¿Cómo fue el trato que recibiste? ¿Necesitás algo más de nuestra parte?${cierre}`
   } else {
-    mensaje = `Hola ${nombre}! 👋 Te escribe ${primerNombreAgente} del área de Calidad de Liendo Automotores. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\n¿Pudiste resolver tu trámite? ¿Cómo fue la atención que recibiste? Si necesitás algo más, no dudes en escribirnos.${cierre}`
+    mensaje = `Hola ${nombre}! 👋 ${presentacion}. ¡Muchas gracias por tu visita el día de hoy! 🙌\n\n¿Pudiste resolver tu trámite? ¿Cómo fue la atención que recibiste? Si necesitás algo más, no dudes en escribirnos.${cierre}`
   }
 
   return `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(mensaje)}`
 }
 
 function RecepcionCard({ rec }: { rec: Recepcion }) {
-  const { perfil } = useAuth()
   const marcarAtendido = useMarcarAtendido()
   const marcarContactado = useMarcarContactado()
 
@@ -70,7 +68,7 @@ function RecepcionCard({ rec }: { rec: Recepcion }) {
 
   const handleContactar = () => {
     marcarContactado.mutate(rec.id)
-    window.open(getWhatsAppFollowUp(rec, perfil?.nombre_completo || ''), '_blank')
+    window.open(getWhatsAppFollowUp(rec), '_blank')
   }
 
   const horaIngreso = new Date(rec.created_at).toLocaleTimeString('es-AR', {
