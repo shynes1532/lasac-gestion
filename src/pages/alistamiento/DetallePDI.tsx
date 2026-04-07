@@ -155,8 +155,6 @@ export function DetallePDI() {
   const secciones = [...new Set(items.map((i) => i.seccion))]
   const estadoPDI = pdi.aprobado === true ? 'aprobado' : pdi.aprobado === false ? 'rechazado' : pdi.fecha_inicio ? 'en_proceso' : 'pendiente'
 
-  const canApprove = ncCriticas.length === 0 && completados === items.length
-
   const tabs = [
     { id: 'checklist', label: 'Checklist', count: items.length },
     { id: 'nc', label: 'No Conformidades', count: ncs.length },
@@ -180,6 +178,17 @@ export function DetallePDI() {
           </p>
         </div>
       </div>
+
+      {/* Botón rápido de aprobación — siempre disponible si el PDI no está aprobado */}
+      {pdi.aprobado === null && (
+        <button
+          onClick={() => setConfirmApprove(true)}
+          className="w-full mb-4 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white font-bold py-5 rounded-xl shadow-lg flex items-center justify-center gap-3 text-lg cursor-pointer transition-all active:scale-[0.98]"
+        >
+          <CheckCircle className="h-7 w-7" />
+          PDI APROBADO — PASAR A ENTREGA
+        </button>
+      )}
 
       {/* Progress */}
       <ProgressBar value={completados} max={items.length} label="Progreso del PDI" className="mb-6" />
@@ -336,7 +345,6 @@ export function DetallePDI() {
               <Button
                 variant="success"
                 fullWidth
-                disabled={!canApprove && ncCriticas.length > 0}
                 onClick={() => setConfirmApprove(true)}
               >
                 <CheckCircle className="h-4 w-4" />
@@ -400,10 +408,7 @@ export function DetallePDI() {
         onClose={() => setConfirmApprove(false)}
         onConfirm={() => aprobarPDI.mutate(true)}
         title="Aprobar PDI"
-        message={ncMayores.length > 0
-          ? `Hay ${ncMayores.length} NC mayores abiertas. ¿Confirmar aprobación como supervisor?`
-          : '¿Confirmar aprobación del PDI? La unidad pasará a estado de Entrega.'
-        }
+        message="¿Confirmar aprobación del PDI? La unidad pasará inmediatamente al estado de Entrega."
         confirmText="Aprobar"
         loading={aprobarPDI.isPending}
       />
