@@ -32,6 +32,7 @@ interface EntregadaRow {
   tipo_operacion: string
   cliente_nombre: string | null
   fecha_entrega_real: string | null
+  entrega_con_incidente: boolean | null
   created_at: string
   titular: { nombre_apellido: string }[]
   unidad: { modelo: string; color: string; vin_chasis: string }[]
@@ -52,14 +53,12 @@ export function UnidadesEntregadas() {
         .from('operaciones')
         .select(`
           id, numero_operacion, sucursal, tipo_operacion, cliente_nombre,
-          fecha_entrega_real, created_at,
+          fecha_entrega_real, entrega_con_incidente, created_at,
           titular:titulares(nombre_apellido),
           unidad:unidades(modelo, color, vin_chasis)
         `)
         .eq('estado_actual', 'entregado')
-        .eq('unidad_entregada', true)
-        .eq('entrega_con_incidente', false)
-        .order('fecha_entrega_real', { ascending: false })
+        .order('fecha_entrega_real', { ascending: false, nullsFirst: false })
 
       if (sucursalFiltro) query = query.eq('sucursal', sucursalFiltro)
       if (tipoFiltro) query = query.eq('tipo_operacion', tipoFiltro)
@@ -110,13 +109,29 @@ export function UnidadesEntregadas() {
   const toggle = (key: string) =>
     setCollapsed(prev => ({ ...prev, [key]: !prev[key] }))
 
+  // Por defecto pliega meses viejos (>3 meses de antigüedad) salvo que el usuario los haya tocado
+  const isCollapsedDefault = (year: string, month: number) => {
+    if (collapsed[`${year}-${month}`] !== undefined) return collapsed[`${year}-${month}`]
+    const ahora = new Date()
+    const fechaGrupo = new Date(parseInt(year), month, 1)
+    const diffMeses = (ahora.getFullYear() - fechaGrupo.getFullYear()) * 12 + (ahora.getMonth() - fechaGrupo.getMonth())
+    return diffMeses > 1 // Pliega meses anteriores a los últimos 2
+  }
+
   return (
     <div>
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Unidades Entregadas</h1>
-          <p className="text-sm text-text-secondary mt-1">{filtered.length} unidades entregadas</p>
+          <p className="text-sm text-text-secondary mt-1">Archivo histórico agrupado por mes</p>
+        </div>
+        <div className="bg-bg-secondary border border-border rounded-xl px-4 py-2 flex items-center gap-3">
+          <Archive className="h-5 w-5 text-green-400" />
+          <div>
+            <p className="text-2xl font-bold text-text-primary leading-none">{filtered.length}</p>
+            <p className="text-[10px] text-text-muted">total</p>
+          </div>
         </div>
       </div>
 
@@ -167,6 +182,7 @@ export function UnidadesEntregadas() {
                 <div className="space-y-3 ml-2">
                   {months.map(({ month, items }) => {
                     const monthKey = `${year}-${month}`
+                    const isCollapsed = isCollapsedDefault(year, month)
                     return (
                       <div key={monthKey}>
                         {/* Month header */}
@@ -174,7 +190,7 @@ export function UnidadesEntregadas() {
                           onClick={() => toggle(monthKey)}
                           className="flex items-center gap-2 mb-2 cursor-pointer group"
                         >
-                          {collapsed[monthKey]
+                          {isCollapsed
                             ? <ChevronRight className="h-4 w-4 text-text-muted" />
                             : <ChevronDown className="h-4 w-4 text-text-muted" />
                           }
@@ -184,7 +200,7 @@ export function UnidadesEntregadas() {
                           <span className="text-xs text-text-muted">({items.length})</span>
                         </button>
 
-                        {!collapsed[monthKey] && (
+                        {!isCollapsed && (
                           <div className="space-y-2 ml-4">
                             {items.map(op => {
                               const titular = op.titular?.[0]?.nombre_apellido || op.cliente_nombre || 'Sin titular'
@@ -197,12 +213,17 @@ export function UnidadesEntregadas() {
                                 >
                                   <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                                     <div className="flex-1 min-w-0">
-                                      <div className="flex items-center gap-2 mb-1">
+                                      <div className="flex items-center gap-2 mb-1 flex-wrap">
                                         <FileText className="h-3.5 w-3.5 text-action" />
                                         <span className="text-sm font-mono font-medium text-action">{op.numero_operacion}</span>
                                         <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
                                           Entregada
                                         </span>
+                                        {op.entrega_con_incidente && (
+                                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+                                            ⚠ con incidente
+                                          </span>
+                                        )}
                                       </div>
                                       <div className="flex items-center gap-1.5 text-sm text-text-primary">
                                         <User className="h-3.5 w-3.5 text-text-muted" />
