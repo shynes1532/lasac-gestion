@@ -7,17 +7,18 @@ import { Button, Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } fr
 import { diasEntre } from '../../utils/formatters'
 
 const estadoOptions = [
-  { value: '', label: 'Todos los estados' },
-  { value: 'pendiente', label: 'Pendiente' },
-  { value: 'en_proceso', label: 'En proceso' },
-  { value: 'observado', label: 'Observado' },
-  { value: 'aprobado', label: 'Aprobado' },
-  { value: 'rechazado', label: 'Rechazado' },
+  { value: 'en_cola', label: 'En cola (pendientes + en proceso)' },
+  { value: 'pendiente', label: 'Solo pendientes' },
+  { value: 'en_proceso', label: 'Solo en proceso' },
+  { value: 'aprobado', label: 'Aprobados' },
+  { value: 'rechazado', label: 'Rechazados' },
+  { value: '', label: 'Todos (incluye aprobados y rechazados)' },
 ]
 
 export function ColaPDI() {
   const navigate = useNavigate()
-  const [estadoFiltro, setEstadoFiltro] = useState('')
+  // Por defecto: solo lo que está en cola (no muestra aprobados ni rechazados)
+  const [estadoFiltro, setEstadoFiltro] = useState('en_cola')
 
   const { data: alistamientos, isLoading } = useQuery({
     queryKey: ['alistamiento', estadoFiltro],
@@ -34,19 +35,19 @@ export function ColaPDI() {
         `)
         .order('created_at', { ascending: true })
 
-      if (estadoFiltro) {
-        const aprobadoMap: Record<string, any> = {
-          aprobado: true,
-          rechazado: false,
-        }
-        if (estadoFiltro === 'aprobado' || estadoFiltro === 'rechazado') {
-          query = query.eq('aprobado', aprobadoMap[estadoFiltro])
-        } else if (estadoFiltro === 'pendiente') {
-          query = query.is('fecha_inicio', null).is('aprobado', null)
-        } else if (estadoFiltro === 'en_proceso') {
-          query = query.not('fecha_inicio', 'is', null).is('aprobado', null)
-        }
+      if (estadoFiltro === 'en_cola') {
+        // Pendientes + en proceso (excluye aprobados y rechazados)
+        query = query.is('aprobado', null)
+      } else if (estadoFiltro === 'pendiente') {
+        query = query.is('fecha_inicio', null).is('aprobado', null)
+      } else if (estadoFiltro === 'en_proceso') {
+        query = query.not('fecha_inicio', 'is', null).is('aprobado', null)
+      } else if (estadoFiltro === 'aprobado') {
+        query = query.eq('aprobado', true)
+      } else if (estadoFiltro === 'rechazado') {
+        query = query.eq('aprobado', false)
       }
+      // Si estadoFiltro === '' → no filtra, trae todos
 
       const { data, error } = await query
       if (error) throw error
