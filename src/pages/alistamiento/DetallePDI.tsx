@@ -72,9 +72,25 @@ export function DetallePDI() {
 
       // 2. Update operacion
       if (pdi?.operacion?.id) {
-        const updateData = aprobado
-          ? { estado_alistamiento: 'aprobado', estado_actual: 'entrega' }
+        // Trae el estado_actual actual para no retroceder si ya está en un estado posterior
+        const { data: opActual } = await supabase
+          .from('operaciones')
+          .select('estado_actual')
+          .eq('id', pdi.operacion.id)
+          .single()
+
+        // Estados posteriores a 'entrega' que no debemos pisar
+        const estadosPosteriores = ['entrega', 'entregado', 'caida']
+        const yaPaso = estadosPosteriores.includes(opActual?.estado_actual || '')
+
+        const updateData: Record<string, any> = aprobado
+          ? { estado_alistamiento: 'aprobado' }
           : { estado_alistamiento: 'rechazado' }
+
+        // Solo actualiza estado_actual si todavía está en el pipeline previo a entrega
+        if (aprobado && !yaPaso) {
+          updateData.estado_actual = 'entrega'
+        }
 
         const { error: opError } = await supabase
           .from('operaciones')
