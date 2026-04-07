@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, Phone, Check, MessageCircle, Clock, UserCheck, Send, BarChart3 } from 'lucide-react'
+import { Plus, Phone, Check, MessageCircle, Clock, UserCheck, Send, BarChart3, Download } from 'lucide-react'
 import { useRecepciones, useMarcarAtendido, useMarcarContactado } from '../../hooks/useRecepciones'
 import { Button, Badge, Card, SearchInput, Select, EmptyState, notify } from '../../components/ui'
 import type { Recepcion, AreaRecepcion } from '../../lib/types'
@@ -31,6 +31,38 @@ const ESTADO_LABELS: Record<string, string> = {
   en_espera: 'En espera',
   atendido: 'Atendido',
   contactado: 'Contactado',
+}
+
+function exportarCSV(recepciones: Recepcion[]) {
+  const headers = ['Fecha', 'Hora', 'Nombre', 'Teléfono', 'Área', 'Subárea', 'Origen', 'Modelo interés', 'Estado', 'Notas']
+  const rows = recepciones.map(r => {
+    const fecha = new Date(r.created_at)
+    return [
+      fecha.toLocaleDateString('es-AR'),
+      fecha.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' }),
+      r.nombre,
+      r.telefono,
+      AREA_LABELS[r.area] || r.area,
+      SUBAREA_LABELS[r.subarea] || r.subarea,
+      r.origen || '',
+      r.modelo_interes || '',
+      ESTADO_LABELS[r.estado] || r.estado,
+      (r.notas || '').replace(/[\r\n]+/g, ' '),
+    ]
+  })
+
+  const csv = [headers, ...rows]
+    .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+
+  const bom = '\uFEFF' // Para que Excel lea UTF-8 correctamente
+  const blob = new Blob([bom + csv], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `recepcion-${new Date().toISOString().slice(0, 10)}.csv`
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 function getWhatsAppFollowUp(rec: Recepcion): string {
@@ -163,6 +195,10 @@ export function ListaRecepcion() {
           <p className="text-sm text-text-muted">Control de ingreso de clientes</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => exportarCSV(recepciones)} disabled={recepciones.length === 0}>
+            <Download className="h-4 w-4" />
+            CSV
+          </Button>
           <Link to="/recepcion/reporte">
             <Button variant="secondary">
               <BarChart3 className="h-4 w-4" />

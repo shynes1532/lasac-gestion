@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowLeft, ChevronLeft, ChevronRight, Users, TrendingUp, MapPin, Car } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Users, TrendingUp, MapPin, Car, Printer } from 'lucide-react'
 import { useRecepcionesMes } from '../../hooks/useRecepciones'
-import { Card } from '../../components/ui'
+import { Card, Button } from '../../components/ui'
 import type { Recepcion, AreaRecepcion, OrigenRecepcion } from '../../lib/types'
 
 const MESES = [
@@ -144,9 +144,52 @@ export function DashboardRecepcion() {
   const promedioDiario = diasUnicos > 0 ? (total / diasUnicos).toFixed(1) : '0'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 print-area">
+      {/* Estilos para impresión */}
+      <style>{`
+        @media print {
+          @page { size: A4; margin: 1.5cm; }
+          body { background: white !important; color: black !important; }
+          aside, .no-print { display: none !important; }
+          main, .print-area { padding: 0 !important; margin: 0 !important; max-width: 100% !important; }
+          .print-area * { color: black !important; }
+          .print-area .bg-bg-card,
+          .print-area .bg-bg-tertiary,
+          .print-area .bg-bg-secondary { background: white !important; border: 1px solid #ccc !important; }
+          .print-area .text-text-primary,
+          .print-area .text-text-secondary,
+          .print-area .text-text-muted { color: black !important; }
+          .print-area h1, .print-area h2 { color: black !important; }
+          .print-area .border, .print-area .border-border { border-color: #ccc !important; }
+          .print-area table { border-collapse: collapse; }
+          .print-area table th, .print-area table td { border: 1px solid #ccc !important; }
+          .print-area .h-32 { page-break-inside: avoid; }
+          .print-area .grid { page-break-inside: avoid; }
+        }
+        @media print {
+          .print-title {
+            display: block !important;
+            text-align: center;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #000;
+            padding-bottom: 10px;
+          }
+        }
+        .print-title { display: none; }
+      `}</style>
+
+      {/* Título visible solo en impresión */}
+      <div className="print-title">
+        <h1 style={{ fontSize: '24px', fontWeight: 'bold', margin: 0 }}>
+          LIENDO AUTOMOTORES — Reporte de Recepción
+        </h1>
+        <p style={{ fontSize: '14px', margin: '5px 0 0 0' }}>
+          {MESES[mes - 1]} {anio}
+        </p>
+      </div>
+
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between no-print">
         <div className="flex items-center gap-3">
           <Link to="/recepcion" className="text-text-muted hover:text-text-primary">
             <ArrowLeft className="h-5 w-5" />
@@ -156,10 +199,14 @@ export function DashboardRecepcion() {
             <p className="text-sm text-text-muted">Estadísticas mensuales para marketing</p>
           </div>
         </div>
+        <Button onClick={() => window.print()} variant="secondary">
+          <Printer className="h-4 w-4" />
+          Imprimir / PDF
+        </Button>
       </div>
 
       {/* Selector de mes */}
-      <Card className="p-3 flex items-center justify-between">
+      <Card className="p-3 flex items-center justify-between no-print">
         <button onClick={prevMes} className="p-1 hover:bg-bg-tertiary rounded cursor-pointer">
           <ChevronLeft className="h-5 w-5 text-text-secondary" />
         </button>
