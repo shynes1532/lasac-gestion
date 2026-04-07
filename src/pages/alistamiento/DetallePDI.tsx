@@ -56,7 +56,8 @@ export function DetallePDI() {
 
   const aprobarPDI = useMutation({
     mutationFn: async (aprobado: boolean) => {
-      const { error } = await supabase
+      // 1. Update alistamiento_pdi
+      const { error: pdiError } = await supabase
         .from('alistamiento_pdi')
         .update({
           aprobado,
@@ -64,23 +65,41 @@ export function DetallePDI() {
           fecha_fin: new Date().toISOString(),
         })
         .eq('id', id!)
-      if (error) throw error
+      if (pdiError) {
+        console.error('Error al actualizar alistamiento_pdi:', pdiError)
+        throw new Error(`No se pudo actualizar el PDI: ${pdiError.message}`)
+      }
 
-      if (aprobado && pdi?.operacion) {
-        await supabase
+      // 2. Update operacion
+      if (pdi?.operacion?.id) {
+        const updateData = aprobado
+          ? { estado_alistamiento: 'aprobado', estado_actual: 'entrega' }
+          : { estado_alistamiento: 'rechazado' }
+
+        const { error: opError } = await supabase
           .from('operaciones')
-          .update({ estado_alistamiento: 'aprobado', estado_actual: 'entrega' })
+          .update(updateData)
           .eq('id', pdi.operacion.id)
-      } else if (!aprobado && pdi?.operacion) {
-        await supabase
-          .from('operaciones')
-          .update({ estado_alistamiento: 'rechazado' })
-          .eq('id', pdi.operacion.id)
+
+        if (opError) {
+          console.error('Error al actualizar operacion:', opError)
+          throw new Error(`No se pudo actualizar la operación: ${opError.message}`)
+        }
+      } else {
+        console.warn('PDI sin operación vinculada — solo se actualizó alistamiento_pdi')
       }
     },
     onSuccess: (_, aprobado) => {
       queryClient.invalidateQueries({ queryKey: ['pdi', id] })
+      queryClient.invalidateQueries({ queryKey: ['alistamiento'] })
+      queryClient.invalidateQueries({ queryKey: ['operaciones'] })
       notify.success(aprobado ? 'PDI aprobado — unidad lista para entrega' : 'PDI rechazado')
+      setConfirmApprove(false)
+      setConfirmReject(false)
+    },
+    onError: (err: any) => {
+      console.error('Error completo:', err)
+      notify.error(err?.message || 'Error desconocido al aprobar el PDI')
       setConfirmApprove(false)
       setConfirmReject(false)
     },
