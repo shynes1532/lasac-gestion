@@ -39,9 +39,9 @@ export function EntregasProgramadas() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Truck className="h-5 w-5" /> Entregas programadas
+            <Truck className="h-5 w-5" /> Entregas pendientes
           </h1>
-          <p className="text-sm text-text-secondary">Operaciones en Paso 5 y 6</p>
+          <p className="text-sm text-text-secondary">Operaciones con PDI aprobado, listas para coordinar la entrega al cliente</p>
         </div>
         <div className="flex gap-2">
           <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}
