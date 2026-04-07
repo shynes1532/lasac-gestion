@@ -17,13 +17,13 @@ const navItems = [
   { path: '/mora',                label: 'Mora',         icon: AlertTriangle },
   { path: '/alistamiento',        label: 'PDI',          icon: Wrench },
   { path: '/calidad',             label: 'Calidad',      icon: ShieldCheck },
-  { path: '/entregas-programadas',label: 'Entregas',     icon: Truck },
+  { path: '/entregas-programadas',label: 'Entregas pendientes', icon: Truck },
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
   { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
   { path: '/garantias',             label: 'Garantias',    icon: Wrench },
   { path: '/siniestros',            label: 'Siniestros',   icon: AlertTriangle },
   { path: '/calibre',              label: 'Calibre',      icon: Shield },
-  { path: '/unidades-entregadas', label: 'Entregadas',   icon: Archive },
+  { path: '/unidades-entregadas', label: 'Archivo entregadas', icon: Archive },
   { path: '/reportes',            label: 'Reportes',     icon: Printer },
 ]
 
