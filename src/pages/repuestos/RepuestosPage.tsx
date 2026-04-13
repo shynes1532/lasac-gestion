@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
 import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera } from 'lucide-react'
-import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
@@ -402,7 +401,7 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
 // Página principal de Repuestos
 // ============================================================
 export function RepuestosPage() {
-  const { perfil } = useAuth()
+  useAuth() // Ensures user is authenticated
   const [busqueda, setBusqueda] = useState('')
   const [selectedRepuesto, setSelectedRepuesto] = useState<Repuesto | null>(null)
   const [showNuevo, setShowNuevo] = useState(false)
