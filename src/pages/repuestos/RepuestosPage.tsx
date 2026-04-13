@@ -1,7 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { ScanLine, Package, Plus, Minus, AlertTriangle, X, History, Camera, CameraOff } from 'lucide-react'
-import { useRepuestos, useRepuestoPorCodigo, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
+import { supabase } from '../../lib/supabase'
+import { useAuth } from '../../context/AuthContext'
+import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
 import type { Repuesto } from '../../lib/types'
 
@@ -403,31 +405,53 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
 }
 
 export function RepuestosPage() {
+  const { perfil } = useAuth()
   const [busqueda, setBusqueda] = useState('')
   const [scanning, setScanning] = useState(false)
-  const [codigoEscaneado, setCodigoEscaneado] = useState<string | null>(null)
+  const [buscandoCodigo, setBuscandoCodigo] = useState(false)
   const [selectedRepuesto, setSelectedRepuesto] = useState<Repuesto | null>(null)
   const [showNuevo, setShowNuevo] = useState(false)
   const [codigoNuevo, setCodigoNuevo] = useState('')
 
   const { data: repuestos = [], isLoading } = useRepuestos(busqueda)
-  const { data: repuestoEscaneado } = useRepuestoPorCodigo(codigoEscaneado)
 
-  // Cuando se escanea un código, buscar en la base
-  useEffect(() => {
-    if (codigoEscaneado && repuestoEscaneado !== undefined) {
-      if (repuestoEscaneado) {
-        setSelectedRepuesto(repuestoEscaneado)
-        notify.success(`Encontrado: ${repuestoEscaneado.descripcion}`)
-      } else {
-        // No existe → ofrecer crear
-        setCodigoNuevo(codigoEscaneado)
-        setShowNuevo(true)
-        notify.info('Código no encontrado — creá el repuesto')
+  // Búsqueda directa por código escaneado — sin useEffect ni hooks reactivos
+  const buscarPorCodigo = async (codigo: string) => {
+    setBuscandoCodigo(true)
+    try {
+      let q = supabase
+        .from('repuestos')
+        .select('*')
+        .eq('codigo_fiat', codigo)
+        .eq('activo', true)
+
+      if (perfil?.sucursal && perfil.sucursal !== 'Ambas') {
+        q = q.eq('sucursal', perfil.sucursal)
       }
-      setCodigoEscaneado(null)
+
+      const { data, error } = await q
+      if (error) {
+        console.error('Error buscando repuesto:', error)
+        notify.error('Error al buscar el repuesto')
+        return
+      }
+
+      if (data && data.length > 0) {
+        setSelectedRepuesto(data[0] as Repuesto)
+        notify.success(`Encontrado: ${data[0].descripcion}`)
+      } else {
+        // No existe → ofrecer crear con el código precargado
+        setCodigoNuevo(codigo)
+        setShowNuevo(true)
+        notify.info(`Código ${codigo} no encontrado — creá el repuesto`)
+      }
+    } catch (err) {
+      console.error('Error:', err)
+      notify.error('Error inesperado')
+    } finally {
+      setBuscandoCodigo(false)
     }
-  }, [codigoEscaneado, repuestoEscaneado])
+  }
 
   const stockBajo = repuestos.filter(r => r.stock_actual <= r.stock_minimo)
 
@@ -535,12 +559,22 @@ export function RepuestosPage() {
         </div>
       )}
 
+      {/* Buscando código */}
+      {buscandoCodigo && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
+          <div className="bg-bg-secondary rounded-xl p-6 text-center">
+            <div className="h-8 w-8 border-2 border-action border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+            <p className="text-text-primary font-medium">Buscando repuesto...</p>
+          </div>
+        </div>
+      )}
+
       {/* Scanner */}
       {scanning && (
         <BarcodeScanner
           onScan={(code) => {
             setScanning(false)
-            setCodigoEscaneado(code)
+            buscarPorCodigo(code)
           }}
           onClose={() => setScanning(false)}
         />
