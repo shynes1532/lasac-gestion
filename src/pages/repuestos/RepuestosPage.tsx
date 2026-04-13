@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { ScanLine, Package, Plus, Minus, AlertTriangle, X, History, Camera, CameraOff } from 'lucide-react'
+import { ScanLine, Package, Plus, Minus, AlertTriangle, X, History, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
@@ -7,41 +7,37 @@ import { Button, Card, SearchInput, EmptyState, notify } from '../../components/
 import type { Repuesto } from '../../lib/types'
 
 function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
-  const videoRef = useRef<HTMLVideoElement | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const detectorRef = useRef<any>(null)
-  const scanningRef = useRef(true)
-  const [error, setError] = useState<string | null>(null)
   const [manualCode, setManualCode] = useState('')
   const [cameraActive, setCameraActive] = useState(false)
-  const [hasBarcodeAPI, setHasBarcodeAPI] = useState(false)
-
+  const [error, setError] = useState<string | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+  const scanningRef = useRef(true)
   const onScanRef = useRef(onScan)
   onScanRef.current = onScan
 
+  // Detect if BarcodeDetector is available (Chrome Android only)
+  const hasBarcodeAPI = typeof window !== 'undefined' && 'BarcodeDetector' in window
+
   const cleanup = () => {
     scanningRef.current = false
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop())
-      streamRef.current = null
-    }
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop())
+        streamRef.current = null
+      }
+    } catch { /* ignore */ }
   }
 
   useEffect(() => {
-    // Check if BarcodeDetector API is available
-    const hasBD = typeof (window as any).BarcodeDetector !== 'undefined'
-    setHasBarcodeAPI(hasBD)
+    if (!hasBarcodeAPI) return
 
-    if (!hasBD) {
-      // No hay BarcodeDetector — solo input manual
-      return
-    }
+    let animFrame = 0
 
-    // Start camera + BarcodeDetector
     const startScanner = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }
+          video: { facingMode: 'environment' }
         })
         streamRef.current = stream
 
@@ -51,119 +47,93 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
           setCameraActive(true)
         }
 
-        const detector = new (window as any).BarcodeDetector({
-          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf', 'qr_code']
+        const BDClass = (window as any).BarcodeDetector
+        const detector = new BDClass({
+          formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf']
         })
-        detectorRef.current = detector
 
-        // Scan loop
         const scanFrame = async () => {
-          if (!scanningRef.current || !videoRef.current || videoRef.current.readyState < 2) {
-            if (scanningRef.current) requestAnimationFrame(scanFrame)
+          if (!scanningRef.current || !videoRef.current) return
+          if (videoRef.current.readyState < 2) {
+            animFrame = requestAnimationFrame(scanFrame)
             return
           }
-
           try {
             const barcodes = await detector.detect(videoRef.current)
             if (barcodes.length > 0 && scanningRef.current) {
               scanningRef.current = false
-              const code = barcodes[0].rawValue
               cleanup()
-              onScanRef.current(code)
+              onScanRef.current(barcodes[0].rawValue)
               return
             }
-          } catch {
-            // ignore detection errors
-          }
-
-          if (scanningRef.current) requestAnimationFrame(scanFrame)
+          } catch { /* ignore */ }
+          if (scanningRef.current) animFrame = requestAnimationFrame(scanFrame)
         }
 
-        requestAnimationFrame(scanFrame)
-      } catch (err) {
+        animFrame = requestAnimationFrame(scanFrame)
+      } catch (err: any) {
         console.error('Camera error:', err)
-        setError('No se pudo acceder a la cámara. Verificá los permisos.')
+        setError('No se pudo acceder a la cámara.')
       }
     }
 
     startScanner()
-    return cleanup
-  }, [])
+    return () => { cleanup(); cancelAnimationFrame(animFrame) }
+  }, [hasBarcodeAPI])
 
   const handleManualSubmit = () => {
-    if (manualCode.trim()) {
-      cleanup()
-      onScanRef.current(manualCode.trim())
-    }
-  }
-
-  const handleClose = () => {
+    if (!manualCode.trim()) return
     cleanup()
-    onClose()
+    onScanRef.current(manualCode.trim())
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ zIndex: 9999 }}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black/80">
+      <div className="flex items-center justify-between p-4 bg-black">
         <div className="flex items-center gap-2">
-          <ScanLine className="h-5 w-5 text-action" />
-          <span className="text-white font-bold">
-            {hasBarcodeAPI ? 'Escaneá el código de barras' : 'Ingresá el código FIAT'}
-          </span>
+          <ScanLine className="h-5 w-5 text-red-500" />
+          <span className="text-white font-bold text-sm">Buscar repuesto por código</span>
         </div>
-        <button onClick={handleClose} className="text-white/70 hover:text-white cursor-pointer">
+        <button onClick={() => { cleanup(); onClose() }} className="text-white p-2 cursor-pointer">
           <X className="h-6 w-6" />
         </button>
       </div>
 
-      {/* Camera view */}
-      <div className="flex-1 flex items-center justify-center relative overflow-hidden">
-        {error ? (
-          <div className="text-center p-8">
-            <CameraOff className="h-12 w-12 text-red-400 mx-auto mb-3" />
-            <p className="text-white/80 text-sm">{error}</p>
-          </div>
-        ) : hasBarcodeAPI ? (
-          <>
-            <video
-              ref={videoRef}
-              className="w-full h-full object-cover"
-              playsInline
-              muted
-              autoPlay
-            />
-            {cameraActive && (
-              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                <div className="w-72 h-28 border-2 border-action rounded-lg relative">
-                  <div className="absolute inset-0 bg-action/5" />
-                  <div className="absolute -top-6 left-0 right-0 text-center">
-                    <span className="text-xs text-white/80 bg-black/60 px-2 py-0.5 rounded">
-                      Centrá el código de barras acá
-                    </span>
-                  </div>
+      {/* Camera (solo Chrome Android) */}
+      {hasBarcodeAPI && !error && (
+        <div className="flex-1 relative overflow-hidden bg-gray-900">
+          <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
+          {cameraActive && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="w-72 h-28 border-2 border-red-500 rounded-lg">
+                <div className="absolute -top-6 left-0 right-0 text-center">
+                  <span className="text-xs text-white bg-black/70 px-2 py-1 rounded">Centrá el código acá</span>
                 </div>
               </div>
-            )}
-          </>
-        ) : (
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Mensaje si no hay cámara */}
+      {(!hasBarcodeAPI || error) && (
+        <div className="flex-1 flex items-center justify-center">
           <div className="text-center p-8">
             <Camera className="h-12 w-12 text-white/30 mx-auto mb-3" />
             <p className="text-white/60 text-sm">
-              Tu navegador no soporta escaneo automático de códigos de barras.
+              {error || 'Escáner de cámara no disponible en este navegador.'}
             </p>
-            <p className="text-white/40 text-xs mt-1">
-              Usá Chrome en Android para escanear, o ingresá el código abajo.
+            <p className="text-white/40 text-xs mt-2">
+              Usá Chrome en Android para escanear. O ingresá el código abajo.
             </p>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Manual input — siempre visible */}
-      <div className="p-4 bg-black/90 space-y-3">
-        <p className="text-white/50 text-xs text-center">
-          {hasBarcodeAPI && !error ? 'Si no escanea, ingresá el código a mano:' : 'Ingresá el código del repuesto:'}
-        </p>
+      {/* Input manual — SIEMPRE visible */}
+      <div className="p-4 bg-gray-950 space-y-3 safe-bottom">
+        <p className="text-white/50 text-xs text-center">Ingresá el código FIAT del repuesto:</p>
         <div className="flex gap-2">
           <input
             type="text"
@@ -171,15 +141,15 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
             onChange={e => setManualCode(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
             placeholder="Ej: 51987654"
-            autoFocus={!hasBarcodeAPI}
-            className="flex-1 px-3 py-3 bg-white/10 border border-white/20 rounded-lg text-white text-base font-mono placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-action/50"
+            autoFocus
+            className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-lg font-mono placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-red-500/50"
             autoComplete="off"
-            inputMode="text"
+            inputMode="numeric"
           />
           <button
             onClick={handleManualSubmit}
             disabled={!manualCode.trim()}
-            className="px-5 py-3 bg-action text-white rounded-lg font-bold text-sm cursor-pointer disabled:opacity-40"
+            className="px-6 py-3 bg-red-600 text-white rounded-xl font-bold cursor-pointer disabled:opacity-40"
           >
             Buscar
           </button>
@@ -472,8 +442,16 @@ export function RepuestosPage() {
   const [selectedRepuesto, setSelectedRepuesto] = useState<Repuesto | null>(null)
   const [showNuevo, setShowNuevo] = useState(false)
   const [codigoNuevo, setCodigoNuevo] = useState('')
+  const [pageError, setPageError] = useState<string | null>(null)
 
-  const { data: repuestos = [], isLoading } = useRepuestos(busqueda)
+  const { data: repuestos = [], isLoading, error: queryError } = useRepuestos(busqueda)
+
+  // Si la query de repuestos falla (tabla no existe, etc), mostramos error visible
+  useEffect(() => {
+    if (queryError) {
+      setPageError((queryError as any)?.message || 'Error al cargar repuestos')
+    }
+  }, [queryError])
 
   // Búsqueda directa por código escaneado — sin useEffect ni hooks reactivos
   const buscarPorCodigo = async (codigo: string) => {
@@ -514,6 +492,20 @@ export function RepuestosPage() {
   }
 
   const stockBajo = repuestos.filter(r => r.stock_actual <= r.stock_minimo)
+
+  // Error visible
+  if (pageError) {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-xl font-bold text-text-primary">Repuestos</h1>
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4">
+          <p className="text-red-400 font-bold mb-1">Error al cargar el módulo</p>
+          <p className="text-sm text-red-300">{pageError}</p>
+          <p className="text-xs text-red-300/60 mt-2">Verificá que la tabla <code>repuestos</code> exista en Supabase (migración 008).</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-4">
