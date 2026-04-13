@@ -594,6 +594,43 @@ export interface Recepcion {
   updated_at: string
 }
 
+// ============================================================
+// Repuestos — Stock con scanner de código de barras
+// ============================================================
+
+export type TipoMovimientoRepuesto = 'ingreso' | 'egreso'
+
+export interface Repuesto {
+  id: string
+  codigo_fiat: string
+  descripcion: string
+  ubicacion: string | null
+  stock_actual: number
+  stock_minimo: number
+  precio_costo: number | null
+  precio_venta: number | null
+  sucursal: Sucursal
+  activo: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface RepuestoMovimiento {
+  id: string
+  repuesto_id: string
+  tipo: TipoMovimientoRepuesto
+  cantidad: number
+  motivo: string | null
+  operacion_id: string | null
+  stock_anterior: number
+  stock_posterior: number
+  realizado_por: string | null
+  created_at: string
+  // Join
+  repuesto?: Repuesto
+}
+
 // Requiere prenda?
 export function requierePrenda(op: Pick<Operacion, 'forma_pago' | 'tipo_operacion'>): boolean {
   return op.forma_pago === 'financiado_banco' || op.tipo_operacion === 'plan_ahorro'

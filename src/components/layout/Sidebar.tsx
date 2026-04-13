@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
   LogOut, Menu, X, CreditCard, ShieldCheck, DollarSign, Printer, Shield,
-  UserCheck, AlertTriangle, PieChart, Archive, ClipboardList,
+  UserCheck, AlertTriangle, PieChart, Archive, ClipboardList, Package,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
@@ -20,6 +20,7 @@ const navItems = [
   { path: '/entregas-programadas',label: 'Entregas pendientes', icon: Truck },
   { path: '/prendas',             label: 'Prendas',      icon: CreditCard },
   { path: '/saldos',              label: 'Saldos',       icon: DollarSign },
+  { path: '/repuestos',             label: 'Repuestos',    icon: Package },
   { path: '/garantias',             label: 'Garantias',    icon: Wrench },
   { path: '/siniestros',            label: 'Siniestros',   icon: AlertTriangle },
   { path: '/calibre',              label: 'Calibre',      icon: Shield },
