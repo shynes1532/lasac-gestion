@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Html5Qrcode } from 'html5-qrcode'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import { ScanLine, Package, Plus, Minus, AlertTriangle, X, History, Camera, CameraOff } from 'lucide-react'
 import { useRepuestos, useRepuestoPorCodigo, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
@@ -7,33 +7,68 @@ import type { Repuesto } from '../../lib/types'
 
 function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
   const scannerRef = useRef<Html5Qrcode | null>(null)
+  const scannedRef = useRef(false)
   const [error, setError] = useState<string | null>(null)
+  const [lastScanned, setLastScanned] = useState<string | null>(null)
+
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan
 
   useEffect(() => {
-    const scanner = new Html5Qrcode('barcode-reader')
+    // Habilitar todos los formatos de código de barras comunes
+    const formatsToSupport = [
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.EAN_8,
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.CODE_93,
+      Html5QrcodeSupportedFormats.UPC_A,
+      Html5QrcodeSupportedFormats.UPC_E,
+      Html5QrcodeSupportedFormats.ITF,
+      Html5QrcodeSupportedFormats.QR_CODE,
+      Html5QrcodeSupportedFormats.DATA_MATRIX,
+    ]
+
+    const scanner = new Html5Qrcode('barcode-reader', {
+      formatsToSupport,
+      verbose: false,
+    })
     scannerRef.current = scanner
 
     scanner.start(
       { facingMode: 'environment' },
       {
-        fps: 10,
-        qrbox: { width: 280, height: 120 },
-        aspectRatio: 2.0,
+        fps: 15,
+        qrbox: { width: 300, height: 150 },
+        aspectRatio: 1.5,
+        disableFlip: false,
       },
       (decodedText) => {
+        if (scannedRef.current) return
+        scannedRef.current = true
+        setLastScanned(decodedText)
         scanner.stop().catch(() => {})
-        onScan(decodedText)
+        onScanRef.current(decodedText)
       },
-      () => {} // ignore errors during scanning
+      () => {} // ignore frame errors
     ).catch((err) => {
-      setError('No se pudo acceder a la cámara. Verificá los permisos.')
+      setError('No se pudo acceder a la cámara. Verificá los permisos del navegador.')
       console.error('Scanner error:', err)
     })
 
     return () => {
       scanner.stop().catch(() => {})
     }
-  }, [onScan])
+  }, []) // sin deps — se monta una sola vez
+
+  const [manualCode, setManualCode] = useState('')
+
+  const handleManualSubmit = () => {
+    if (manualCode.trim()) {
+      scannerRef.current?.stop().catch(() => {})
+      onScanRef.current(manualCode.trim())
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 bg-black flex flex-col">
@@ -52,17 +87,41 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
           <div className="text-center p-8">
             <CameraOff className="h-12 w-12 text-red-400 mx-auto mb-3" />
             <p className="text-white/80 text-sm">{error}</p>
-            <button onClick={onClose} className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-white text-sm cursor-pointer">
-              Cerrar
-            </button>
           </div>
         ) : (
           <div id="barcode-reader" className="w-full max-w-md" />
         )}
       </div>
 
-      <div className="p-4 bg-black/80 text-center">
-        <p className="text-white/50 text-xs">Apuntá la cámara al código de barras del repuesto FIAT</p>
+      {lastScanned && (
+        <div className="px-4 py-2 bg-green-600 text-center">
+          <p className="text-white font-bold">Leído: {lastScanned}</p>
+        </div>
+      )}
+
+      {/* Ingreso manual como fallback */}
+      <div className="p-4 bg-black/90 space-y-3">
+        <p className="text-white/50 text-xs text-center">
+          {error ? 'Ingresá el código manualmente:' : 'Si no escanea, ingresá el código a mano:'}
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={manualCode}
+            onChange={e => setManualCode(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
+            placeholder="Ej: 51987654"
+            className="flex-1 px-3 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white text-sm font-mono placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-action/50"
+            autoComplete="off"
+          />
+          <button
+            onClick={handleManualSubmit}
+            disabled={!manualCode.trim()}
+            className="px-4 py-2.5 bg-action text-white rounded-lg font-bold text-sm cursor-pointer disabled:opacity-40"
+          >
+            Buscar
+          </button>
+        </div>
       </div>
     </div>
   )
