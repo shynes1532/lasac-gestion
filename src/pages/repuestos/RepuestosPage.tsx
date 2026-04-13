@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef } from 'react'
-import { ScanLine, Package, Plus, Minus, AlertTriangle, X, History, Camera } from 'lucide-react'
+import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
 import type { Repuesto } from '../../lib/types'
 
-function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
-  const [manualCode, setManualCode] = useState('')
-  const [cameraActive, setCameraActive] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+// ============================================================
+// Scanner inline — se abre encima del campo código
+// Usa BarcodeDetector en Chrome Android, input manual como fallback
+// ============================================================
+function InlineScanner({ onScan, onClose }: { onScan: (code: string) => void; onClose: () => void }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const scanningRef = useRef(true)
-  const onScanRef = useRef(onScan)
-  onScanRef.current = onScan
+  const [error, setError] = useState<string | null>(null)
+  const [cameraReady, setCameraReady] = useState(false)
 
-  // Detect if BarcodeDetector is available (Chrome Android only)
   const hasBarcodeAPI = typeof window !== 'undefined' && 'BarcodeDetector' in window
 
   const cleanup = () => {
@@ -30,11 +30,14 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
   }
 
   useEffect(() => {
-    if (!hasBarcodeAPI) return
+    if (!hasBarcodeAPI) {
+      setError('Tu navegador no soporta escaneo automático. Ingresá el código manualmente.')
+      return
+    }
 
     let animFrame = 0
 
-    const startScanner = async () => {
+    const start = async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' }
@@ -44,26 +47,25 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
         if (videoRef.current) {
           videoRef.current.srcObject = stream
           await videoRef.current.play()
-          setCameraActive(true)
+          setCameraReady(true)
         }
 
-        const BDClass = (window as any).BarcodeDetector
-        const detector = new BDClass({
+        const detector = new (window as any).BarcodeDetector({
           formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'upc_a', 'upc_e', 'itf']
         })
 
         const scanFrame = async () => {
-          if (!scanningRef.current || !videoRef.current) return
-          if (videoRef.current.readyState < 2) {
-            animFrame = requestAnimationFrame(scanFrame)
+          if (!scanningRef.current || !videoRef.current || videoRef.current.readyState < 2) {
+            if (scanningRef.current) animFrame = requestAnimationFrame(scanFrame)
             return
           }
           try {
             const barcodes = await detector.detect(videoRef.current)
             if (barcodes.length > 0 && scanningRef.current) {
               scanningRef.current = false
+              const code = barcodes[0].rawValue
               cleanup()
-              onScanRef.current(barcodes[0].rawValue)
+              onScan(code)
               return
             }
           } catch { /* ignore */ }
@@ -73,92 +75,54 @@ function BarcodeScanner({ onScan, onClose }: { onScan: (code: string) => void; o
         animFrame = requestAnimationFrame(scanFrame)
       } catch (err: any) {
         console.error('Camera error:', err)
-        setError('No se pudo acceder a la cámara.')
+        setError('No se pudo acceder a la cámara. Verificá los permisos.')
       }
     }
 
-    startScanner()
+    start()
     return () => { cleanup(); cancelAnimationFrame(animFrame) }
   }, [hasBarcodeAPI])
 
-  const handleManualSubmit = () => {
-    if (!manualCode.trim()) return
-    cleanup()
-    onScanRef.current(manualCode.trim())
-  }
-
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col" style={{ zIndex: 9999 }}>
+    <div className="bg-black rounded-xl overflow-hidden border border-border">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-black">
+      <div className="flex items-center justify-between px-3 py-2 bg-black">
         <div className="flex items-center gap-2">
-          <ScanLine className="h-5 w-5 text-red-500" />
-          <span className="text-white font-bold text-sm">Buscar repuesto por código</span>
+          <ScanLine className="h-4 w-4 text-action" />
+          <span className="text-white text-xs font-bold">Escaneá el código de barras</span>
         </div>
-        <button onClick={() => { cleanup(); onClose() }} className="text-white p-2 cursor-pointer">
-          <X className="h-6 w-6" />
+        <button onClick={() => { cleanup(); onClose() }} className="text-white/70 p-1 cursor-pointer">
+          <X className="h-5 w-5" />
         </button>
       </div>
 
-      {/* Camera (solo Chrome Android) */}
-      {hasBarcodeAPI && !error && (
-        <div className="flex-1 relative overflow-hidden bg-gray-900">
+      {/* Camera */}
+      {!error ? (
+        <div className="relative" style={{ height: '200px' }}>
           <video ref={videoRef} className="w-full h-full object-cover" playsInline muted autoPlay />
-          {cameraActive && (
+          {cameraReady && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-72 h-28 border-2 border-red-500 rounded-lg">
-                <div className="absolute -top-6 left-0 right-0 text-center">
-                  <span className="text-xs text-white bg-black/70 px-2 py-1 rounded">Centrá el código acá</span>
-                </div>
-              </div>
+              <div className="w-64 h-20 border-2 border-red-500 rounded-lg" />
+            </div>
+          )}
+          {!cameraReady && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="h-6 w-6 border-2 border-action border-t-transparent rounded-full animate-spin" />
             </div>
           )}
         </div>
-      )}
-
-      {/* Mensaje si no hay cámara */}
-      {(!hasBarcodeAPI || error) && (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center p-8">
-            <Camera className="h-12 w-12 text-white/30 mx-auto mb-3" />
-            <p className="text-white/60 text-sm">
-              {error || 'Escáner de cámara no disponible en este navegador.'}
-            </p>
-            <p className="text-white/40 text-xs mt-2">
-              Usá Chrome en Android para escanear. O ingresá el código abajo.
-            </p>
-          </div>
+      ) : (
+        <div className="p-4 text-center">
+          <p className="text-white/60 text-xs">{error}</p>
         </div>
       )}
-
-      {/* Input manual — SIEMPRE visible */}
-      <div className="p-4 bg-gray-950 space-y-3 safe-bottom">
-        <p className="text-white/50 text-xs text-center">Ingresá el código FIAT del repuesto:</p>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={manualCode}
-            onChange={e => setManualCode(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleManualSubmit()}
-            placeholder="Ej: 51987654"
-            autoFocus
-            className="flex-1 px-4 py-3 bg-white/10 border border-white/20 rounded-xl text-white text-lg font-mono placeholder:text-white/30 focus:outline-none focus:ring-2 focus:ring-red-500/50"
-            autoComplete="off"
-            inputMode="numeric"
-          />
-          <button
-            onClick={handleManualSubmit}
-            disabled={!manualCode.trim()}
-            className="px-6 py-3 bg-red-600 text-white rounded-xl font-bold cursor-pointer disabled:opacity-40"
-          >
-            Buscar
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
 
+// ============================================================
+// Panel de movimiento (ingreso/egreso) para un repuesto existente
+// ============================================================
 function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: () => void }) {
   const [tipo, setTipo] = useState<'ingreso' | 'egreso'>('ingreso')
   const [cantidad, setCantidad] = useState(1)
@@ -189,7 +153,10 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
           <div className="flex items-center justify-between">
             <div>
               <h3 className="font-bold text-text-primary">{repuesto.descripcion}</h3>
-              <p className="text-xs text-text-muted">Código: {repuesto.codigo_fiat} | Stock: <span className="font-bold text-text-primary">{repuesto.stock_actual}</span></p>
+              <p className="text-xs text-text-muted">
+                Código: <span className="font-mono text-action">{repuesto.codigo_fiat}</span> | Stock: <span className="font-bold text-text-primary">{repuesto.stock_actual}</span>
+                {repuesto.ubicacion && <> | 📍 {repuesto.ubicacion}</>}
+              </p>
             </div>
             <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
               <X className="h-5 w-5" />
@@ -201,27 +168,17 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
           <div className="p-4 space-y-4">
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => setTipo('ingreso')}
+              <button onClick={() => setTipo('ingreso')}
                 className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                  tipo === 'ingreso'
-                    ? 'bg-green-600 text-white'
-                    : 'bg-bg-tertiary text-text-secondary'
-                }`}
-              >
-                <Plus className="h-4 w-4" />
-                Ingreso
+                  tipo === 'ingreso' ? 'bg-green-600 text-white' : 'bg-bg-tertiary text-text-secondary'
+                }`}>
+                <Plus className="h-4 w-4" /> Ingreso
               </button>
-              <button
-                onClick={() => setTipo('egreso')}
+              <button onClick={() => setTipo('egreso')}
                 className={`py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer transition-colors ${
-                  tipo === 'egreso'
-                    ? 'bg-red-600 text-white'
-                    : 'bg-bg-tertiary text-text-secondary'
-                }`}
-              >
-                <Minus className="h-4 w-4" />
-                Egreso
+                  tipo === 'egreso' ? 'bg-red-600 text-white' : 'bg-bg-tertiary text-text-secondary'
+                }`}>
+                <Minus className="h-4 w-4" /> Egreso
               </button>
             </div>
 
@@ -229,38 +186,22 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
             <div>
               <label className="block text-xs text-text-muted mb-1">Cantidad</label>
               <div className="flex items-center gap-3">
-                <button
-                  onClick={() => setCantidad(Math.max(1, cantidad - 1))}
-                  className="w-12 h-12 rounded-xl bg-bg-tertiary text-text-primary font-bold text-xl cursor-pointer hover:bg-bg-primary transition-colors"
-                >
-                  -
-                </button>
-                <input
-                  type="number"
-                  value={cantidad}
+                <button onClick={() => setCantidad(Math.max(1, cantidad - 1))}
+                  className="w-12 h-12 rounded-xl bg-bg-tertiary text-text-primary font-bold text-xl cursor-pointer">-</button>
+                <input type="number" value={cantidad} min={1}
                   onChange={e => setCantidad(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="flex-1 text-center text-2xl font-bold bg-bg-primary border border-border rounded-xl py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
-                  min={1}
-                />
-                <button
-                  onClick={() => setCantidad(cantidad + 1)}
-                  className="w-12 h-12 rounded-xl bg-bg-tertiary text-text-primary font-bold text-xl cursor-pointer hover:bg-bg-primary transition-colors"
-                >
-                  +
-                </button>
+                  className="flex-1 text-center text-2xl font-bold bg-bg-primary border border-border rounded-xl py-2 text-text-primary focus:outline-none" />
+                <button onClick={() => setCantidad(cantidad + 1)}
+                  className="w-12 h-12 rounded-xl bg-bg-tertiary text-text-primary font-bold text-xl cursor-pointer">+</button>
               </div>
             </div>
 
             {/* Motivo */}
             <div>
               <label className="block text-xs text-text-muted mb-1">Motivo (opcional)</label>
-              <input
-                type="text"
-                value={motivo}
-                onChange={e => setMotivo(e.target.value)}
+              <input type="text" value={motivo} onChange={e => setMotivo(e.target.value)}
                 placeholder="Ej: Compra proveedor, Venta mostrador, OT-123..."
-                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-action/30"
-              />
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary placeholder:text-text-muted focus:outline-none" />
             </div>
 
             {/* Preview */}
@@ -276,19 +217,12 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
 
             {/* Botones */}
             <div className="flex gap-2">
-              <button
-                onClick={() => setShowHistorial(true)}
-                className="p-2.5 bg-bg-tertiary rounded-xl text-text-muted hover:text-text-primary cursor-pointer"
-                title="Ver historial"
-              >
+              <button onClick={() => setShowHistorial(true)}
+                className="p-2.5 bg-bg-tertiary rounded-xl text-text-muted hover:text-text-primary cursor-pointer" title="Ver historial">
                 <History className="h-5 w-5" />
               </button>
-              <Button
-                fullWidth
-                onClick={handleSubmit}
-                loading={registrarMov.isPending}
-                disabled={tipo === 'egreso' && repuesto.stock_actual - cantidad < 0}
-              >
+              <Button fullWidth onClick={handleSubmit} loading={registrarMov.isPending}
+                disabled={tipo === 'egreso' && repuesto.stock_actual - cantidad < 0}>
                 {tipo === 'ingreso' ? <Plus className="h-4 w-4" /> : <Minus className="h-4 w-4" />}
                 Registrar {tipo}
               </Button>
@@ -327,6 +261,9 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
   )
 }
 
+// ============================================================
+// Formulario nuevo repuesto — con scanner integrado en el campo código
+// ============================================================
 function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
   codigoInicial: string
   onCreated: (rep: Repuesto) => void
@@ -341,6 +278,7 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
     precio_costo: '',
     precio_venta: '',
   })
+  const [showScanner, setShowScanner] = useState(false)
   const crearRepuesto = useCrearRepuesto()
 
   const handleSubmit = async () => {
@@ -375,12 +313,38 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
           </button>
         </div>
         <div className="p-4 space-y-3">
+          {/* Código FIAT con botón scanner */}
           <div>
             <label className="block text-xs text-text-muted mb-1">Código FIAT *</label>
-            <input type="text" value={form.codigo_fiat}
-              onChange={e => setForm({ ...form, codigo_fiat: e.target.value })}
-              className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-action/30" />
+            <div className="flex gap-2">
+              <input type="text" value={form.codigo_fiat}
+                onChange={e => setForm({ ...form, codigo_fiat: e.target.value })}
+                placeholder="Ej: 51987654"
+                className="flex-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-action/30" />
+              <button
+                onClick={() => setShowScanner(!showScanner)}
+                className={`px-3 py-2 rounded-lg font-bold text-sm cursor-pointer transition-colors ${
+                  showScanner ? 'bg-red-600 text-white' : 'bg-action/10 text-action hover:bg-action/20'
+                }`}
+                title="Escanear código de barras"
+              >
+                <Camera className="h-5 w-5" />
+              </button>
+            </div>
           </div>
+
+          {/* Scanner inline — se abre debajo del campo código */}
+          {showScanner && (
+            <InlineScanner
+              onScan={(code) => {
+                setForm(f => ({ ...f, codigo_fiat: code }))
+                setShowScanner(false)
+                notify.success(`Código escaneado: ${code}`)
+              }}
+              onClose={() => setShowScanner(false)}
+            />
+          )}
+
           <div>
             <label className="block text-xs text-text-muted mb-1">Descripción *</label>
             <input type="text" value={form.descripcion}
@@ -398,15 +362,15 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs text-text-muted mb-1">Stock inicial</label>
-              <input type="number" value={form.stock_actual}
+              <input type="number" value={form.stock_actual} min={0}
                 onChange={e => setForm({ ...form, stock_actual: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" min={0} />
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
             </div>
             <div>
               <label className="block text-xs text-text-muted mb-1">Stock mínimo</label>
-              <input type="number" value={form.stock_minimo}
+              <input type="number" value={form.stock_minimo} min={0}
                 onChange={e => setForm({ ...form, stock_minimo: parseInt(e.target.value) || 0 })}
-                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" min={0} />
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -434,11 +398,12 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
   )
 }
 
+// ============================================================
+// Página principal de Repuestos
+// ============================================================
 export function RepuestosPage() {
   const { perfil } = useAuth()
   const [busqueda, setBusqueda] = useState('')
-  const [scanning, setScanning] = useState(false)
-  const [buscandoCodigo, setBuscandoCodigo] = useState(false)
   const [selectedRepuesto, setSelectedRepuesto] = useState<Repuesto | null>(null)
   const [showNuevo, setShowNuevo] = useState(false)
   const [codigoNuevo, setCodigoNuevo] = useState('')
@@ -446,54 +411,12 @@ export function RepuestosPage() {
 
   const { data: repuestos = [], isLoading, error: queryError } = useRepuestos(busqueda)
 
-  // Si la query de repuestos falla (tabla no existe, etc), mostramos error visible
   useEffect(() => {
-    if (queryError) {
-      setPageError((queryError as any)?.message || 'Error al cargar repuestos')
-    }
+    if (queryError) setPageError((queryError as any)?.message || 'Error al cargar repuestos')
   }, [queryError])
-
-  // Búsqueda directa por código escaneado — sin useEffect ni hooks reactivos
-  const buscarPorCodigo = async (codigo: string) => {
-    setBuscandoCodigo(true)
-    try {
-      let q = supabase
-        .from('repuestos')
-        .select('*')
-        .eq('codigo_fiat', codigo)
-        .eq('activo', true)
-
-      if (perfil?.sucursal && perfil.sucursal !== 'Ambas') {
-        q = q.eq('sucursal', perfil.sucursal)
-      }
-
-      const { data, error } = await q
-      if (error) {
-        console.error('Error buscando repuesto:', error)
-        notify.error('Error al buscar el repuesto')
-        return
-      }
-
-      if (data && data.length > 0) {
-        setSelectedRepuesto(data[0] as Repuesto)
-        notify.success(`Encontrado: ${data[0].descripcion}`)
-      } else {
-        // No existe → ofrecer crear con el código precargado
-        setCodigoNuevo(codigo)
-        setShowNuevo(true)
-        notify.info(`Código ${codigo} no encontrado — creá el repuesto`)
-      }
-    } catch (err) {
-      console.error('Error:', err)
-      notify.error('Error inesperado')
-    } finally {
-      setBuscandoCodigo(false)
-    }
-  }
 
   const stockBajo = repuestos.filter(r => r.stock_actual <= r.stock_minimo)
 
-  // Error visible
   if (pageError) {
     return (
       <div className="space-y-4">
@@ -513,18 +436,12 @@ export function RepuestosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">Repuestos</h1>
-          <p className="text-sm text-text-secondary">Stock y movimientos con scanner</p>
+          <p className="text-sm text-text-secondary">Stock y movimientos</p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setScanning(true)}>
-            <Camera className="h-4 w-4" />
-            Escanear
-          </Button>
-          <Button variant="secondary" onClick={() => { setCodigoNuevo(''); setShowNuevo(true) }}>
-            <Plus className="h-4 w-4" />
-            Nuevo
-          </Button>
-        </div>
+        <Button onClick={() => { setCodigoNuevo(''); setShowNuevo(true) }}>
+          <Plus className="h-4 w-4" />
+          Nuevo repuesto
+        </Button>
       </div>
 
       {/* KPIs */}
@@ -552,11 +469,8 @@ export function RepuestosPage() {
           </div>
           <div className="flex flex-wrap gap-1">
             {stockBajo.slice(0, 5).map(r => (
-              <button
-                key={r.id}
-                onClick={() => setSelectedRepuesto(r)}
-                className="text-xs bg-amber-500/20 px-2 py-0.5 rounded text-amber-200 cursor-pointer hover:bg-amber-500/30"
-              >
+              <button key={r.id} onClick={() => setSelectedRepuesto(r)}
+                className="text-xs bg-amber-500/20 px-2 py-0.5 rounded text-amber-200 cursor-pointer hover:bg-amber-500/30">
                 {r.codigo_fiat} ({r.stock_actual})
               </button>
             ))}
@@ -581,16 +495,13 @@ export function RepuestosPage() {
         <EmptyState
           icon={<Package className="h-12 w-12" />}
           title="Sin repuestos"
-          description={busqueda ? 'No se encontraron repuestos' : 'Escaneá un código de barras para empezar'}
+          description={busqueda ? 'No se encontraron repuestos' : 'Creá tu primer repuesto con el botón "Nuevo repuesto"'}
         />
       ) : (
         <div className="space-y-2">
           {repuestos.map(rep => (
-            <button
-              key={rep.id}
-              onClick={() => setSelectedRepuesto(rep)}
-              className="w-full text-left bg-bg-secondary rounded-xl border border-border p-3 hover:border-action/40 transition-colors cursor-pointer"
-            >
+            <button key={rep.id} onClick={() => setSelectedRepuesto(rep)}
+              className="w-full text-left bg-bg-secondary rounded-xl border border-border p-3 hover:border-action/40 transition-colors cursor-pointer">
               <div className="flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
@@ -611,43 +522,16 @@ export function RepuestosPage() {
         </div>
       )}
 
-      {/* Buscando código */}
-      {buscandoCodigo && (
-        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center">
-          <div className="bg-bg-secondary rounded-xl p-6 text-center">
-            <div className="h-8 w-8 border-2 border-action border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-            <p className="text-text-primary font-medium">Buscando repuesto...</p>
-          </div>
-        </div>
-      )}
-
-      {/* Scanner */}
-      {scanning && (
-        <BarcodeScanner
-          onScan={(code) => {
-            setScanning(false)
-            buscarPorCodigo(code)
-          }}
-          onClose={() => setScanning(false)}
-        />
-      )}
-
       {/* Panel de movimiento */}
       {selectedRepuesto && (
-        <MovimientoPanel
-          repuesto={selectedRepuesto}
-          onClose={() => setSelectedRepuesto(null)}
-        />
+        <MovimientoPanel repuesto={selectedRepuesto} onClose={() => setSelectedRepuesto(null)} />
       )}
 
       {/* Crear nuevo repuesto */}
       {showNuevo && (
         <NuevoRepuestoForm
           codigoInicial={codigoNuevo}
-          onCreated={(rep) => {
-            setShowNuevo(false)
-            setSelectedRepuesto(rep)
-          }}
+          onCreated={(rep) => { setShowNuevo(false); setSelectedRepuesto(rep) }}
           onClose={() => setShowNuevo(false)}
         />
       )}
