@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
-import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera } from 'lucide-react'
+import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera, Pencil } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
@@ -123,12 +125,47 @@ function InlineScanner({ onScan, onClose }: { onScan: (code: string) => void; on
 // Panel de movimiento (ingreso/egreso) para un repuesto existente
 // ============================================================
 function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: () => void }) {
+  const queryClient = useQueryClient()
   const [tipo, setTipo] = useState<'ingreso' | 'egreso'>('ingreso')
   const [cantidad, setCantidad] = useState(1)
   const [motivo, setMotivo] = useState('')
   const registrarMov = useRegistrarMovimiento()
   const { data: movimientos } = useMovimientos(repuesto.id)
   const [showHistorial, setShowHistorial] = useState(false)
+  const [showEditar, setShowEditar] = useState(false)
+  const [editForm, setEditForm] = useState({
+    codigo_fiat: repuesto.codigo_fiat,
+    descripcion: repuesto.descripcion,
+    ubicacion: repuesto.ubicacion || '',
+    stock_minimo: repuesto.stock_minimo,
+    precio_costo: repuesto.precio_costo?.toString() || '',
+    precio_venta: repuesto.precio_venta?.toString() || '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const handleSaveEdit = async () => {
+    if (!editForm.codigo_fiat) { notify.error('El código es obligatorio'); return }
+    setSaving(true)
+    try {
+      const { error } = await supabase.from('repuestos').update({
+        codigo_fiat: editForm.codigo_fiat,
+        descripcion: editForm.descripcion || editForm.codigo_fiat,
+        ubicacion: editForm.ubicacion || null,
+        stock_minimo: editForm.stock_minimo,
+        precio_costo: editForm.precio_costo ? Number(editForm.precio_costo) : null,
+        precio_venta: editForm.precio_venta ? Number(editForm.precio_venta) : null,
+      }).eq('id', repuesto.id)
+      if (error) throw error
+      notify.success('Repuesto actualizado')
+      queryClient.invalidateQueries({ queryKey: ['repuestos'] })
+      setShowEditar(false)
+      onClose()
+    } catch (err: any) {
+      notify.error(err?.message || 'Error al guardar')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const handleSubmit = async () => {
     try {
@@ -157,13 +194,69 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
                 {repuesto.ubicacion && <> | 📍 {repuesto.ubicacion}</>}
               </p>
             </div>
-            <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
-              <X className="h-5 w-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowEditar(!showEditar)}
+                className="text-xs text-action hover:text-action/80 underline cursor-pointer">
+                Editar
+              </button>
+              <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {!showHistorial ? (
+        {showEditar ? (
+          <div className="p-4 space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <Pencil className="h-4 w-4 text-action" />
+              <h4 className="font-bold text-text-primary text-sm">Editar repuesto</h4>
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Código FIAT</label>
+              <input type="text" value={editForm.codigo_fiat}
+                onChange={e => setEditForm({ ...editForm, codigo_fiat: e.target.value })}
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary font-mono focus:outline-none focus:ring-2 focus:ring-action/30" />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Descripción</label>
+              <input type="text" value={editForm.descripcion}
+                onChange={e => setEditForm({ ...editForm, descripcion: e.target.value })}
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30" />
+            </div>
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Ubicación</label>
+              <input type="text" value={editForm.ubicacion}
+                onChange={e => setEditForm({ ...editForm, ubicacion: e.target.value })}
+                placeholder="Ej: Estante A3"
+                className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Stock mín.</label>
+                <input type="number" value={editForm.stock_minimo} min={0}
+                  onChange={e => setEditForm({ ...editForm, stock_minimo: parseInt(e.target.value) || 0 })}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">P. costo</label>
+                <input type="number" value={editForm.precio_costo}
+                  onChange={e => setEditForm({ ...editForm, precio_costo: e.target.value })}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs text-text-muted mb-1">P. venta</label>
+                <input type="number" value={editForm.precio_venta}
+                  onChange={e => setEditForm({ ...editForm, precio_venta: e.target.value })}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="ghost" fullWidth onClick={() => setShowEditar(false)}>Cancelar</Button>
+              <Button fullWidth onClick={handleSaveEdit} loading={saving}>Guardar cambios</Button>
+            </div>
+          </div>
+        ) : !showHistorial ? (
           <div className="p-4 space-y-4">
             {/* Tipo */}
             <div className="grid grid-cols-2 gap-2">
