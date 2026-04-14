@@ -299,51 +299,68 @@ function BarraPipeline({ estadoActual }: { estadoActual: EstadoActual }) {
 // BANDERAS VIAJERAS
 // ============================================================
 
-function BanderasViajeras({ op }: { op: OperacionDetalle }) {
+function BanderasViajeras({ op, onMutate }: { op: OperacionDetalle; onMutate: (updates: Partial<Operacion>) => void }) {
   const semaforo = op.fecha_compromiso ? getSemaforoCompromiso(op.fecha_compromiso) : null
   const semaforoColors = { verde: 'text-green-400', amarillo: 'text-yellow-400', rojo: 'text-red-400' }
   const semaforoEmoji = { verde: '🟢', amarillo: '🟡', rojo: '🔴' }
   const necesitaPrenda = requierePrenda({ forma_pago: op.forma_pago, tipo_operacion: op.tipo_operacion })
 
   return (
-    <div className="flex flex-wrap gap-3 mb-5 p-3 bg-bg-primary border border-border rounded-lg">
-      {/* Prenda */}
-      {necesitaPrenda && (
-        <div className="flex items-center gap-1.5 text-sm">
-          <Flag className="h-3.5 w-3.5 text-text-muted" />
-          <span className="text-text-muted">Prenda:</span>
-          {op.estado_prenda === 'enviada' ? (
-            <span className="text-green-400 font-medium">🟢 Enviada</span>
-          ) : (
-            <span className="text-red-400 font-medium">🔴 Pendiente</span>
-          )}
-        </div>
-      )}
+    <div className="mb-5 p-3 bg-bg-primary border border-border rounded-lg space-y-3">
+      <div className="flex flex-wrap gap-3">
+        {/* Prenda */}
+        {necesitaPrenda && (
+          <div className="flex items-center gap-1.5 text-sm">
+            <Flag className="h-3.5 w-3.5 text-text-muted" />
+            <span className="text-text-muted">Prenda:</span>
+            {op.estado_prenda === 'enviada' ? (
+              <span className="text-green-400 font-medium">🟢 Enviada</span>
+            ) : (
+              <span className="text-red-400 font-medium">🔴 Pendiente</span>
+            )}
+          </div>
+        )}
 
-      {/* Compromiso */}
-      {op.fecha_compromiso && semaforo && (
+        {/* Compromiso */}
+        {op.fecha_compromiso && semaforo && (
+          <div className="flex items-center gap-1.5 text-sm">
+            <Calendar className="h-3.5 w-3.5 text-text-muted" />
+            <span className="text-text-muted">Compromiso:</span>
+            <span className={`font-medium ${semaforoColors[semaforo]}`}>
+              {semaforoEmoji[semaforo]}{' '}
+              {(() => {
+                const d = diasRestantes(op.fecha_compromiso)
+                if (d < 0) return `${Math.abs(d)} días vencido`
+                if (d === 0) return 'Hoy'
+                return `${d} días`
+              })()}
+            </span>
+          </div>
+        )}
+
+        {/* Vendedor */}
         <div className="flex items-center gap-1.5 text-sm">
-          <Calendar className="h-3.5 w-3.5 text-text-muted" />
-          <span className="text-text-muted">Compromiso:</span>
-          <span className={`font-medium ${semaforoColors[semaforo]}`}>
-            {semaforoEmoji[semaforo]}{' '}
-            {(() => {
-              const d = diasRestantes(op.fecha_compromiso)
-              if (d < 0) return `${Math.abs(d)} días vencido`
-              if (d === 0) return 'Hoy'
-              return `${d} días`
-            })()}
+          <User className="h-3.5 w-3.5 text-text-muted" />
+          <span className="text-text-muted">Asesor:</span>
+          <span className="text-text-primary font-medium">
+            {(op as any).asesor?.nombre_completo ?? 'Sin asignar'}
           </span>
         </div>
-      )}
+      </div>
 
-      {/* Vendedor */}
-      <div className="flex items-center gap-1.5 text-sm">
-        <User className="h-3.5 w-3.5 text-text-muted" />
-        <span className="text-text-muted">Asesor:</span>
-        <span className="text-text-primary font-medium">
-          {(op as any).asesor?.nombre_completo ?? 'Sin asignar'}
-        </span>
+      {/* Patente — siempre visible y editable en todos los pasos */}
+      <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+        <span className="text-xs text-text-muted shrink-0">🚗 Patente:</span>
+        <input
+          type="text"
+          placeholder="Sin patente — ingresá acá"
+          value={op.dominio_patente ?? ''}
+          onChange={(e) => onMutate({ dominio_patente: e.target.value.toUpperCase() || null } as Partial<Operacion>)}
+          className="flex-1 px-2 py-1 bg-bg-secondary border border-border rounded text-sm text-text-primary font-mono uppercase focus:outline-none focus:ring-1 focus:ring-action/50 placeholder:text-text-muted/50 placeholder:normal-case"
+        />
+        {op.dominio_patente && (
+          <span className="text-green-400 text-xs font-bold">{op.dominio_patente}</span>
+        )}
       </div>
     </div>
   )
@@ -1998,7 +2015,7 @@ export function DetalleOperacion() {
       <BarraPipeline estadoActual={op.estado_actual} />
 
       {/* ---- BANDERAS VIAJERAS ---- */}
-      <BanderasViajeras op={op} />
+      <BanderasViajeras op={op} onMutate={handleMutOp} />
 
       {/* ---- TABS ---- */}
       <TabBar
