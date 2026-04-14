@@ -552,6 +552,18 @@ function Paso2Documentacion({
             </Button>
           </div>
 
+          {/* Patente — editable desde paso 2 */}
+          <div className="pt-2 border-t border-border">
+            <label className="text-xs text-text-muted block mb-1">Dominio / Patente (si ya se tiene)</label>
+            <input
+              type="text"
+              placeholder="ABC 123"
+              value={op.dominio_patente ?? ''}
+              onChange={(e) => onMutate({ dominio_patente: e.target.value.toUpperCase() || null } as Partial<Operacion>)}
+              className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/50 uppercase"
+            />
+          </div>
+
           {/* Extras plan ahorro */}
           {esPlan && (
             <>
@@ -1249,9 +1261,30 @@ function SaldoPagos({
           }
           <h3 className="text-sm font-bold text-text-primary uppercase tracking-wider">Estado de cuenta</h3>
         </div>
-        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badgeColor}`}>
-          {badgeText}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${badgeColor}`}>
+            {badgeText}
+          </span>
+          {estaPagado && (
+            <button
+              onClick={async () => {
+                const { error } = await supabase.from('operaciones').update({
+                  saldo_pagado: false,
+                  banco_saldo_cancelado: false,
+                  banco_fecha_pago: null,
+                }).eq('id', op.id)
+                if (error) notify.error(error.message)
+                else {
+                  notify.success('Saldo vuelve a pendiente')
+                  onPagoRegistrado()
+                }
+              }}
+              className="text-[10px] text-red-400 hover:text-red-300 underline cursor-pointer"
+            >
+              Desmarcar
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Saldo total destacado */}
@@ -1309,8 +1342,27 @@ function SaldoPagos({
               Marcar banco como pagado — Cancelar saldo
             </button>
           ) : (
-            <div className="text-xs text-green-400 mt-1">
-              Pagado el {(op as any).banco_fecha_pago || '—'}
+            <div className="flex items-center justify-between mt-1">
+              <span className="text-xs text-green-400">
+                Pagado el {(op as any).banco_fecha_pago || '—'}
+              </span>
+              <button
+                onClick={async () => {
+                  const { error } = await supabase.from('operaciones').update({
+                    banco_saldo_cancelado: false,
+                    banco_fecha_pago: null,
+                    saldo_pagado: false,
+                  }).eq('id', op.id)
+                  if (error) notify.error(error.message)
+                  else {
+                    notify.success('Pago del banco desmarcado — saldo vuelve a pendiente')
+                    onPagoRegistrado()
+                  }
+                }}
+                className="text-xs text-red-400 hover:text-red-300 underline cursor-pointer"
+              >
+                Desmarcar pagado
+              </button>
             </div>
           )}
         </div>
