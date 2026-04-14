@@ -281,14 +281,14 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
   const crearRepuesto = useCrearRepuesto()
 
   const handleSubmit = async () => {
-    if (!form.codigo_fiat || !form.descripcion) {
-      notify.error('Código y descripción son obligatorios')
+    if (!form.codigo_fiat) {
+      notify.error('El código es obligatorio')
       return
     }
     try {
       const rep = await crearRepuesto.mutateAsync({
         codigo_fiat: form.codigo_fiat,
-        descripcion: form.descripcion,
+        descripcion: form.descripcion || form.codigo_fiat,
         ubicacion: form.ubicacion || undefined,
         stock_actual: form.stock_actual,
         stock_minimo: form.stock_minimo,
