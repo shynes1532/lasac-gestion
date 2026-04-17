@@ -118,11 +118,9 @@ export function ColaPDI() {
                 hoverable
                 onClick={() => navigate(`/alistamiento/${item.id}`)}
                 className={`border-l-4 ${
-                  urgencia === 'red' ? 'border-l-danger'
-                  : urgencia === 'yellow' ? 'border-l-warning'
-                  : tipo === 'plan_ahorro' ? 'border-l-purple-400'
-                  : tipo === 'usados' ? 'border-l-orange-400'
-                  : 'border-l-blue-400'
+                  urgencia === 'red' ? 'border-l-red-500'
+                  : urgencia === 'yellow' ? 'border-l-yellow-400'
+                  : 'border-l-green-500'
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
