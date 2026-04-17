@@ -4,6 +4,8 @@ import { Wrench, Clock, AlertTriangle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Button, Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } from '../../components/ui'
+import { COLORES_TIPO, TIPO_LABEL } from '../../lib/constants'
+import type { TipoOperacion } from '../../lib/types'
 import { diasEntre } from '../../utils/formatters'
 
 const estadoOptions = [
@@ -107,17 +109,31 @@ export function ColaPDI() {
             const titular = op?.titular?.[0]
             const estado = getEstadoPDI(item)
             const urgencia = getUrgencia(item.created_at)
+            const tipo = (op?.tipo_operacion || '0km') as TipoOperacion
+            const colores = COLORES_TIPO[tipo] || COLORES_TIPO['0km']
 
             return (
               <Card
                 key={item.id}
                 hoverable
                 onClick={() => navigate(`/alistamiento/${item.id}`)}
-                className={urgencia === 'red' ? 'border-l-4 border-l-danger' : urgencia === 'yellow' ? 'border-l-4 border-l-warning' : ''}
+                className={`border-l-4 ${
+                  urgencia === 'red' ? 'border-l-danger'
+                  : urgencia === 'yellow' ? 'border-l-warning'
+                  : tipo === 'plan_ahorro' ? 'border-l-purple-400'
+                  : tipo === 'usados' ? 'border-l-orange-400'
+                  : 'border-l-blue-400'
+                }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{ backgroundColor: colores.bg, color: colores.text, border: `1px solid ${colores.border}` }}
+                      >
+                        {TIPO_LABEL[tipo]}
+                      </span>
                       <span className="text-sm font-mono text-action">{op?.numero_operacion}</span>
                       <EstadoBadge estado={estado} tipo="alistamiento" />
                       {urgencia === 'red' && (
