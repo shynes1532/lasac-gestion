@@ -8,6 +8,7 @@ interface FiltrosStock {
   tipo?: TipoStock | ''
   sucursal?: Sucursal | 'todas'
   estado?: EstadoStock | ''
+  excluirBatea?: boolean
 }
 
 export function useStock(filtros: FiltrosStock = {}) {
@@ -27,6 +28,9 @@ export function useStock(filtros: FiltrosStock = {}) {
       }
       if (filtros.estado) {
         q = q.eq('estado', filtros.estado)
+      }
+      if (filtros.excluirBatea) {
+        q = q.neq('estado', 'batea')
       }
       if (filtros.busqueda) {
         const b = filtros.busqueda
