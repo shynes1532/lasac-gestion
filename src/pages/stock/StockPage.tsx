@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Car, Plus, Search, X, ArrowRightLeft, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
 import { useStock, useCrearStock, useActualizarStock, useTransferirStock, useEliminarStock } from '../../hooks/useStock'
+import { supabase } from '../../lib/supabase'
 import { Button, Card, EmptyState, CardSkeleton, Badge, Modal, ConfirmDialog, notify } from '../../components/ui'
 import type { TipoStock, EstadoStock, Sucursal, StockVehiculo } from '../../lib/types'
 
@@ -315,6 +316,14 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
   const actualizar = useActualizarStock()
   const isEdit = !!vehiculo
 
+  const [modelos, setModelos] = useState<string[]>([])
+
+  useEffect(() => {
+    supabase.from('modelos_fiat').select('nombre').eq('activo', true).order('nombre').then(({ data }) => {
+      if (data) setModelos(data.map(m => m.nombre))
+    })
+  }, [])
+
   const [form, setForm] = useState({
     vin: vehiculo?.vin || '',
     marca: vehiculo?.marca || 'FIAT',
@@ -390,7 +399,16 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
           {/* Modelo */}
           <div>
             <label className="text-xs text-text-muted">Modelo *</label>
-            <input value={form.modelo} onChange={e => set('modelo', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" placeholder="Cronos, Pulse..." />
+            <input
+              list="modelos-fiat-list"
+              value={form.modelo}
+              onChange={e => set('modelo', e.target.value)}
+              className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none"
+              placeholder="Seleccioná o escribí..."
+            />
+            <datalist id="modelos-fiat-list">
+              {modelos.map(m => <option key={m} value={m} />)}
+            </datalist>
           </div>
           {/* Versión */}
           <div>
