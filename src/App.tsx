@@ -30,6 +30,7 @@ const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(
 const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').then(m => ({ default: m.SiniestrosPage })))
 const UnidadesEntregadas = lazy(() => import('./pages/archivo/UnidadesEntregadas').then(m => ({ default: m.UnidadesEntregadas })))
 const RepuestosPage = lazy(() => import('./pages/repuestos/RepuestosPage').then(m => ({ default: m.RepuestosPage })))
+const StockPage = lazy(() => import('./pages/stock/StockPage').then(m => ({ default: m.StockPage })))
 const ListaRecepcion = lazy(() => import('./pages/recepcion/ListaRecepcion').then(m => ({ default: m.ListaRecepcion })))
 const NuevaRecepcion = lazy(() => import('./pages/recepcion/NuevaRecepcion').then(m => ({ default: m.NuevaRecepcion })))
 const DashboardRecepcion = lazy(() => import('./pages/recepcion/DashboardRecepcion').then(m => ({ default: m.DashboardRecepcion })))
@@ -132,6 +133,10 @@ export default function App() {
                 } />
                 <Route path="/recepcion/reporte" element={
                   <ProtectedRoute><DashboardRecepcion /></ProtectedRoute>
+                } />
+
+                <Route path="/stock" element={
+                  <ProtectedRoute><StockPage /></ProtectedRoute>
                 } />
 
                 <Route path="/repuestos" element={

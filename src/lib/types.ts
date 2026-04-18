@@ -5,7 +5,7 @@
 
 // --- Enums como union types ---
 
-export type Sucursal = 'Ushuaia' | 'Rio Grande'
+export type Sucursal = 'Ushuaia' | 'Rio Grande' | 'Austral'
 export type SucursalUsuario = 'Ushuaia' | 'Rio Grande' | 'Ambas'
 
 export type TipoOperacion = '0km' | 'usados' | 'plan_ahorro'
@@ -629,6 +629,53 @@ export interface RepuestoMovimiento {
   created_at: string
   // Join
   repuesto?: Repuesto
+}
+
+// ============================================================
+// Stock de Vehículos — 0KM, Plan Ahorro, Usados
+// ============================================================
+
+export type TipoStock = '0km' | 'plan_ahorro' | 'usado'
+export type EstadoStock = 'disponible' | 'reservado' | 'vendido' | 'en_transito'
+
+export interface StockVehiculo {
+  id: string
+  vin: string
+  marca: string
+  modelo: string
+  version: string | null
+  color: string | null
+  anio: number | null
+  tipo: TipoStock
+  estado: EstadoStock
+  sucursal: Sucursal
+  precio: number | null
+  kilometraje: number | null
+  // Plan de ahorro
+  grupo_orden: string | null
+  titular_plan: string | null
+  // Usado
+  patente: string | null
+  // Link a operación
+  operacion_id: string | null
+  observaciones: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  // Joins
+  operacion?: Operacion | null
+}
+
+export interface TransferenciaStock {
+  id: string
+  stock_id: string
+  sucursal_origen: Sucursal
+  sucursal_destino: Sucursal
+  motivo: string | null
+  realizado_por: string | null
+  created_at: string
+  // Join
+  vehiculo?: StockVehiculo
 }
 
 // Requiere prenda?
