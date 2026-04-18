@@ -1995,11 +1995,16 @@ export function DetalleOperacion() {
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-sm text-text-secondary">
-            <span className="flex items-center gap-1">
-              <User className="h-3.5 w-3.5 text-text-muted" />
-              {op.cliente_nombre ?? 'Sin nombre'}
-            </span>
+          <div className="flex flex-wrap items-center gap-2 text-sm text-text-secondary">
+            <User className="h-3.5 w-3.5 text-text-muted shrink-0" />
+            <input
+              type="text"
+              value={op.cliente_nombre ?? ''}
+              onChange={(e) => handleMutOp({ cliente_nombre: e.target.value || null })}
+              placeholder="Nombre del cliente"
+              className="bg-transparent border-b border-transparent hover:border-border focus:border-action text-text-primary text-sm font-medium px-0 py-0.5 focus:outline-none min-w-0 flex-shrink"
+              style={{ width: `${Math.max(10, (op.cliente_nombre?.length || 10)) + 2}ch` }}
+            />
             {op.unidades?.modelo && (
               <span className="flex items-center gap-1">
                 <Car className="h-3.5 w-3.5 text-text-muted" />
