@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wrench, Clock, AlertTriangle, Search } from 'lucide-react'
+import { Wrench, Clock, AlertTriangle, Search, X } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Button, Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } from '../../components/ui'
@@ -104,23 +104,36 @@ export function ColaPDI() {
         </div>
       </div>
 
-      <div className="flex gap-3 mb-6">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+      <div className="space-y-3 mb-6">
+        {/* Buscador grande */}
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-muted" />
           <input
             type="text"
             placeholder="Buscar por nombre, patente, chasis, modelo..."
             value={busqueda}
             onChange={e => setBusqueda(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm bg-bg-primary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-action/30"
+            className="w-full pl-10 pr-3 py-3 text-base bg-bg-primary border border-border rounded-xl text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-action/30"
           />
+          {busqueda && (
+            <button
+              onClick={() => setBusqueda('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary cursor-pointer"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </div>
+        {/* Filtro de estado */}
         <Select
           options={estadoOptions}
           value={estadoFiltro}
           onChange={(e) => setEstadoFiltro(e.target.value)}
-          className="max-w-[200px]"
         />
+        {/* Resultado de búsqueda */}
+        {busqueda && (
+          <p className="text-xs text-text-muted">{filtrados.length} resultado{filtrados.length !== 1 ? 's' : ''} para "{busqueda}"</p>
+        )}
       </div>
 
       {isLoading ? (
