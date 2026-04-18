@@ -22,6 +22,34 @@ const ESTADO_COLORES: Record<EstadoStock, { color: 'green' | 'yellow' | 'red' | 
 
 const SUCURSALES: Sucursal[] = ['Ushuaia', 'Rio Grande', 'Austral']
 
+const COLORES_FIAT = [
+  'Blanco Alaska',
+  'Blanco Banchisa',
+  'Blanco Gelato',
+  'Negro Vulcano',
+  'Negro Cinema',
+  'Gris Silverstone',
+  'Gris Colosseo',
+  'Gris Scandium',
+  'Gris Strato',
+  'Plata Bari',
+  'Plata Minimal',
+  'Rojo Montecarlo',
+  'Rojo Passione',
+  'Rojo Solidale',
+  'Azul Portofino',
+  'Azul Italia',
+  'Azul Venezia',
+  'Azul Provenza',
+  'Verde Toscana',
+  'Verde Technogreen',
+  'Bronce Magnetico',
+  'Marrón Castoro',
+  'Amarillo Modena',
+  'Naranja Sicilia',
+  'Beige Cappuccino',
+]
+
 function getColorAntiguedad(dias: number): 'green' | 'yellow' | 'red' {
   if (dias > 30) return 'red'
   if (dias > 15) return 'yellow'
@@ -560,7 +588,8 @@ function BateaForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
           </div>
           <div>
             <label className="text-xs text-text-muted">Color</label>
-            <input value={form.color} onChange={e => set('color', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" />
+            <input list="colores-fiat-list" value={form.color} onChange={e => set('color', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" placeholder="Seleccioná o escribí..." />
+            <datalist id="colores-fiat-list">{COLORES_FIAT.map(c => <option key={c} value={c} />)}</datalist>
           </div>
           <div>
             <label className="text-xs text-text-muted">Tipo</label>
@@ -745,7 +774,8 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
           </div>
           <div>
             <label className="text-xs text-text-muted">Color</label>
-            <input value={form.color} onChange={e => set('color', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" />
+            <input list="colores-fiat-list" value={form.color} onChange={e => set('color', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" placeholder="Seleccioná o escribí..." />
+            <datalist id="colores-fiat-list">{COLORES_FIAT.map(c => <option key={c} value={c} />)}</datalist>
           </div>
           <div>
             <label className="text-xs text-text-muted">Año</label>
