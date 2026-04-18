@@ -20,6 +20,7 @@ const estadoOptions = [
 export function ColaPDI() {
   const navigate = useNavigate()
   const [busqueda, setBusqueda] = useState('')
+  const [sucursalFiltro, setSucursalFiltro] = useState('todas')
   // Por defecto: solo lo que está en cola (no muestra aprobados ni rechazados)
   const [estadoFiltro, setEstadoFiltro] = useState('en_cola')
 
@@ -58,26 +59,37 @@ export function ColaPDI() {
     },
   })
 
-  // Filtrar por búsqueda (nombre, apellido, dominio, chasis, modelo)
+  // Filtrar por sucursal + búsqueda
   const filtrados = useMemo(() => {
     if (!alistamientos) return []
-    if (!busqueda.trim()) return alistamientos
-    const b = busqueda.toLowerCase()
-    return alistamientos.filter((item: any) => {
-      const op = item.operacion
-      const unidad = op?.unidad?.[0]
-      const titular = op?.titular?.[0]
-      return [
-        op?.cliente_nombre,
-        titular?.nombre_apellido,
-        unidad?.modelo,
-        unidad?.vin_chasis,
-        unidad?.patente_actual,
-        op?.dominio_patente,
-        op?.numero_operacion,
-      ].filter(Boolean).join(' ').toLowerCase().includes(b)
-    })
-  }, [alistamientos, busqueda])
+    let resultado = alistamientos
+
+    // Filtro sucursal
+    if (sucursalFiltro !== 'todas') {
+      resultado = resultado.filter((item: any) => item.operacion?.sucursal === sucursalFiltro)
+    }
+
+    // Filtro búsqueda
+    if (busqueda.trim()) {
+      const b = busqueda.toLowerCase()
+      resultado = resultado.filter((item: any) => {
+        const op = item.operacion
+        const unidad = op?.unidad?.[0]
+        const titular = op?.titular?.[0]
+        return [
+          op?.cliente_nombre,
+          titular?.nombre_apellido,
+          unidad?.modelo,
+          unidad?.vin_chasis,
+          unidad?.patente_actual,
+          op?.dominio_patente,
+          op?.numero_operacion,
+        ].filter(Boolean).join(' ').toLowerCase().includes(b)
+      })
+    }
+
+    return resultado
+  }, [alistamientos, busqueda, sucursalFiltro])
 
   const getUrgencia = (createdAt: string) => {
     const dias = diasEntre(createdAt)
@@ -105,6 +117,34 @@ export function ColaPDI() {
       </div>
 
       <div className="space-y-3 mb-6">
+        {/* Filtro sucursal — tabs grandes */}
+        <div className="grid grid-cols-3 gap-2">
+          {[
+            { value: 'todas', label: 'Todas', emoji: '📋' },
+            { value: 'Ushuaia', label: 'Ushuaia', emoji: '🏔️' },
+            { value: 'Rio Grande', label: 'Río Grande', emoji: '🏭' },
+          ].map(suc => {
+            const count = suc.value === 'todas'
+              ? (alistamientos?.length || 0)
+              : (alistamientos?.filter((a: any) => a.operacion?.sucursal === suc.value).length || 0)
+            return (
+              <button
+                key={suc.value}
+                onClick={() => setSucursalFiltro(suc.value)}
+                className={`py-3 rounded-xl text-center cursor-pointer transition-all ${
+                  sucursalFiltro === suc.value
+                    ? 'bg-action text-white font-bold'
+                    : 'bg-bg-secondary border border-border text-text-secondary hover:border-action/30'
+                }`}
+              >
+                <span className="text-lg">{suc.emoji}</span>
+                <p className="text-sm font-medium mt-0.5">{suc.label}</p>
+                <p className="text-xs opacity-70">{count}</p>
+              </button>
+            )
+          })}
+        </div>
+
         {/* Buscador grande */}
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-text-muted" />
