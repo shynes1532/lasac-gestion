@@ -30,7 +30,6 @@ const ESTADOS_PIPELINE_VALUES: EstadoActual[] = ['cierre','documentacion','gesto
 
 export function ListaOperaciones() {
   const navigate = useNavigate()
-  useAuth()
   const [searchParams] = useSearchParams()
 
   const tipoValidos: (TipoOperacion | 'todos')[] = ['todos','0km','usados','plan_ahorro']
@@ -117,21 +116,25 @@ export function ListaOperaciones() {
     )
   })
 
+  const { perfil } = useAuth()
   const queryClient = useQueryClient()
-  const [eliminando, setEliminando] = useState<string | null>(null)
+  const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
-  async function eliminarOp(e: React.MouseEvent, opId: string) {
-    e.stopPropagation()
-    if (eliminando === opId) {
-      // Segundo click = confirmar
-      const { error } = await supabase.from('operaciones').delete().eq('id', opId)
-      if (error) { notify.error(error.message); setEliminando(null); return }
+  async function eliminarOp() {
+    if (!confirmEliminar) return
+    setEliminando(true)
+    try {
+      const { error } = await supabase.from('operaciones').delete().eq('id', confirmEliminar)
+      if (error) { notify.error(error.message); return }
       notify.success('Operación eliminada')
-      setEliminando(null)
       queryClient.invalidateQueries({ queryKey: ['operaciones'] })
-    } else {
-      setEliminando(opId)
-      setTimeout(() => setEliminando(null), 3000)
+      queryClient.invalidateQueries({ queryKey: ['operaciones-counts'] })
+    } catch (err: any) {
+      notify.error(err?.message || 'Error al eliminar')
+    } finally {
+      setEliminando(false)
+      setConfirmEliminar(null)
     }
   }
 
@@ -410,25 +413,48 @@ export function ListaOperaciones() {
                       </span>
                     )}
 
-                    {/* Eliminar */}
-                    <button
-                      onClick={e => eliminarOp(e, op.id)}
-                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg cursor-pointer transition-colors ${
-                        eliminando === op.id
-                          ? 'bg-red-600 text-white'
-                          : 'text-text-muted hover:text-red-400 hover:bg-red-500/10'
-                      }`}
-                      title={eliminando === op.id ? 'Click para confirmar' : 'Eliminar'}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                      {eliminando === op.id ? 'Confirmar' : ''}
-                    </button>
+                    {/* Eliminar — solo directores */}
+                    {perfil?.rol === 'director' && (
+                      <button
+                        onClick={e => { e.stopPropagation(); setConfirmEliminar(op.id) }}
+                        className="text-text-muted hover:text-red-400 hover:bg-red-500/10 p-1 rounded-lg cursor-pointer transition-colors"
+                        title="Eliminar operación"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
 
               </div>
             )
           })}
+        </div>
+      )}
+
+      {/* Modal confirmación eliminar */}
+      {confirmEliminar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60">
+          <div className="bg-bg-secondary rounded-xl border border-border p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold text-red-400 mb-2">⚠️ Eliminar operación</h3>
+            <p className="text-sm text-text-secondary mb-2">
+              ¿Estás seguro? Esta acción <strong>no se puede deshacer</strong>.
+            </p>
+            <p className="text-sm text-text-secondary mb-6">
+              Se eliminará la operación y todos sus datos asociados (titular, unidad, trámites, PDI, entrega).
+            </p>
+            <div className="flex gap-2 justify-end">
+              <Button variant="ghost" onClick={() => setConfirmEliminar(null)}>Cancelar</Button>
+              <Button
+                variant="danger"
+                onClick={eliminarOp}
+                loading={eliminando}
+              >
+                <Trash2 className="h-4 w-4" />
+                Sí, eliminar
+              </Button>
+            </div>
+          </div>
         </div>
       )}
     </div>
