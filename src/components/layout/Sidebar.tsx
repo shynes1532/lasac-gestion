@@ -2,7 +2,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, FileText, Wrench, Truck,
   LogOut, Menu, X, CreditCard, ShieldCheck, DollarSign, Printer, Shield,
-  UserCheck, AlertTriangle, PieChart, Archive, ClipboardList, Package,
+  UserCheck, AlertTriangle, Archive, ClipboardList, Package,
 } from 'lucide-react'
 import { useState } from 'react'
 import { useAuth, canAccessRoute } from '../../context/AuthContext'
@@ -12,9 +12,7 @@ const navItems = [
   { path: '/recepcion',           label: 'Recepción',    icon: ClipboardList },
   { path: '/dashboard',           label: 'Dashboard',    icon: LayoutDashboard },
   { path: '/operaciones',         label: 'Operaciones',  icon: FileText },
-  { path: '/ahorristas',          label: 'Ahorristas',   icon: UserCheck },
-  { path: '/cartera',             label: 'Cartera',      icon: PieChart },
-  { path: '/mora',                label: 'Mora',         icon: AlertTriangle },
+  { path: '/plan',                label: 'Plan',         icon: UserCheck },
   { path: '/alistamiento',        label: 'PDI',          icon: Wrench },
   { path: '/calidad',             label: 'Calidad',      icon: ShieldCheck },
   { path: '/entregas-programadas',label: 'Entregas pendientes', icon: Truck },

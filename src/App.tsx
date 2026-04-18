@@ -23,9 +23,7 @@ const EntregasProgramadas = lazy(() => import('./pages/entregas/EntregasPrograma
 const SaldosPendientes = lazy(() => import('./pages/saldos/SaldosPendientes').then(m => ({ default: m.SaldosPendientes })))
 const ReportesPage = lazy(() => import('./pages/reportes/ReportesPage').then(m => ({ default: m.ReportesPage })))
 const CalibrePage = lazy(() => import('./pages/calibre/CalibrePage').then(m => ({ default: m.CalibrePage })))
-const AhorristasPage = lazy(() => import('./pages/ahorristas/AhorristasPage').then(m => ({ default: m.AhorristasPage })))
-const GestionMoraPage = lazy(() => import('./pages/mora/GestionMoraPage').then(m => ({ default: m.GestionMoraPage })))
-const CarteraPage = lazy(() => import('./pages/cartera/CarteraPage').then(m => ({ default: m.CarteraPage })))
+const PlanPage = lazy(() => import('./pages/plan/PlanPage').then(m => ({ default: m.PlanPage })))
 const GarantiasPage = lazy(() => import('./pages/garantias/GarantiasPage').then(m => ({ default: m.GarantiasPage })))
 const SiniestrosPage = lazy(() => import('./pages/siniestros/SiniestrosPage').then(m => ({ default: m.SiniestrosPage })))
 const UnidadesEntregadas = lazy(() => import('./pages/archivo/UnidadesEntregadas').then(m => ({ default: m.UnidadesEntregadas })))
@@ -109,15 +107,13 @@ export default function App() {
                 <Route path="/calibre" element={
                   <ProtectedRoute><CalibrePage /></ProtectedRoute>
                 } />
-                <Route path="/ahorristas" element={
-                  <ProtectedRoute><AhorristasPage /></ProtectedRoute>
+                <Route path="/plan" element={
+                  <ProtectedRoute><PlanPage /></ProtectedRoute>
                 } />
-                <Route path="/mora" element={
-                  <ProtectedRoute><GestionMoraPage /></ProtectedRoute>
-                } />
-                <Route path="/cartera" element={
-                  <ProtectedRoute><CarteraPage /></ProtectedRoute>
-                } />
+                {/* Redirects legado */}
+                <Route path="/ahorristas" element={<Navigate to="/plan" replace />} />
+                <Route path="/cartera" element={<Navigate to="/plan" replace />} />
+                <Route path="/mora" element={<Navigate to="/plan" replace />} />
                 <Route path="/garantias" element={
                   <ProtectedRoute><GarantiasPage /></ProtectedRoute>
                 } />
