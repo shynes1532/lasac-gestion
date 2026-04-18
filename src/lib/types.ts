@@ -636,7 +636,7 @@ export interface RepuestoMovimiento {
 // ============================================================
 
 export type TipoStock = '0km' | 'plan_ahorro' | 'usado'
-export type EstadoStock = 'disponible' | 'reservado' | 'vendido' | 'en_transito'
+export type EstadoStock = 'disponible' | 'reservado' | 'vendido' | 'en_transito' | 'batea'
 
 export interface StockVehiculo {
   id: string
@@ -656,6 +656,8 @@ export interface StockVehiculo {
   titular_plan: string | null
   // Usado
   patente: string | null
+  // Incidente / daño
+  incidente: string | null
   // Link a operación
   operacion_id: string | null
   observaciones: string | null

@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Car, Plus, Search, X, ArrowRightLeft, Pencil, Trash2, ChevronDown, ChevronUp } from 'lucide-react'
+import { Car, Plus, Search, X, ArrowRightLeft, Pencil, Trash2, ChevronDown, ChevronUp, AlertTriangle, Clock } from 'lucide-react'
 import { useStock, useCrearStock, useActualizarStock, useTransferirStock, useEliminarStock } from '../../hooks/useStock'
 import { supabase } from '../../lib/supabase'
 import { Button, Card, EmptyState, CardSkeleton, Badge, Modal, ConfirmDialog, notify } from '../../components/ui'
+import { diasEntre } from '../../utils/formatters'
 import type { TipoStock, EstadoStock, Sucursal, StockVehiculo } from '../../lib/types'
 
 const TIPO_COLORES: Record<TipoStock, { bg: string; text: string; label: string }> = {
@@ -11,18 +12,27 @@ const TIPO_COLORES: Record<TipoStock, { bg: string; text: string; label: string 
   'usado':       { bg: '#e0e7ff', text: '#4338ca', label: 'Usado' },
 }
 
-const ESTADO_COLORES: Record<EstadoStock, { color: string; label: string }> = {
-  'disponible': { color: 'green',  label: 'Disponible' },
-  'reservado':  { color: 'yellow', label: 'Reservado' },
-  'vendido':    { color: 'gray',   label: 'Vendido' },
-  'en_transito':{ color: 'blue',   label: 'En tránsito' },
-}
-
-const BADGE_COLORS: Record<string, 'green' | 'yellow' | 'red' | 'blue' | 'gray'> = {
-  green: 'green', yellow: 'yellow', gray: 'gray', blue: 'blue',
+const ESTADO_COLORES: Record<EstadoStock, { color: 'green' | 'yellow' | 'red' | 'blue' | 'gray'; label: string }> = {
+  'disponible':  { color: 'green',  label: 'Disponible' },
+  'reservado':   { color: 'yellow', label: 'Reservado' },
+  'vendido':     { color: 'gray',   label: 'Vendido' },
+  'en_transito': { color: 'blue',   label: 'En tránsito' },
+  'batea':       { color: 'yellow', label: 'Batea' },
 }
 
 const SUCURSALES: Sucursal[] = ['Ushuaia', 'Rio Grande', 'Austral']
+
+function getColorAntiguedad(dias: number): 'green' | 'yellow' | 'red' {
+  if (dias > 30) return 'red'
+  if (dias > 15) return 'yellow'
+  return 'green'
+}
+
+const BORDER_ANTIGUEDAD = {
+  green: 'border-l-green-500',
+  yellow: 'border-l-yellow-400',
+  red: 'border-l-red-500',
+}
 
 export function StockPage() {
   const [busqueda, setBusqueda] = useState('')
@@ -46,12 +56,13 @@ export function StockPage() {
 
   // KPIs
   const kpis = useMemo(() => {
-    if (!stock) return { total: 0, ushuaia: 0, rioGrande: 0, austral: 0 }
+    if (!stock) return { total: 0, ushuaia: 0, rioGrande: 0, austral: 0, conIncidente: 0 }
     return {
       total: stock.length,
       ushuaia: stock.filter(s => s.sucursal === 'Ushuaia').length,
       rioGrande: stock.filter(s => s.sucursal === 'Rio Grande').length,
       austral: stock.filter(s => s.sucursal === 'Austral').length,
+      conIncidente: stock.filter(s => !!s.incidente).length,
     }
   }, [stock])
 
@@ -61,7 +72,12 @@ export function StockPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
           <h1 className="text-2xl font-bold text-text-primary">Stock de Vehículos</h1>
-          <p className="text-sm text-text-secondary mt-1">{kpis.total} vehículos</p>
+          <p className="text-sm text-text-secondary mt-1">
+            {kpis.total} vehículos
+            {kpis.conIncidente > 0 && (
+              <span className="text-red-500 font-semibold ml-2">· {kpis.conIncidente} con incidente</span>
+            )}
+          </p>
         </div>
         <Button onClick={() => { setEditando(null); setShowForm(true) }}>
           <Plus className="h-4 w-4 mr-1" /> Nuevo vehículo
@@ -155,6 +171,7 @@ export function StockPage() {
           className="w-full py-2 px-3 bg-bg-primary border border-border rounded-xl text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
         >
           <option value="">Todos los estados</option>
+          <option value="batea">Batea (descarga)</option>
           <option value="disponible">Disponible</option>
           <option value="reservado">Reservado</option>
           <option value="en_transito">En tránsito</option>
@@ -179,9 +196,19 @@ export function StockPage() {
             const tipoCfg = TIPO_COLORES[v.tipo]
             const estadoCfg = ESTADO_COLORES[v.estado]
             const isExpanded = expandido === v.id
+            const dias = diasEntre(v.created_at)
+            const colorDias = getColorAntiguedad(dias)
+            const tieneIncidente = !!v.incidente
 
             return (
-              <Card key={v.id} className="overflow-hidden">
+              <Card
+                key={v.id}
+                className={`overflow-hidden border-l-4 ${
+                  tieneIncidente
+                    ? 'border-l-red-500 bg-red-500/5'
+                    : BORDER_ANTIGUEDAD[colorDias]
+                }`}
+              >
                 <button
                   onClick={() => setExpandido(isExpanded ? null : v.id)}
                   className="w-full text-left p-4 cursor-pointer"
@@ -195,10 +222,16 @@ export function StockPage() {
                         >
                           {tipoCfg.label}
                         </span>
-                        <Badge color={BADGE_COLORS[estadoCfg.color] || 'gray'} size="sm">
+                        <Badge color={estadoCfg.color} size="sm">
                           {estadoCfg.label}
                         </Badge>
                         <span className="text-[10px] text-text-muted">{v.sucursal}</span>
+                        {tieneIncidente && (
+                          <Badge color="red" size="sm">
+                            <AlertTriangle className="h-3 w-3 mr-1" />
+                            Incidente
+                          </Badge>
+                        )}
                       </div>
                       <p className="text-sm font-bold text-text-primary">
                         {v.marca} {v.modelo} {v.version || ''} {v.anio ? `(${v.anio})` : ''}
@@ -207,13 +240,26 @@ export function StockPage() {
                         {v.color ? `${v.color} · ` : ''}VIN: ...{v.vin.slice(-6)}
                         {v.patente ? ` · ${v.patente}` : ''}
                       </p>
+                      {tieneIncidente && (
+                        <p className="text-xs text-red-500 font-medium mt-0.5">
+                          {v.incidente}
+                        </p>
+                      )}
                       {v.tipo === 'plan_ahorro' && v.titular_plan && (
                         <p className="text-xs text-text-muted mt-0.5">
                           Titular: {v.titular_plan} {v.grupo_orden ? `· G/O: ${v.grupo_orden}` : ''}
                         </p>
                       )}
                     </div>
-                    <div className="flex items-center gap-1">
+                    <div className="flex flex-col items-end gap-1">
+                      <span className={`flex items-center gap-1 text-xs font-medium ${
+                        colorDias === 'red' ? 'text-red-500'
+                        : colorDias === 'yellow' ? 'text-yellow-600'
+                        : 'text-green-600'
+                      }`}>
+                        <Clock className="h-3 w-3" />
+                        {dias}d
+                      </span>
                       {v.precio && (
                         <span className="text-xs font-mono text-text-secondary">
                           ${v.precio.toLocaleString('es-AR')}
@@ -230,6 +276,7 @@ export function StockPage() {
                     <div className="grid grid-cols-2 gap-2 text-xs mt-3">
                       <div><span className="text-text-muted">VIN:</span> <span className="font-mono text-text-primary">{v.vin}</span></div>
                       <div><span className="text-text-muted">Sucursal:</span> <span className="text-text-primary">{v.sucursal}</span></div>
+                      <div><span className="text-text-muted">Antigüedad:</span> <span className="text-text-primary">{dias} días</span></div>
                       {v.kilometraje != null && (
                         <div><span className="text-text-muted">Km:</span> <span className="text-text-primary">{v.kilometraje.toLocaleString('es-AR')}</span></div>
                       )}
@@ -238,6 +285,11 @@ export function StockPage() {
                       )}
                       {v.operacion_id && (
                         <div className="col-span-2"><span className="text-text-muted">Operación:</span> <span className="text-action font-mono">{(v as any).operacion?.numero_operacion || v.operacion_id.slice(0, 8)}</span></div>
+                      )}
+                      {v.incidente && (
+                        <div className="col-span-2 bg-red-500/10 rounded-lg p-2">
+                          <span className="text-red-500 font-semibold">Incidente:</span> <span className="text-red-400">{v.incidente}</span>
+                        </div>
                       )}
                       {v.observaciones && (
                         <div className="col-span-2"><span className="text-text-muted">Obs:</span> <span className="text-text-primary">{v.observaciones}</span></div>
@@ -339,6 +391,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
     grupo_orden: vehiculo?.grupo_orden || '',
     titular_plan: vehiculo?.titular_plan || '',
     patente: vehiculo?.patente || '',
+    incidente: vehiculo?.incidente || '',
     observaciones: vehiculo?.observaciones || '',
   })
 
@@ -364,6 +417,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
       grupo_orden: form.grupo_orden.trim() || undefined,
       titular_plan: form.titular_plan.trim() || undefined,
       patente: form.patente.trim() || undefined,
+      incidente: form.incidente.trim() || null,
       observaciones: form.observaciones.trim() || undefined,
     }
 
@@ -450,6 +504,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
           <div>
             <label className="text-xs text-text-muted">Estado</label>
             <select value={form.estado} onChange={e => set('estado', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none">
+              <option value="batea">Batea (descarga)</option>
               <option value="disponible">Disponible</option>
               <option value="reservado">Reservado</option>
               <option value="en_transito">En tránsito</option>
@@ -461,7 +516,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
             <label className="text-xs text-text-muted">Kilometraje</label>
             <input type="number" value={form.kilometraje} onChange={e => set('kilometraje', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" />
           </div>
-          {/* Patente (usado) */}
+          {/* Patente */}
           <div>
             <label className="text-xs text-text-muted">Patente</label>
             <input value={form.patente} onChange={e => set('patente', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" />
@@ -479,6 +534,16 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
               </div>
             </>
           )}
+          {/* Incidente */}
+          <div className="col-span-2">
+            <label className="text-xs text-text-muted">Incidente / Daño (se marca en rojo si tiene)</label>
+            <input
+              value={form.incidente}
+              onChange={e => set('incidente', e.target.value)}
+              className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none"
+              placeholder="Ej: rayón puerta trasera, golpe paragolpes..."
+            />
+          </div>
           {/* Observaciones */}
           <div className="col-span-2">
             <label className="text-xs text-text-muted">Observaciones</label>
