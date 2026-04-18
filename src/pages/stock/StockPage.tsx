@@ -47,11 +47,14 @@ export function StockPage() {
 
   const eliminarMut = useEliminarStock()
 
+  // Batea siempre se carga aparte
+  const { data: batea } = useStock({ estado: 'batea', sucursal: sucursalFiltro })
+
   const { data: stock, isLoading } = useStock({
     busqueda: busqueda.trim(),
     tipo: tipoFiltro,
     sucursal: sucursalFiltro,
-    estado: estadoFiltro,
+    estado: estadoFiltro === 'batea' ? 'batea' : estadoFiltro,
   })
 
   // KPIs
@@ -178,6 +181,68 @@ export function StockPage() {
           <option value="vendido">Vendido</option>
         </select>
       </div>
+
+      {/* ─── BATEA ─── Sección separada, siempre visible si hay autos */}
+      {batea && batea.length > 0 && estadoFiltro !== 'batea' && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="w-3 h-3 rounded-full bg-amber-500 animate-pulse" />
+            <h2 className="text-base font-bold text-text-primary">Batea — Descarga</h2>
+            <Badge color="yellow" size="sm">{batea.length}</Badge>
+          </div>
+          <div className="space-y-2 bg-amber-500/5 border border-amber-500/20 rounded-xl p-3">
+            {batea.map(v => {
+              const tipoCfg = TIPO_COLORES[v.tipo]
+              const dias = diasEntre(v.created_at)
+              const tieneIncidente = !!v.incidente
+              return (
+                <div
+                  key={v.id}
+                  className={`flex items-center justify-between gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:border-action/30 ${
+                    tieneIncidente
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-bg-primary border-border'
+                  }`}
+                  onClick={() => { setEditando(v); setShowForm(true) }}
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                      <span
+                        className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
+                        style={{ backgroundColor: tipoCfg.bg, color: tipoCfg.text }}
+                      >
+                        {tipoCfg.label}
+                      </span>
+                      <span className="text-[10px] text-text-muted">{v.sucursal}</span>
+                      {tieneIncidente && (
+                        <Badge color="red" size="sm">
+                          <AlertTriangle className="h-3 w-3 mr-1" />Incidente
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-sm font-bold text-text-primary truncate">
+                      {v.marca} {v.modelo} {v.color ? `· ${v.color}` : ''}
+                    </p>
+                    <p className="text-xs text-text-muted">
+                      VIN: ...{v.vin.slice(-6)}
+                      {v.patente ? ` · ${v.patente}` : ''}
+                    </p>
+                    {tieneIncidente && (
+                      <p className="text-xs text-red-500 font-medium">{v.incidente}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <span className={`text-xs font-bold ${dias > 3 ? 'text-red-500' : dias > 1 ? 'text-yellow-600' : 'text-green-600'}`}>
+                      {dias}d
+                    </span>
+                    <p className="text-[10px] text-text-muted">en batea</p>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Lista */}
       {isLoading ? (
