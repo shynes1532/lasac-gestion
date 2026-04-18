@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wrench, Clock, AlertTriangle } from 'lucide-react'
+import { Wrench, Clock, AlertTriangle, Search } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '../../lib/supabase'
 import { Button, Select, EstadoBadge, Card, EmptyState, CardSkeleton, Badge } from '../../components/ui'
@@ -19,6 +19,7 @@ const estadoOptions = [
 
 export function ColaPDI() {
   const navigate = useNavigate()
+  const [busqueda, setBusqueda] = useState('')
   // Por defecto: solo lo que está en cola (no muestra aprobados ni rechazados)
   const [estadoFiltro, setEstadoFiltro] = useState('en_cola')
 
@@ -30,7 +31,7 @@ export function ColaPDI() {
         .select(`
           *,
           operacion:operaciones(
-            id, numero_operacion, sucursal, tipo_operacion, cliente_nombre,
+            id, numero_operacion, sucursal, tipo_operacion, cliente_nombre, dominio_patente,
             unidad:unidades(*),
             titular:titulares(nombre_apellido)
           )
@@ -57,6 +58,27 @@ export function ColaPDI() {
     },
   })
 
+  // Filtrar por búsqueda (nombre, apellido, dominio, chasis, modelo)
+  const filtrados = useMemo(() => {
+    if (!alistamientos) return []
+    if (!busqueda.trim()) return alistamientos
+    const b = busqueda.toLowerCase()
+    return alistamientos.filter((item: any) => {
+      const op = item.operacion
+      const unidad = op?.unidad?.[0]
+      const titular = op?.titular?.[0]
+      return [
+        op?.cliente_nombre,
+        titular?.nombre_apellido,
+        unidad?.modelo,
+        unidad?.vin_chasis,
+        unidad?.patente_actual,
+        op?.dominio_patente,
+        op?.numero_operacion,
+      ].filter(Boolean).join(' ').toLowerCase().includes(b)
+    })
+  }, [alistamientos, busqueda])
+
   const getUrgencia = (createdAt: string) => {
     const dias = diasEntre(createdAt)
     if (dias > 5) return 'red'
@@ -82,12 +104,22 @@ export function ColaPDI() {
         </div>
       </div>
 
-      <div className="mb-6">
+      <div className="flex gap-3 mb-6">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, patente, chasis, modelo..."
+            value={busqueda}
+            onChange={e => setBusqueda(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm bg-bg-primary border border-border rounded-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-2 focus:ring-action/30"
+          />
+        </div>
         <Select
           options={estadoOptions}
           value={estadoFiltro}
           onChange={(e) => setEstadoFiltro(e.target.value)}
-          className="max-w-xs"
+          className="max-w-[200px]"
         />
       </div>
 
@@ -95,7 +127,7 @@ export function ColaPDI() {
         <div className="space-y-3">
           {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
         </div>
-      ) : !alistamientos?.length ? (
+      ) : !filtrados.length ? (
         <EmptyState
           icon={<Wrench className="h-12 w-12" />}
           title="No hay unidades en cola"
@@ -103,7 +135,7 @@ export function ColaPDI() {
         />
       ) : (
         <div className="space-y-3">
-          {alistamientos.map((item: any) => {
+          {filtrados.map((item: any) => {
             const op = item.operacion
             const unidad = op?.unidad?.[0]
             const titular = op?.titular?.[0]
