@@ -614,6 +614,17 @@ export interface Repuesto {
   created_by: string | null
   created_at: string
   updated_at: string
+  // Pricing engine (migration 012). Pueden ser null en repuestos
+  // preexistentes que aún no fueron migrados al motor.
+  precio_lista: number | null
+  descuento_fabricante: number
+  moneda: 'ARS' | 'USD'
+  vigencia_desde: string | null
+  vigencia_hasta: string | null
+  familia_fiscal: 'gravado_normal' | 'exento_19640' | 'no_gravado'
+  precio_minimo_autorizado: number | null
+  marca: string | null
+  discontinuado: boolean
 }
 
 export interface RepuestoMovimiento {

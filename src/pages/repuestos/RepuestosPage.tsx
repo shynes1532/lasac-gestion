@@ -1,9 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera, Pencil } from 'lucide-react'
+import { Package, Plus, Minus, AlertTriangle, X, History, ScanLine, Camera, Pencil, Users } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '../../context/AuthContext'
 import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos } from '../../hooks/useRepuestos'
+import { useClientes, CLIENTE_MOSTRADOR_ID } from '../../hooks/useClientes'
+import { usePrecioVenta, useStockDisponibleAgregado } from '../../hooks/usePricing'
+import { formatARS, getPricingBadges } from '../../lib/pricing'
 import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
 import type { Repuesto } from '../../lib/types'
 
@@ -124,7 +127,7 @@ function InlineScanner({ onScan, onClose }: { onScan: (code: string) => void; on
 // ============================================================
 // Panel de movimiento (ingreso/egreso) para un repuesto existente
 // ============================================================
-function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: () => void }) {
+function MovimientoPanel({ repuesto, clienteId, onClose }: { repuesto: Repuesto; clienteId: string; onClose: () => void }) {
   const queryClient = useQueryClient()
   const [tipo, setTipo] = useState<'ingreso' | 'egreso'>('ingreso')
   const [cantidad, setCantidad] = useState(1)
@@ -140,8 +143,26 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
     stock_minimo: repuesto.stock_minimo,
     precio_costo: repuesto.precio_costo?.toString() || '',
     precio_venta: repuesto.precio_venta?.toString() || '',
+    // Pricing engine
+    marca:                    repuesto.marca ?? '',
+    moneda:                   repuesto.moneda ?? 'ARS',
+    precio_lista:             repuesto.precio_lista?.toString() ?? '',
+    descuento_fabricante:     repuesto.descuento_fabricante?.toString() ?? '0',
+    familia_fiscal:           repuesto.familia_fiscal ?? 'gravado_normal',
+    precio_minimo_autorizado: repuesto.precio_minimo_autorizado?.toString() ?? '',
+    vigencia_desde:           repuesto.vigencia_desde ?? '',
+    vigencia_hasta:           repuesto.vigencia_hasta ?? '',
+    discontinuado:            repuesto.discontinuado,
   })
   const [saving, setSaving] = useState(false)
+
+  // Pricing en vivo según el cliente seleccionado en la página
+  const tienePricing = repuesto.precio_lista != null
+  const { data: precio } = usePrecioVenta({
+    productoId: repuesto.id,
+    clienteId,
+    enabled: tienePricing,
+  })
 
   const handleSaveEdit = async () => {
     if (!editForm.codigo_fiat) { notify.error('El código es obligatorio'); return }
@@ -154,10 +175,21 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
         stock_minimo: editForm.stock_minimo,
         precio_costo: editForm.precio_costo ? Number(editForm.precio_costo) : null,
         precio_venta: editForm.precio_venta ? Number(editForm.precio_venta) : null,
+        // Pricing engine
+        marca:                    editForm.marca.trim() || null,
+        moneda:                   editForm.moneda,
+        precio_lista:             editForm.precio_lista ? Number(editForm.precio_lista) : null,
+        descuento_fabricante:     editForm.descuento_fabricante ? Number(editForm.descuento_fabricante) : 0,
+        familia_fiscal:           editForm.familia_fiscal,
+        precio_minimo_autorizado: editForm.precio_minimo_autorizado ? Number(editForm.precio_minimo_autorizado) : null,
+        vigencia_desde:           editForm.vigencia_desde || null,
+        vigencia_hasta:           editForm.vigencia_hasta || null,
+        discontinuado:            editForm.discontinuado,
       }).eq('id', repuesto.id)
       if (error) throw error
       notify.success('Repuesto actualizado')
       queryClient.invalidateQueries({ queryKey: ['repuestos'] })
+      queryClient.invalidateQueries({ queryKey: ['precio-venta'] })
       setShowEditar(false)
       onClose()
     } catch (err: any) {
@@ -206,6 +238,43 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
           </div>
         </div>
 
+        {/* Bloque de pricing en vivo (solo cuando NO se está editando) */}
+        {!showEditar && tienePricing && precio && (
+          <div className="px-4 pt-4">
+            <div className="bg-bg-primary border border-border rounded-xl p-3 space-y-2">
+              <div className="flex items-baseline justify-between">
+                <span className="text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                  Precio sugerido
+                </span>
+                <span className="text-[10px] text-text-muted">
+                  {precio.tier} · IVA {Math.round(precio.iva_rate * 100)}%
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-green-400">{formatARS(precio.precio_final)}</p>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-text-muted pt-1 border-t border-border/50">
+                <div className="flex justify-between"><span>Lista</span><span className="text-text-secondary">{formatARS(precio.precio_lista)}</span></div>
+                <div className="flex justify-between"><span>Neto</span><span className="text-text-secondary">{formatARS(precio.precio_neto)}</span></div>
+                <div className="flex justify-between"><span>Costo</span><span className="text-text-secondary">{formatARS(precio.precio_costo)}</span></div>
+                <div className="flex justify-between"><span>Markup</span><span className="text-text-secondary">{formatARS(precio.precio_markup)}</span></div>
+                {precio.cotizacion_usd && (
+                  <div className="flex justify-between col-span-2"><span>USD</span><span className="text-text-secondary">{precio.fuente_cotiz} @ {precio.cotizacion_usd}</span></div>
+                )}
+              </div>
+              {precio.warnings.length > 0 && (
+                <p className="text-[10px] text-amber-400/90">⚠ {precio.warnings.join(' · ')}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {!showEditar && !tienePricing && (
+          <div className="px-4 pt-4">
+            <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-[11px] text-amber-200">
+              Sin <code>precio_lista</code> FIAT cargado. Usá "Editar" para cargar pricing y activar el motor.
+            </div>
+          </div>
+        )}
+
         {showEditar ? (
           <div className="p-4 space-y-3">
             <div className="flex items-center gap-2 mb-2">
@@ -251,6 +320,91 @@ function MovimientoPanel({ repuesto, onClose }: { repuesto: Repuesto; onClose: (
                   className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
               </div>
             </div>
+
+            {/* Bloque pricing engine */}
+            <div className="pt-3 mt-1 border-t border-border space-y-3">
+              <p className="text-[11px] uppercase tracking-wider text-text-muted font-semibold">
+                Pricing engine (lista FIAT)
+              </p>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Marca</label>
+                  <input type="text" value={editForm.marca}
+                    onChange={e => setEditForm({ ...editForm, marca: e.target.value })}
+                    placeholder="FIAT, Mopar..."
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Moneda</label>
+                  <select value={editForm.moneda}
+                    onChange={e => setEditForm({ ...editForm, moneda: e.target.value as 'ARS' | 'USD' })}
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none">
+                    <option value="ARS">ARS</option>
+                    <option value="USD">USD</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Precio lista *</label>
+                  <input type="number" step="0.01" value={editForm.precio_lista}
+                    onChange={e => setEditForm({ ...editForm, precio_lista: e.target.value })}
+                    placeholder="0"
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Descuento fab. %</label>
+                  <input type="number" step="0.1" min={0} max={100} value={editForm.descuento_fabricante}
+                    onChange={e => setEditForm({ ...editForm, descuento_fabricante: e.target.value })}
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Familia fiscal</label>
+                <select value={editForm.familia_fiscal}
+                  onChange={e => setEditForm({ ...editForm, familia_fiscal: e.target.value as Repuesto['familia_fiscal'] })}
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none">
+                  <option value="gravado_normal">Gravado normal (IVA 21%)</option>
+                  <option value="exento_19640">Exento Ley 19.640 (TDF → IVA 0%)</option>
+                  <option value="no_gravado">No gravado (siempre IVA 0%)</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs text-text-muted mb-1">Precio mínimo autorizado</label>
+                <input type="number" step="0.01" value={editForm.precio_minimo_autorizado}
+                  onChange={e => setEditForm({ ...editForm, precio_minimo_autorizado: e.target.value })}
+                  placeholder="Sin piso (opcional)"
+                  className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                <p className="text-[10px] text-text-muted mt-0.5">Por debajo de este valor la venta requiere aprobación del director.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Vigencia desde</label>
+                  <input type="date" value={editForm.vigencia_desde}
+                    onChange={e => setEditForm({ ...editForm, vigencia_desde: e.target.value })}
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Vigencia hasta</label>
+                  <input type="date" value={editForm.vigencia_hasta}
+                    onChange={e => setEditForm({ ...editForm, vigencia_hasta: e.target.value })}
+                    className="w-full px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:outline-none" />
+                </div>
+              </div>
+
+              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+                <input type="checkbox" checked={editForm.discontinuado}
+                  onChange={e => setEditForm({ ...editForm, discontinuado: e.target.checked })}
+                  className="w-4 h-4" />
+                Producto discontinuado
+              </label>
+            </div>
+
             <div className="flex gap-2 pt-2">
               <Button variant="ghost" fullWidth onClick={() => setShowEditar(false)}>Cancelar</Button>
               <Button fullWidth onClick={handleSaveEdit} loading={saving}>Guardar cambios</Button>
@@ -491,6 +645,156 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
 }
 
 // ============================================================
+// Card de un repuesto (incluye precio sugerido y stock por sucursal)
+// ============================================================
+function RepuestoCard({
+  rep,
+  clienteId,
+  onClick,
+}: {
+  rep: Repuesto
+  clienteId: string
+  onClick: () => void
+}) {
+  const tienePricing = rep.precio_lista != null
+
+  // Si el repuesto no tiene precio_lista, no llamamos al motor
+  // (lanza excepción). Mostramos el precio_venta legacy.
+  const { data: precio } = usePrecioVenta({
+    productoId: rep.id,
+    clienteId,
+    enabled: tienePricing,
+  })
+
+  const { data: stock } = useStockDisponibleAgregado({
+    productoId: rep.id,
+  })
+
+  const badges = getPricingBadges({
+    vigenciaHasta: rep.vigencia_hasta,
+    discontinuado: rep.discontinuado,
+    familiaFiscal: rep.familia_fiscal,
+    condicionIvaCliente: 'CF', // se refina con cliente seleccionado abajo si querés
+    provinciaCliente: 'TDF',
+    precioFinal: precio?.precio_final ?? null,
+    precioMinimoAutorizado: rep.precio_minimo_autorizado,
+  })
+
+  const badgeColors: Record<string, string> = {
+    red:    'bg-red-500/20 text-red-300 border-red-500/40',
+    gray:   'bg-bg-tertiary text-text-muted border-border',
+    green:  'bg-green-500/20 text-green-300 border-green-500/40',
+    orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  }
+
+  const bajoStock = rep.stock_actual <= rep.stock_minimo
+  const detalle = stock?.detalle_por_sucursal ?? []
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left bg-bg-secondary rounded-xl border border-border p-3 hover:border-action/40 transition-colors cursor-pointer"
+    >
+      {/* Línea 1: código, ubicación, marca */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-mono text-action bg-action/10 px-1.5 py-0.5 rounded">
+              {rep.codigo_fiat}
+            </span>
+            {rep.marca && (
+              <span className="text-[10px] text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded uppercase">
+                {rep.marca}
+              </span>
+            )}
+            {rep.ubicacion && (
+              <span className="text-xs text-text-muted">📍 {rep.ubicacion}</span>
+            )}
+          </div>
+          <p className="text-sm text-text-primary mt-1 truncate">{rep.descripcion}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className={`text-lg font-bold ${bajoStock ? 'text-amber-400' : 'text-text-primary'}`}>
+            {rep.stock_actual}
+          </p>
+          <p className="text-[10px] text-text-muted">unidades</p>
+        </div>
+      </div>
+
+      {/* Línea 2: precio y stock por sucursal */}
+      <div className="flex items-center justify-between gap-3 mt-2 pt-2 border-t border-border/50">
+        <div className="min-w-0">
+          {tienePricing ? (
+            precio ? (
+              <div className="flex items-baseline gap-2">
+                <span className="text-lg font-bold text-green-400">
+                  {formatARS(precio.precio_final)}
+                </span>
+                <span className="text-[10px] text-text-muted">
+                  {precio.tier} · IVA {Math.round(precio.iva_rate * 100)}%
+                </span>
+                {rep.moneda === 'USD' && precio.cotizacion_usd && (
+                  <span className="text-[10px] text-text-muted">
+                    USD@{precio.cotizacion_usd}
+                  </span>
+                )}
+              </div>
+            ) : (
+              <span className="text-xs text-text-muted">Calculando…</span>
+            )
+          ) : rep.precio_venta != null ? (
+            <div className="flex items-baseline gap-2">
+              <span className="text-base font-semibold text-text-secondary">
+                {formatARS(rep.precio_venta)}
+              </span>
+              <span className="text-[10px] text-amber-400/80">Sin lista FIAT</span>
+            </div>
+          ) : (
+            <span className="text-xs text-text-muted">Sin precio</span>
+          )}
+        </div>
+
+        {/* Stock por sucursal — mini */}
+        {detalle.length > 0 && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {detalle.map((d) => (
+              <span
+                key={d.sucursal}
+                className="text-[10px] bg-bg-tertiary text-text-secondary px-1.5 py-0.5 rounded"
+                title={`Físico ${d.detalle.stock_fisico} · Reservado ${d.detalle.reservado} · Disponible ${d.detalle.disponible}`}
+              >
+                {d.sucursal === 'Ushuaia' ? 'USH' : d.sucursal === 'Rio Grande' ? 'RG' : 'DC'}: {d.detalle.disponible}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Badges */}
+      {badges.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2">
+          {badges.map((b) => (
+            <span
+              key={b.type}
+              className={`text-[10px] px-1.5 py-0.5 rounded border ${badgeColors[b.variant]}`}
+            >
+              {b.label}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Warnings desde calcular_precio_venta */}
+      {precio?.warnings?.length ? (
+        <p className="text-[10px] text-amber-400/80 mt-1 truncate">
+          ⚠ {precio.warnings.join(' · ')}
+        </p>
+      ) : null}
+    </button>
+  )
+}
+
+// ============================================================
 // Página principal de Repuestos
 // ============================================================
 export function RepuestosPage() {
@@ -500,8 +804,10 @@ export function RepuestosPage() {
   const [showNuevo, setShowNuevo] = useState(false)
   const [codigoNuevo, setCodigoNuevo] = useState('')
   const [pageError, setPageError] = useState<string | null>(null)
+  const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
 
   const { data: repuestos = [], isLoading, error: queryError } = useRepuestos(busqueda)
+  const { data: clientes = [] } = useClientes()
 
   useEffect(() => {
     if (queryError) setPageError((queryError as any)?.message || 'Error al cargar repuestos')
@@ -534,6 +840,28 @@ export function RepuestosPage() {
           <Plus className="h-4 w-4" />
           Nuevo repuesto
         </Button>
+      </div>
+
+      {/* Selector de cliente — afecta el precio sugerido por tier */}
+      <div className="bg-bg-secondary border border-border rounded-xl p-3">
+        <label className="text-[11px] uppercase tracking-wider text-text-muted font-semibold flex items-center gap-1.5 mb-1">
+          <Users className="h-3.5 w-3.5" />
+          Cliente para cálculo de precio
+        </label>
+        <select
+          value={clienteId}
+          onChange={(e) => setClienteId(e.target.value)}
+          className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
+        >
+          {clientes.length === 0 && (
+            <option value={CLIENTE_MOSTRADOR_ID}>MOSTRADOR — Consumidor Final (default)</option>
+          )}
+          {clientes.map(c => (
+            <option key={c.id} value={c.id}>
+              {c.nombre} {c.cuit ? `· CUIT ${c.cuit}` : ''} · {c.condicion_iva}/{c.provincia}
+            </option>
+          ))}
+        </select>
       </div>
 
       {/* KPIs */}
@@ -592,31 +920,23 @@ export function RepuestosPage() {
       ) : (
         <div className="space-y-2">
           {repuestos.map(rep => (
-            <button key={rep.id} onClick={() => setSelectedRepuesto(rep)}
-              className="w-full text-left bg-bg-secondary rounded-xl border border-border p-3 hover:border-action/40 transition-colors cursor-pointer">
-              <div className="flex items-center justify-between">
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-action bg-action/10 px-1.5 py-0.5 rounded">{rep.codigo_fiat}</span>
-                    {rep.ubicacion && <span className="text-xs text-text-muted">📍 {rep.ubicacion}</span>}
-                  </div>
-                  <p className="text-sm text-text-primary mt-0.5 truncate">{rep.descripcion}</p>
-                </div>
-                <div className="text-right shrink-0 ml-3">
-                  <p className={`text-lg font-bold ${rep.stock_actual <= rep.stock_minimo ? 'text-amber-400' : 'text-text-primary'}`}>
-                    {rep.stock_actual}
-                  </p>
-                  <p className="text-[10px] text-text-muted">unidades</p>
-                </div>
-              </div>
-            </button>
+            <RepuestoCard
+              key={rep.id}
+              rep={rep}
+              clienteId={clienteId}
+              onClick={() => setSelectedRepuesto(rep)}
+            />
           ))}
         </div>
       )}
 
       {/* Panel de movimiento */}
       {selectedRepuesto && (
-        <MovimientoPanel repuesto={selectedRepuesto} onClose={() => setSelectedRepuesto(null)} />
+        <MovimientoPanel
+          repuesto={selectedRepuesto}
+          clienteId={clienteId}
+          onClose={() => setSelectedRepuesto(null)}
+        />
       )}
 
       {/* Crear nuevo repuesto */}
