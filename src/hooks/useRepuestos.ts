@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Repuesto, RepuestoMovimiento } from '../lib/types'
 
-export function useRepuestos(busqueda?: string, sucursalFiltro?: 'Ushuaia' | 'Rio Grande' | 'Todas') {
+export function useRepuestos(busqueda?: string, sucursalFiltro?: 'Ushuaia' | 'Rio Grande' | 'Deposito Central' | 'Todas') {
   const { perfil } = useAuth()
 
   return useQuery({

@@ -8,6 +8,7 @@ import { useClientes, CLIENTE_MOSTRADOR_ID } from '../../hooks/useClientes'
 import { usePrecioVenta, useStockDisponibleAgregado } from '../../hooks/usePricing'
 import { formatARS, getPricingBadges } from '../../lib/pricing'
 import { Button, Card, SearchInput, EmptyState, notify, Tabs } from '../../components/ui'
+import { PedidosSection } from './PedidosSection'
 import type { Repuesto } from '../../lib/types'
 
 // ============================================================
@@ -813,6 +814,7 @@ export function RepuestosPage() {
   const [pageError, setPageError] = useState<string | null>(null)
   const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
   const [sucursalTab, setSucursalTab] = useState<'Rio Grande' | 'Ushuaia' | 'Todas'>('Rio Grande')
+  const [seccion, setSeccion] = useState<'stock' | 'pedidos'>('stock')
 
   // Si el usuario tiene sucursal específica, no puede cambiar de tab.
   const tabBloqueado = !!(perfil?.sucursal && perfil.sucursal !== 'Ambas')
@@ -845,13 +847,49 @@ export function RepuestosPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-text-primary">Repuestos</h1>
-          <p className="text-sm text-text-secondary">Stock y movimientos</p>
+          <p className="text-sm text-text-secondary">
+            {seccion === 'stock' ? 'Stock y movimientos' : 'Pedidos al cliente'}
+          </p>
         </div>
-        <Button onClick={() => { setCodigoNuevo(''); setShowNuevo(true) }}>
-          <Plus className="h-4 w-4" />
-          Nuevo repuesto
-        </Button>
+        {seccion === 'stock' && (
+          <Button onClick={() => { setCodigoNuevo(''); setShowNuevo(true) }}>
+            <Plus className="h-4 w-4" />
+            Nuevo repuesto
+          </Button>
+        )}
       </div>
+
+      {/* Tabs principales: Stock | Pedidos */}
+      <Tabs
+        tabs={[
+          { id: 'stock',   label: 'Stock' },
+          { id: 'pedidos', label: 'Pedidos' },
+        ]}
+        activeTab={seccion}
+        onChange={(id) => setSeccion(id as 'stock' | 'pedidos')}
+      />
+
+      {/* Tabs por sucursal — visible en ambas secciones (Stock y Pedidos).
+          Para usuarios atados a una sucursal específica, el filtro lo aplica el hook. */}
+      {!tabBloqueado && (
+        <Tabs
+          tabs={[
+            { id: 'Rio Grande', label: 'Río Grande' },
+            { id: 'Ushuaia', label: 'Ushuaia' },
+            { id: 'Todas', label: 'Todas' },
+          ]}
+          activeTab={sucursalTab}
+          onChange={(id) => setSucursalTab(id as 'Rio Grande' | 'Ushuaia' | 'Todas')}
+        />
+      )}
+
+      {/* === SECCIÓN PEDIDOS === */}
+      {seccion === 'pedidos' && (
+        <PedidosSection sucursal={sucursalTab} />
+      )}
+
+      {/* === SECCIÓN STOCK === */}
+      {seccion === 'stock' && <>
 
       {/* Selector de cliente — afecta el precio sugerido por tier */}
       <div className="bg-bg-secondary border border-border rounded-xl p-3">
@@ -874,20 +912,6 @@ export function RepuestosPage() {
           ))}
         </select>
       </div>
-
-      {/* Tabs por sucursal — solo visibles si el usuario es director (sucursal Ambas).
-          Para usuarios atados a una sucursal específica, el filtro lo aplica el hook. */}
-      {!tabBloqueado && (
-        <Tabs
-          tabs={[
-            { id: 'Rio Grande', label: 'Río Grande' },
-            { id: 'Ushuaia', label: 'Ushuaia' },
-            { id: 'Todas', label: 'Todas' },
-          ]}
-          activeTab={sucursalTab}
-          onChange={(id) => setSucursalTab(id as 'Rio Grande' | 'Ushuaia' | 'Todas')}
-        />
-      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
@@ -954,6 +978,9 @@ export function RepuestosPage() {
           ))}
         </div>
       )}
+
+      </>}
+      {/* === FIN SECCIÓN STOCK === */}
 
       {/* Panel de movimiento */}
       {selectedRepuesto && (
