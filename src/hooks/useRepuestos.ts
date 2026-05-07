@@ -3,11 +3,11 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import type { Repuesto, RepuestoMovimiento } from '../lib/types'
 
-export function useRepuestos(busqueda?: string) {
+export function useRepuestos(busqueda?: string, sucursalFiltro?: 'Ushuaia' | 'Rio Grande' | 'Todas') {
   const { perfil } = useAuth()
 
   return useQuery({
-    queryKey: ['repuestos', busqueda, perfil?.sucursal],
+    queryKey: ['repuestos', busqueda, perfil?.sucursal, sucursalFiltro],
     queryFn: async () => {
       let q = supabase
         .from('repuestos')
@@ -15,9 +15,14 @@ export function useRepuestos(busqueda?: string) {
         .eq('activo', true)
         .order('descripcion', { ascending: true })
 
+      // Si el usuario es de una sucursal específica, no puede ver otras.
+      // El director (sucursal='Ambas') puede usar sucursalFiltro para alternar.
       if (perfil?.sucursal && perfil.sucursal !== 'Ambas') {
         q = q.eq('sucursal', perfil.sucursal)
+      } else if (sucursalFiltro && sucursalFiltro !== 'Todas') {
+        q = q.eq('sucursal', sucursalFiltro)
       }
+
       if (busqueda) {
         q = q.or(`codigo_fiat.ilike.%${busqueda}%,descripcion.ilike.%${busqueda}%`)
       }
@@ -80,6 +85,9 @@ interface CrearRepuestoData {
   stock_minimo?: number
   precio_costo?: number
   precio_venta?: number
+  /** Forzar la sucursal del nuevo repuesto. Si no se pasa, se usa la del perfil
+   *  (o 'Ushuaia' como fallback cuando el perfil tiene sucursal='Ambas'). */
+  sucursal?: 'Ushuaia' | 'Rio Grande'
 }
 
 export function useCrearRepuesto() {
@@ -88,11 +96,18 @@ export function useCrearRepuesto() {
 
   return useMutation({
     mutationFn: async (data: CrearRepuestoData) => {
+      const sucursal: 'Ushuaia' | 'Rio Grande' =
+        data.sucursal
+          ?? (perfil?.sucursal && perfil.sucursal !== 'Ambas'
+              ? (perfil.sucursal as 'Ushuaia' | 'Rio Grande')
+              : 'Ushuaia')
+
+      const { sucursal: _ignore, ...rest } = data
       const { data: rep, error } = await supabase
         .from('repuestos')
         .insert({
-          ...data,
-          sucursal: perfil?.sucursal === 'Ambas' ? 'Ushuaia' : perfil?.sucursal,
+          ...rest,
+          sucursal,
           created_by: user!.id,
         })
         .select()

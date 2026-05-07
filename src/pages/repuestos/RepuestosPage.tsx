@@ -7,7 +7,7 @@ import { useRepuestos, useCrearRepuesto, useRegistrarMovimiento, useMovimientos 
 import { useClientes, CLIENTE_MOSTRADOR_ID } from '../../hooks/useClientes'
 import { usePrecioVenta, useStockDisponibleAgregado } from '../../hooks/usePricing'
 import { formatARS, getPricingBadges } from '../../lib/pricing'
-import { Button, Card, SearchInput, EmptyState, notify } from '../../components/ui'
+import { Button, Card, SearchInput, EmptyState, notify, Tabs } from '../../components/ui'
 import type { Repuesto } from '../../lib/types'
 
 // ============================================================
@@ -510,8 +510,9 @@ function MovimientoPanel({ repuesto, clienteId, onClose }: { repuesto: Repuesto;
 // ============================================================
 // Formulario nuevo repuesto — con scanner integrado en el campo código
 // ============================================================
-function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
+function NuevoRepuestoForm({ codigoInicial, sucursalForzada, onCreated, onClose }: {
   codigoInicial: string
+  sucursalForzada?: 'Ushuaia' | 'Rio Grande'
   onCreated: (rep: Repuesto) => void
   onClose: () => void
 }) {
@@ -541,8 +542,9 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
         stock_minimo: form.stock_minimo,
         precio_costo: form.precio_costo ? Number(form.precio_costo) : undefined,
         precio_venta: form.precio_venta ? Number(form.precio_venta) : undefined,
+        sucursal: sucursalForzada,
       })
-      notify.success('Repuesto creado')
+      notify.success(`Repuesto creado${sucursalForzada ? ` en ${sucursalForzada}` : ''}`)
       onCreated(rep)
     } catch (err: any) {
       notify.error(err?.message || 'Error al crear repuesto')
@@ -553,7 +555,12 @@ function NuevoRepuestoForm({ codigoInicial, onCreated, onClose }: {
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60">
       <div className="bg-bg-secondary rounded-t-2xl sm:rounded-xl border border-border w-full max-w-md max-h-[90vh] overflow-y-auto">
         <div className="p-4 border-b border-border flex items-center justify-between">
-          <h3 className="font-bold text-text-primary">Nuevo repuesto</h3>
+          <div>
+            <h3 className="font-bold text-text-primary">Nuevo repuesto</h3>
+            {sucursalForzada && (
+              <p className="text-xs text-action mt-0.5">📍 Sucursal: {sucursalForzada}</p>
+            )}
+          </div>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
             <X className="h-5 w-5" />
           </button>
@@ -798,15 +805,19 @@ function RepuestoCard({
 // Página principal de Repuestos
 // ============================================================
 export function RepuestosPage() {
-  useAuth() // Ensures user is authenticated
+  const { perfil } = useAuth()
   const [busqueda, setBusqueda] = useState('')
   const [selectedRepuesto, setSelectedRepuesto] = useState<Repuesto | null>(null)
   const [showNuevo, setShowNuevo] = useState(false)
   const [codigoNuevo, setCodigoNuevo] = useState('')
   const [pageError, setPageError] = useState<string | null>(null)
   const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
+  const [sucursalTab, setSucursalTab] = useState<'Rio Grande' | 'Ushuaia' | 'Todas'>('Rio Grande')
 
-  const { data: repuestos = [], isLoading, error: queryError } = useRepuestos(busqueda)
+  // Si el usuario tiene sucursal específica, no puede cambiar de tab.
+  const tabBloqueado = !!(perfil?.sucursal && perfil.sucursal !== 'Ambas')
+
+  const { data: repuestos = [], isLoading, error: queryError } = useRepuestos(busqueda, sucursalTab)
   const { data: clientes = [] } = useClientes()
 
   useEffect(() => {
@@ -863,6 +874,20 @@ export function RepuestosPage() {
           ))}
         </select>
       </div>
+
+      {/* Tabs por sucursal — solo visibles si el usuario es director (sucursal Ambas).
+          Para usuarios atados a una sucursal específica, el filtro lo aplica el hook. */}
+      {!tabBloqueado && (
+        <Tabs
+          tabs={[
+            { id: 'Rio Grande', label: 'Río Grande' },
+            { id: 'Ushuaia', label: 'Ushuaia' },
+            { id: 'Todas', label: 'Todas' },
+          ]}
+          activeTab={sucursalTab}
+          onChange={(id) => setSucursalTab(id as 'Rio Grande' | 'Ushuaia' | 'Todas')}
+        />
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-3 gap-3">
@@ -939,10 +964,17 @@ export function RepuestosPage() {
         />
       )}
 
-      {/* Crear nuevo repuesto */}
+      {/* Crear nuevo repuesto — sucursal según tab activo (o la del perfil si está atado a una). */}
       {showNuevo && (
         <NuevoRepuestoForm
           codigoInicial={codigoNuevo}
+          sucursalForzada={
+            tabBloqueado
+              ? (perfil!.sucursal as 'Ushuaia' | 'Rio Grande')
+              : sucursalTab === 'Todas'
+                ? 'Rio Grande'
+                : sucursalTab
+          }
           onCreated={(rep) => { setShowNuevo(false); setSelectedRepuesto(rep) }}
           onClose={() => setShowNuevo(false)}
         />
