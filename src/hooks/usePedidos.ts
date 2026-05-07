@@ -1,6 +1,8 @@
 // ============================================================
-// Hooks para pedidos de repuestos al cliente (migration 017).
-// CRUD + acciones de recepción/entrega/cancelación.
+// Hooks para pedidos de repuestos al cliente (migrations 017 + 018).
+// Modelo:
+//   tipo  (origen):     garantia | mostrador | siniestro
+//   etapa (ciclo vida): comprado | en_viaje | en_stock | entregado | cancelado
 // ============================================================
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -10,7 +12,8 @@ import type {
   PedidoRepuesto,
   PedidoRepuestoConItems,
   PedidoRepuestoItem,
-  FlagPedido,
+  TipoPedido,
+  EtapaPedido,
 } from '../types/pedidos'
 import type { SucursalRepuestos } from '../types/pricing'
 
@@ -20,11 +23,9 @@ import type { SucursalRepuestos } from '../types/pricing'
 
 export interface PedidosFiltro {
   sucursal?: SucursalRepuestos | 'Todas'
-  /** Si se pasa, devuelve solo pedidos con ese flag activo. */
-  flag?: FlagPedido
-  /** 'abiertos' (default) | 'entregados' | 'cancelados' | 'todos'. */
-  estado?: 'abiertos' | 'entregados' | 'cancelados' | 'todos'
-  /** Búsqueda por numero_pedido, numero_recibo o nombre del cliente. */
+  tipo?: TipoPedido | 'Todos'
+  etapa?: EtapaPedido | 'abiertas' | 'Todas'
+  /** Búsqueda por numero_pedido o numero_recibo. */
   busqueda?: string
 }
 
@@ -45,25 +46,20 @@ export function usePedidos(filtro: PedidosFiltro = {}) {
         q = q.eq('sucursal', filtro.sucursal)
       }
 
-      if (filtro.flag) {
-        q = q.eq(filtro.flag, true)
+      if (filtro.tipo && filtro.tipo !== 'Todos') {
+        q = q.eq('tipo', filtro.tipo)
       }
 
-      const estado = filtro.estado ?? 'abiertos'
-      if (estado === 'abiertos') {
-        q = q.is('entregado_at', null).eq('cancelado', false)
-      } else if (estado === 'entregados') {
-        q = q.not('entregado_at', 'is', null)
-      } else if (estado === 'cancelados') {
-        q = q.eq('cancelado', true)
+      const etapa = filtro.etapa ?? 'abiertas'
+      if (etapa === 'abiertas') {
+        q = q.not('etapa', 'in', '(entregado,cancelado)')
+      } else if (etapa !== 'Todas') {
+        q = q.eq('etapa', etapa)
       }
-      // 'todos' → sin filtro adicional
 
       if (filtro.busqueda && filtro.busqueda.trim()) {
         const s = filtro.busqueda.trim()
-        q = q.or(
-          `numero_pedido.ilike.%${s}%,numero_recibo.ilike.%${s}%`,
-        )
+        q = q.or(`numero_pedido.ilike.%${s}%,numero_recibo.ilike.%${s}%`)
       }
 
       const { data, error } = await q
@@ -102,15 +98,13 @@ export function usePedido(id: string | null | undefined) {
 interface CrearPedidoInput {
   sucursal: SucursalRepuestos
   cliente_id: string | null
+  tipo: TipoPedido
+  etapa?: EtapaPedido
   garantia_id?: string | null
   siniestro_id?: string | null
   numero_recibo?: string | null
   monto_pagado?: number | null
-  esperando_repuesto?:  boolean
-  esperando_garantia?:  boolean
-  esperando_siniestro?: boolean
-  esperando_cliente?:   boolean
-  recibo_emitido?:      boolean
+  recibo_emitido?: boolean
   observaciones?: string | null
   items: Array<{
     producto_id: string
@@ -130,29 +124,25 @@ export function useCrearPedido() {
         throw new Error('El pedido debe tener al menos un repuesto')
       }
 
-      // 1. Insertar cabecera
       const { data: pedido, error: pedErr } = await supabase
         .from('pedidos_repuestos')
         .insert({
-          sucursal: input.sucursal,
-          cliente_id: input.cliente_id,
-          garantia_id: input.garantia_id ?? null,
-          siniestro_id: input.siniestro_id ?? null,
+          sucursal:      input.sucursal,
+          cliente_id:    input.cliente_id,
+          tipo:          input.tipo,
+          etapa:         input.etapa ?? 'comprado',
+          garantia_id:   input.garantia_id ?? null,
+          siniestro_id:  input.siniestro_id ?? null,
           numero_recibo: input.numero_recibo ?? null,
-          monto_pagado: input.monto_pagado ?? null,
-          esperando_repuesto:  input.esperando_repuesto  ?? false,
-          esperando_garantia:  input.esperando_garantia  ?? false,
-          esperando_siniestro: input.esperando_siniestro ?? false,
-          esperando_cliente:   input.esperando_cliente   ?? false,
-          recibo_emitido:      input.recibo_emitido      ?? false,
+          monto_pagado:  input.monto_pagado ?? null,
+          recibo_emitido: input.recibo_emitido ?? false,
           observaciones: input.observaciones ?? null,
-          created_by: user?.id ?? null,
+          created_by:    user?.id ?? null,
         })
         .select()
         .single()
       if (pedErr) throw pedErr
 
-      // 2. Insertar items
       const itemsPayload = input.items.map(it => ({
         pedido_id: (pedido as PedidoRepuesto).id,
         producto_id: it.producto_id,
@@ -175,32 +165,33 @@ export function useCrearPedido() {
 }
 
 // ------------------------------------------------------------
-// Actualizar flags del pedido (toggle)
+// Actualizar tipo / etapa / recibo del pedido
 // ------------------------------------------------------------
 
-export function useActualizarFlagsPedido() {
+export function useActualizarPedido() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: async (input: {
       id: string
-      flags: Partial<{
-        esperando_repuesto:  boolean
-        esperando_garantia:  boolean
-        esperando_siniestro: boolean
-        esperando_cliente:   boolean
-        recibo_emitido:      boolean
-      }>
+      tipo?: TipoPedido
+      etapa?: EtapaPedido
       numero_recibo?: string | null
       monto_pagado?: number | null
+      recibo_emitido?: boolean
+      observaciones?: string | null
     }) => {
+      const payload: Record<string, unknown> = {}
+      if (input.tipo            !== undefined) payload.tipo            = input.tipo
+      if (input.etapa           !== undefined) payload.etapa           = input.etapa
+      if (input.numero_recibo   !== undefined) payload.numero_recibo   = input.numero_recibo
+      if (input.monto_pagado    !== undefined) payload.monto_pagado    = input.monto_pagado
+      if (input.recibo_emitido  !== undefined) payload.recibo_emitido  = input.recibo_emitido
+      if (input.observaciones   !== undefined) payload.observaciones   = input.observaciones
+
       const { error } = await supabase
         .from('pedidos_repuestos')
-        .update({
-          ...input.flags,
-          ...(input.numero_recibo !== undefined && { numero_recibo: input.numero_recibo }),
-          ...(input.monto_pagado  !== undefined && { monto_pagado:  input.monto_pagado  }),
-        })
+        .update(payload)
         .eq('id', input.id)
       if (error) throw error
     },
@@ -212,7 +203,7 @@ export function useActualizarFlagsPedido() {
 }
 
 // ------------------------------------------------------------
-// Marcar item como recibido (llegó del proveedor)
+// Marcar item como recibido
 // ------------------------------------------------------------
 
 export function useRecibirItem() {
@@ -241,7 +232,7 @@ export function useRecibirItem() {
 }
 
 // ------------------------------------------------------------
-// Entregar pedido (descuenta stock + cierra). RPC SQL.
+// Entregar pedido (descuenta stock + setea etapa='entregado'). RPC SQL.
 // ------------------------------------------------------------
 
 export function useEntregarPedido() {
@@ -268,7 +259,7 @@ export function useEntregarPedido() {
 }
 
 // ------------------------------------------------------------
-// Cancelar pedido
+// Cancelar pedido (etapa='cancelado' + motivo)
 // ------------------------------------------------------------
 
 export function useCancelarPedido() {
@@ -279,12 +270,8 @@ export function useCancelarPedido() {
       const { error } = await supabase
         .from('pedidos_repuestos')
         .update({
-          cancelado: true,
+          etapa: 'cancelado',
           motivo_cancelacion: input.motivo,
-          esperando_repuesto: false,
-          esperando_garantia: false,
-          esperando_siniestro: false,
-          esperando_cliente: false,
         })
         .eq('id', input.pedidoId)
       if (error) throw error
@@ -296,5 +283,4 @@ export function useCancelarPedido() {
   })
 }
 
-// Re-export tipos útiles de items
 export type { PedidoRepuestoItem }

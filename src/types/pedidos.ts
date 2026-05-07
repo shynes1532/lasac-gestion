@@ -1,45 +1,68 @@
 // ============================================================
 // Tipos de pedidos de repuestos al cliente.
-// Refleja migration 017_pedidos_repuestos.sql.
+// Refleja migrations 017+018:
+//   tipo  (origen):     garantia | mostrador | siniestro
+//   etapa (ciclo vida): comprado | en_viaje | en_stock | entregado | cancelado
 // ============================================================
 
 import type { SucursalRepuestos } from './pricing'
 
-/** Flags multi-paralelos. Pueden coexistir varios en true. */
-export interface PedidoFlags {
-  esperando_repuesto:  boolean
-  esperando_garantia:  boolean
-  esperando_siniestro: boolean
-  esperando_cliente:   boolean
-  recibo_emitido:      boolean
-}
+export type TipoPedido = 'garantia' | 'mostrador' | 'siniestro'
 
-/** Identificadores de flags como string union para filtros y badges. */
-export type FlagPedido = keyof PedidoFlags
+export type EtapaPedido =
+  | 'comprado'
+  | 'en_viaje'
+  | 'en_stock'
+  | 'entregado'
+  | 'cancelado'
 
-export const FLAGS_PEDIDO: { id: FlagPedido; label: string; emoji: string; color: 'yellow' | 'green' | 'orange' | 'blue' | 'purple' }[] = [
-  { id: 'esperando_repuesto',  label: 'Esperando repuesto',  emoji: '🟡', color: 'yellow' },
-  { id: 'esperando_garantia',  label: 'Esperando garantía',  emoji: '🟢', color: 'green' },
-  { id: 'esperando_siniestro', label: 'Esperando siniestro', emoji: '🟠', color: 'orange' },
-  { id: 'esperando_cliente',   label: 'Esperando cliente',   emoji: '🔵', color: 'blue' },
-  { id: 'recibo_emitido',      label: 'Recibo emitido',      emoji: '🧾', color: 'purple' },
+export const TIPOS_PEDIDO: { id: TipoPedido; label: string; emoji: string; color: 'green' | 'gray' | 'orange' }[] = [
+  { id: 'garantia',  label: 'Garantía',  emoji: '🟢', color: 'green' },
+  { id: 'mostrador', label: 'Mostrador', emoji: '🛒', color: 'gray' },
+  { id: 'siniestro', label: 'Siniestro', emoji: '🟠', color: 'orange' },
 ]
 
-export interface PedidoRepuesto extends PedidoFlags {
+export const ETAPAS_PEDIDO: { id: EtapaPedido; label: string; emoji: string; color: 'yellow' | 'blue' | 'purple' | 'green' | 'red' }[] = [
+  { id: 'comprado',  label: 'Comprado',  emoji: '📝', color: 'yellow' },
+  { id: 'en_viaje',  label: 'En viaje',  emoji: '🚚', color: 'blue' },
+  { id: 'en_stock',  label: 'En stock',  emoji: '📦', color: 'purple' },
+  { id: 'entregado', label: 'Entregado', emoji: '✅', color: 'green' },
+  { id: 'cancelado', label: 'Cancelado', emoji: '❌', color: 'red' },
+]
+
+/** Etapa siguiente en el flujo lineal. Devuelve null si ya está cerrado. */
+export function siguienteEtapa(actual: EtapaPedido): EtapaPedido | null {
+  switch (actual) {
+    case 'comprado':  return 'en_viaje'
+    case 'en_viaje':  return 'en_stock'
+    case 'en_stock':  return 'entregado'
+    case 'entregado': return null
+    case 'cancelado': return null
+  }
+}
+
+export function esEtapaAbierta(e: EtapaPedido): boolean {
+  return e !== 'entregado' && e !== 'cancelado'
+}
+
+export interface PedidoRepuesto {
   id: string
   numero_pedido: string
   sucursal: SucursalRepuestos
   cliente_id: string | null
+
+  tipo: TipoPedido
+  etapa: EtapaPedido
 
   garantia_id: string | null
   siniestro_id: string | null
 
   numero_recibo: string | null
   monto_pagado: number | null
+  recibo_emitido: boolean
 
   entregado_at: string | null
   entregado_por: string | null
-  cancelado: boolean
   motivo_cancelacion: string | null
 
   observaciones: string | null
@@ -68,26 +91,7 @@ export interface PedidoRepuestoItem {
   created_at: string
 }
 
-/** Pedido con sus items + relaciones expandidas (para listado y detalle). */
 export interface PedidoRepuestoConItems extends PedidoRepuesto {
   pedidos_repuestos_items: PedidoRepuestoItem[]
   cliente?: { id: string; nombre: string; cuit: string | null } | null
-}
-
-/** Estado lógico derivado para mostrar en la UI. */
-export type EstadoPedidoUI =
-  | 'abierto'    // sin entregar y sin cancelar
-  | 'entregado'
-  | 'cancelado'
-
-export function getEstadoPedido(p: Pick<PedidoRepuesto, 'entregado_at' | 'cancelado'>): EstadoPedidoUI {
-  if (p.cancelado) return 'cancelado'
-  if (p.entregado_at) return 'entregado'
-  return 'abierto'
-}
-
-export function flagsActivos(p: PedidoFlags): FlagPedido[] {
-  return FLAGS_PEDIDO
-    .filter(f => p[f.id])
-    .map(f => f.id)
 }

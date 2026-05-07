@@ -1,17 +1,17 @@
 // ============================================================
 // Sección "Pedidos" del módulo Repuestos.
-// Lista pedidos abiertos/entregados/cancelados con filtros por flag y sucursal.
-// Modal para crear pedido nuevo (cliente + múltiples items).
-// Modal para ver/editar/entregar/cancelar un pedido existente.
+// Modelo:
+//   tipo  (origen):     garantia | mostrador | siniestro
+//   etapa (ciclo vida): comprado | en_viaje | en_stock | entregado | cancelado
 // ============================================================
 
 import { useState, useMemo } from 'react'
-import { Plus, X, Search, Trash2, Check, AlertTriangle } from 'lucide-react'
+import { Plus, X, Search, Trash2, Check, AlertTriangle, ArrowRight } from 'lucide-react'
 import { Button, EmptyState, notify } from '../../components/ui'
 import {
   usePedidos,
   useCrearPedido,
-  useActualizarFlagsPedido,
+  useActualizarPedido,
   useRecibirItem,
   useEntregarPedido,
   useCancelarPedido,
@@ -19,14 +19,30 @@ import {
 import { useClientes, CLIENTE_MOSTRADOR_ID } from '../../hooks/useClientes'
 import { useRepuestos } from '../../hooks/useRepuestos'
 import {
-  FLAGS_PEDIDO,
-  flagsActivos,
-  type FlagPedido,
+  TIPOS_PEDIDO,
+  ETAPAS_PEDIDO,
+  siguienteEtapa,
+  esEtapaAbierta,
+  type TipoPedido,
+  type EtapaPedido,
   type PedidoRepuestoConItems,
 } from '../../types/pedidos'
 import type { SucursalRepuestos } from '../../types/pricing'
 import type { Repuesto } from '../../lib/types'
 import { formatARS } from '../../lib/pricing'
+
+const TIPO_BADGE_COLOR: Record<string, string> = {
+  green:  'bg-green-500/20 text-green-300 border-green-500/40',
+  gray:   'bg-bg-tertiary text-text-secondary border-border',
+  orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+}
+const ETAPA_BADGE_COLOR: Record<string, string> = {
+  yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+  blue:   'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  purple: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
+  green:  'bg-green-500/20 text-green-300 border-green-500/40',
+  red:    'bg-red-500/20 text-red-300 border-red-500/40',
+}
 
 interface PedidosSectionProps {
   sucursal: SucursalRepuestos | 'Todas'
@@ -37,32 +53,27 @@ interface PedidosSectionProps {
 // ============================================================
 
 export function PedidosSection({ sucursal }: PedidosSectionProps) {
-  const [estado, setEstado] = useState<'abiertos' | 'entregados' | 'cancelados'>('abiertos')
-  const [flagFiltro, setFlagFiltro] = useState<FlagPedido | null>(null)
+  const [tipoFiltro, setTipoFiltro] = useState<TipoPedido | 'Todos'>('Todos')
+  const [etapaFiltro, setEtapaFiltro] = useState<EtapaPedido | 'abiertas' | 'Todas'>('abiertas')
   const [busqueda, setBusqueda] = useState('')
   const [showNuevo, setShowNuevo] = useState(false)
   const [pedidoSel, setPedidoSel] = useState<PedidoRepuestoConItems | null>(null)
 
   const { data: pedidos = [], isLoading } = usePedidos({
     sucursal,
-    estado,
-    flag: flagFiltro ?? undefined,
+    tipo: tipoFiltro,
+    etapa: etapaFiltro,
     busqueda: busqueda || undefined,
   })
 
-  // Conteos por flag (sobre el filtro de estado + sucursal, sin flagFiltro)
-  const { data: pedidosTodos = [] } = usePedidos({ sucursal, estado })
-  const conteosFlag = useMemo(() => {
-    const acc: Record<FlagPedido, number> = {
-      esperando_repuesto: 0,
-      esperando_garantia: 0,
-      esperando_siniestro: 0,
-      esperando_cliente: 0,
-      recibo_emitido: 0,
+  // Conteos para los chips (solo aplican el filtro de sucursal + etapa, sin tipoFiltro)
+  const { data: pedidosTodos = [] } = usePedidos({ sucursal, etapa: etapaFiltro })
+  const conteosTipo = useMemo(() => {
+    const acc: Record<TipoPedido | 'Todos', number> = {
+      Todos: pedidosTodos.length,
+      garantia: 0, mostrador: 0, siniestro: 0,
     }
-    pedidosTodos.forEach(p => {
-      FLAGS_PEDIDO.forEach(f => { if (p[f.id]) acc[f.id]++ })
-    })
+    pedidosTodos.forEach(p => { acc[p.tipo]++ })
     return acc
   }, [pedidosTodos])
 
@@ -70,9 +81,9 @@ export function PedidosSection({ sucursal }: PedidosSectionProps) {
     <div className="space-y-3">
       {/* Header con botón nuevo pedido */}
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1 text-xs text-text-muted">
-          {pedidosTodos.length} pedido{pedidosTodos.length !== 1 ? 's' : ''} {estado}
-        </div>
+        <span className="text-xs text-text-muted">
+          {pedidosTodos.length} pedido{pedidosTodos.length !== 1 ? 's' : ''}
+        </span>
         <Button
           size="sm"
           onClick={() => setShowNuevo(true)}
@@ -84,39 +95,59 @@ export function PedidosSection({ sucursal }: PedidosSectionProps) {
         </Button>
       </div>
 
-      {/* Chips de filtro por flag */}
-      <div className="flex flex-wrap gap-1.5">
-        <button
-          onClick={() => setFlagFiltro(null)}
-          className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors
-            ${flagFiltro === null ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
-        >
-          Todos ({pedidosTodos.length})
-        </button>
-        {FLAGS_PEDIDO.map(f => (
+      {/* Chips: tipo de pedido */}
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1">Tipo</p>
+        <div className="flex flex-wrap gap-1.5">
           <button
-            key={f.id}
-            onClick={() => setFlagFiltro(flagFiltro === f.id ? null : f.id)}
-            className={`text-[11px] px-2 py-1 rounded border cursor-pointer transition-colors
-              ${flagFiltro === f.id ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
+            onClick={() => setTipoFiltro('Todos')}
+            className={`text-[11px] px-2 py-1 rounded border cursor-pointer
+              ${tipoFiltro === 'Todos' ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
           >
-            {f.emoji} {f.label} ({conteosFlag[f.id]})
+            Todos ({conteosTipo.Todos})
           </button>
-        ))}
+          {TIPOS_PEDIDO.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTipoFiltro(tipoFiltro === t.id ? 'Todos' : t.id)}
+              className={`text-[11px] px-2 py-1 rounded border cursor-pointer
+                ${tipoFiltro === t.id ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
+            >
+              {t.emoji} {t.label} ({conteosTipo[t.id]})
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tabs estado */}
-      <div className="flex gap-1 border-b border-border">
-        {(['abiertos', 'entregados', 'cancelados'] as const).map(e => (
+      {/* Chips: etapa */}
+      <div>
+        <p className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1">Etapa</p>
+        <div className="flex flex-wrap gap-1.5">
           <button
-            key={e}
-            onClick={() => setEstado(e)}
-            className={`px-3 py-1.5 text-xs font-medium border-b-2 -mb-px cursor-pointer
-              ${estado === e ? 'border-action text-action' : 'border-transparent text-text-muted hover:text-text-primary'}`}
+            onClick={() => setEtapaFiltro('abiertas')}
+            className={`text-[11px] px-2 py-1 rounded border cursor-pointer
+              ${etapaFiltro === 'abiertas' ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
           >
-            {e[0].toUpperCase() + e.slice(1)}
+            Abiertas
           </button>
-        ))}
+          {ETAPAS_PEDIDO.map(e => (
+            <button
+              key={e.id}
+              onClick={() => setEtapaFiltro(etapaFiltro === e.id ? 'abiertas' : e.id)}
+              className={`text-[11px] px-2 py-1 rounded border cursor-pointer
+                ${etapaFiltro === e.id ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
+            >
+              {e.emoji} {e.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setEtapaFiltro('Todas')}
+            className={`text-[11px] px-2 py-1 rounded border cursor-pointer
+              ${etapaFiltro === 'Todas' ? 'bg-action text-white border-action' : 'bg-bg-tertiary text-text-secondary border-border'}`}
+          >
+            Todas
+          </button>
+        </div>
       </div>
 
       {/* Búsqueda */}
@@ -142,7 +173,7 @@ export function PedidosSection({ sucursal }: PedidosSectionProps) {
         <EmptyState
           icon={<Search className="h-10 w-10" />}
           title="Sin pedidos"
-          description={busqueda || flagFiltro ? 'Ningún pedido coincide con el filtro' : 'Cargá el primer pedido con "Nuevo pedido"'}
+          description={busqueda || tipoFiltro !== 'Todos' ? 'Ningún pedido coincide con el filtro' : 'Cargá el primer pedido con "Nuevo pedido"'}
         />
       ) : (
         <div className="space-y-2">
@@ -173,19 +204,12 @@ export function PedidosSection({ sucursal }: PedidosSectionProps) {
 // Card de un pedido
 // ============================================================
 function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onClick: () => void }) {
-  const flags = flagsActivos(pedido)
+  const tipo  = TIPOS_PEDIDO.find(t => t.id === pedido.tipo)!
+  const etapa = ETAPAS_PEDIDO.find(e => e.id === pedido.etapa)!
   const totalItems = pedido.pedidos_repuestos_items?.length ?? 0
-  const recibidos = pedido.pedidos_repuestos_items?.filter(i => i.recibido).length ?? 0
+  const recibidos  = pedido.pedidos_repuestos_items?.filter(i => i.recibido).length ?? 0
   const entregados = pedido.pedidos_repuestos_items?.filter(i => i.entregado).length ?? 0
   const cliente = pedido.cliente?.nombre ?? 'Sin cliente'
-
-  const badgeColors: Record<string, string> = {
-    yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
-    green:  'bg-green-500/20 text-green-300 border-green-500/40',
-    orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
-    blue:   'bg-blue-500/20 text-blue-300 border-blue-500/40',
-    purple: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
-  }
 
   return (
     <button
@@ -196,18 +220,20 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onCli
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs font-mono font-bold text-action">{pedido.numero_pedido}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${TIPO_BADGE_COLOR[tipo.color]}`}>
+              {tipo.emoji} {tipo.label}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ETAPA_BADGE_COLOR[etapa.color]}`}>
+              {etapa.emoji} {etapa.label}
+            </span>
             <span className="text-[10px] text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded">{pedido.sucursal}</span>
-            {pedido.numero_recibo && (
-              <span className="text-[10px] text-purple-300 bg-purple-500/10 px-1.5 py-0.5 rounded">
-                🧾 {pedido.numero_recibo}
-              </span>
-            )}
           </div>
           <p className="text-sm text-text-primary mt-1 truncate">{cliente}</p>
           <p className="text-[11px] text-text-muted mt-0.5">
             {totalItems} item{totalItems !== 1 ? 's' : ''}
             {recibidos > 0 && ` · ${recibidos}/${totalItems} recibidos`}
             {entregados > 0 && ` · ${entregados}/${totalItems} entregados`}
+            {pedido.numero_recibo && ` · 🧾 ${pedido.numero_recibo}`}
           </p>
         </div>
         <div className="text-right shrink-0">
@@ -220,28 +246,9 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onCli
         </div>
       </div>
 
-      {flags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {flags.map(fid => {
-            const f = FLAGS_PEDIDO.find(x => x.id === fid)!
-            return (
-              <span key={fid} className={`text-[10px] px-1.5 py-0.5 rounded border ${badgeColors[f.color]}`}>
-                {f.emoji} {f.label}
-              </span>
-            )
-          })}
-        </div>
-      )}
-
-      {pedido.cancelado && (
+      {pedido.etapa === 'cancelado' && pedido.motivo_cancelacion && (
         <div className="mt-2 text-[10px] text-red-400">
-          ❌ Cancelado{pedido.motivo_cancelacion ? ` — ${pedido.motivo_cancelacion}` : ''}
-        </div>
-      )}
-
-      {pedido.entregado_at && (
-        <div className="mt-2 text-[10px] text-green-400">
-          ✅ Entregado el {new Date(pedido.entregado_at).toLocaleDateString('es-AR')}
+          ❌ Cancelado — {pedido.motivo_cancelacion}
         </div>
       )}
     </button>
@@ -253,18 +260,14 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onCli
 // ============================================================
 function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; onClose: () => void }) {
   const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
+  const [tipo, setTipo] = useState<TipoPedido>('mostrador')
+  const [etapa, setEtapa] = useState<EtapaPedido>('comprado')
   const [busquedaRep, setBusquedaRep] = useState('')
   const [items, setItems] = useState<Array<{ producto_id: string; codigo: string; descripcion: string; cantidad: number }>>([])
   const [numeroRecibo, setNumeroRecibo] = useState('')
   const [montoPagado, setMontoPagado] = useState('')
+  const [reciboEmitido, setReciboEmitido] = useState(false)
   const [observaciones, setObservaciones] = useState('')
-  const [flags, setFlags] = useState({
-    esperando_repuesto: false,
-    esperando_garantia: false,
-    esperando_siniestro: false,
-    esperando_cliente: false,
-    recibo_emitido: false,
-  })
 
   const { data: clientes = [] } = useClientes()
   const { data: repuestos = [] } = useRepuestos(busquedaRep, sucursal)
@@ -285,10 +288,12 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
       await crearPedido.mutateAsync({
         sucursal,
         cliente_id: clienteId,
+        tipo,
+        etapa,
         numero_recibo: numeroRecibo.trim() || null,
         monto_pagado: montoPagado ? Number(montoPagado) : null,
+        recibo_emitido: reciboEmitido,
         observaciones: observaciones.trim() || null,
-        ...flags,
         items: items.map(it => ({ producto_id: it.producto_id, cantidad: it.cantidad })),
       })
       notify.success('Pedido creado')
@@ -312,6 +317,42 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
         </div>
 
         <div className="p-4 space-y-4">
+          {/* Tipo */}
+          <div>
+            <label className="block text-xs text-text-muted mb-1.5">Tipo de pedido *</label>
+            <div className="grid grid-cols-3 gap-1.5">
+              {TIPOS_PEDIDO.map(t => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => setTipo(t.id)}
+                  className={`text-xs px-2 py-2 rounded-lg border transition-colors cursor-pointer
+                    ${tipo === t.id ? 'bg-action text-white border-action' : 'bg-bg-primary text-text-secondary border-border hover:border-action/40'}`}
+                >
+                  <div>{t.emoji}</div>
+                  <div className="mt-0.5">{t.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Etapa inicial */}
+          <div>
+            <label className="block text-xs text-text-muted mb-1.5">Etapa inicial</label>
+            <select
+              value={etapa}
+              onChange={e => setEtapa(e.target.value as EtapaPedido)}
+              className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
+            >
+              {ETAPAS_PEDIDO.filter(e => e.id !== 'cancelado').map(e => (
+                <option key={e.id} value={e.id}>{e.emoji} {e.label}</option>
+              ))}
+            </select>
+            <p className="text-[10px] text-text-muted mt-0.5">
+              Marcá según corresponda. La mayoría arranca en "Comprado".
+            </p>
+          </div>
+
           {/* Cliente */}
           <div>
             <label className="block text-xs text-text-muted mb-1">Cliente</label>
@@ -365,7 +406,6 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
               </div>
             )}
 
-            {/* Buscar repuesto para agregar */}
             <input
               type="text"
               value={busquedaRep}
@@ -387,24 +427,6 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
                 ))}
               </div>
             )}
-          </div>
-
-          {/* Flags */}
-          <div>
-            <label className="block text-xs text-text-muted mb-1.5">Estado del pedido</label>
-            <div className="space-y-1.5">
-              {FLAGS_PEDIDO.map(f => (
-                <label key={f.id} className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={flags[f.id]}
-                    onChange={e => setFlags({ ...flags, [f.id]: e.target.checked })}
-                    className="w-4 h-4"
-                  />
-                  <span>{f.emoji} {f.label}</span>
-                </label>
-              ))}
-            </div>
           </div>
 
           {/* Recibo / monto */}
@@ -432,6 +454,16 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
             </div>
           </div>
 
+          <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+            <input
+              type="checkbox"
+              checked={reciboEmitido}
+              onChange={e => setReciboEmitido(e.target.checked)}
+              className="w-4 h-4"
+            />
+            🧾 Recibo emitido (cliente ya pagó)
+          </label>
+
           {/* Observaciones */}
           <div>
             <label className="block text-xs text-text-muted mb-1">Observaciones</label>
@@ -457,36 +489,47 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
 }
 
 // ============================================================
-// Modal: Detalle de pedido
+// Modal: Detalle del pedido
 // ============================================================
 function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoRepuestoConItems; onClose: () => void }) {
   const [confirmandoCancel, setConfirmandoCancel] = useState(false)
   const [motivoCancel, setMotivoCancel] = useState('')
 
   const recibirItem = useRecibirItem()
-  const actualizarFlags = useActualizarFlagsPedido()
+  const actualizarPedido = useActualizarPedido()
   const entregarPedido = useEntregarPedido()
   const cancelarPedido = useCancelarPedido()
 
-  const yaEntregado = !!pedido.entregado_at
-  const yaCancelado = pedido.cancelado
-  const cerrado = yaEntregado || yaCancelado
+  const tipo  = TIPOS_PEDIDO.find(t => t.id === pedido.tipo)!
+  const etapa = ETAPAS_PEDIDO.find(e => e.id === pedido.etapa)!
+  const cerrado = !esEtapaAbierta(pedido.etapa)
+  const proxima = siguienteEtapa(pedido.etapa)
 
-  const handleToggleFlag = async (flag: FlagPedido, value: boolean) => {
+  const handleAvanzarEtapa = async (siguiente: EtapaPedido) => {
+    // Si la siguiente etapa es 'entregado', usamos la RPC que descuenta stock
+    if (siguiente === 'entregado') {
+      try {
+        const res = await entregarPedido.mutateAsync({ pedidoId: pedido.id })
+        notify.success(`Pedido entregado: ${res.unidades_descontadas} unidades descontadas de ${res.sucursal}`)
+        onClose()
+      } catch (err: any) {
+        notify.error(err?.message || 'Error al entregar pedido')
+      }
+      return
+    }
     try {
-      await actualizarFlags.mutateAsync({ id: pedido.id, flags: { [flag]: value } })
+      await actualizarPedido.mutateAsync({ id: pedido.id, etapa: siguiente })
+      notify.success(`Etapa actualizada a "${ETAPAS_PEDIDO.find(e => e.id === siguiente)?.label}"`)
     } catch (err: any) {
-      notify.error(err?.message || 'Error al actualizar')
+      notify.error(err?.message || 'Error al cambiar etapa')
     }
   }
 
-  const handleEntregar = async () => {
+  const handleCambiarTipo = async (t: TipoPedido) => {
     try {
-      const res = await entregarPedido.mutateAsync({ pedidoId: pedido.id })
-      notify.success(`Pedido entregado: ${res.unidades_descontadas} unidades descontadas de ${res.sucursal}`)
-      onClose()
+      await actualizarPedido.mutateAsync({ id: pedido.id, tipo: t })
     } catch (err: any) {
-      notify.error(err?.message || 'Error al entregar pedido')
+      notify.error(err?.message || 'Error al cambiar tipo')
     }
   }
 
@@ -517,20 +560,55 @@ function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoRepuestoConItem
         </div>
 
         <div className="p-4 space-y-4">
-          {yaEntregado && (
-            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-sm text-green-300">
-              ✅ Entregado el {new Date(pedido.entregado_at!).toLocaleDateString('es-AR')}
+          {/* Estado actual destacado */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="bg-bg-primary border border-border rounded-lg p-2.5">
+              <p className="text-[10px] uppercase text-text-muted font-semibold">Tipo</p>
+              <p className={`text-sm font-bold mt-0.5`}>
+                {tipo.emoji} {tipo.label}
+              </p>
+            </div>
+            <div className="bg-bg-primary border border-border rounded-lg p-2.5">
+              <p className="text-[10px] uppercase text-text-muted font-semibold">Etapa</p>
+              <p className={`text-sm font-bold mt-0.5`}>
+                {etapa.emoji} {etapa.label}
+              </p>
+            </div>
+          </div>
+
+          {pedido.entregado_at && (
+            <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-2 text-xs text-green-300">
+              ✅ Entregado el {new Date(pedido.entregado_at).toLocaleDateString('es-AR')}
             </div>
           )}
-          {yaCancelado && (
-            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-sm text-red-300">
+          {pedido.etapa === 'cancelado' && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-2 text-xs text-red-300">
               ❌ Cancelado{pedido.motivo_cancelacion ? `: ${pedido.motivo_cancelacion}` : ''}
+            </div>
+          )}
+
+          {/* Cambiar tipo (solo si está abierto) */}
+          {!cerrado && (
+            <div>
+              <label className="block text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1.5">Cambiar tipo</label>
+              <div className="grid grid-cols-3 gap-1.5">
+                {TIPOS_PEDIDO.map(t => (
+                  <button
+                    key={t.id}
+                    onClick={() => handleCambiarTipo(t.id)}
+                    className={`text-xs px-2 py-1.5 rounded border transition-colors cursor-pointer
+                      ${pedido.tipo === t.id ? 'bg-action text-white border-action' : 'bg-bg-primary text-text-secondary border-border hover:border-action/40'}`}
+                  >
+                    {t.emoji} {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {/* Items */}
           <div>
-            <h4 className="text-[11px] uppercase tracking-wider text-text-muted font-semibold mb-2">Repuestos</h4>
+            <h4 className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-2">Repuestos</h4>
             <div className="space-y-1.5">
               {pedido.pedidos_repuestos_items?.map(it => (
                 <div key={it.id} className="flex items-center gap-2 bg-bg-primary border border-border rounded-lg p-2">
@@ -560,30 +638,11 @@ function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoRepuestoConItem
             </div>
           </div>
 
-          {/* Flags toggleables */}
-          {!cerrado && (
-            <div>
-              <h4 className="text-[11px] uppercase tracking-wider text-text-muted font-semibold mb-2">Estado</h4>
-              <div className="space-y-1.5">
-                {FLAGS_PEDIDO.map(f => (
-                  <label key={f.id} className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pedido[f.id]}
-                      onChange={e => handleToggleFlag(f.id, e.target.checked)}
-                      className="w-4 h-4"
-                    />
-                    <span>{f.emoji} {f.label}</span>
-                  </label>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Recibo / monto */}
-          {(pedido.numero_recibo || pedido.monto_pagado) && (
+          {(pedido.numero_recibo || pedido.monto_pagado || pedido.recibo_emitido) && (
             <div className="bg-bg-primary border border-border rounded-lg p-2 text-xs space-y-0.5">
-              {pedido.numero_recibo && <p>🧾 Recibo: {pedido.numero_recibo}</p>}
+              {pedido.recibo_emitido && <p className="text-purple-300">🧾 Recibo emitido</p>}
+              {pedido.numero_recibo && <p>N° {pedido.numero_recibo}</p>}
               {pedido.monto_pagado != null && <p className="text-green-400">Pagado: {formatARS(pedido.monto_pagado)}</p>}
             </div>
           )}
@@ -591,21 +650,26 @@ function DetallePedidoModal({ pedido, onClose }: { pedido: PedidoRepuestoConItem
           {/* Observaciones */}
           {pedido.observaciones && (
             <div>
-              <h4 className="text-[11px] uppercase tracking-wider text-text-muted font-semibold mb-1">Observaciones</h4>
+              <h4 className="text-[10px] uppercase tracking-wider text-text-muted font-semibold mb-1">Observaciones</h4>
               <p className="text-xs text-text-secondary bg-bg-primary border border-border rounded-lg p-2">{pedido.observaciones}</p>
             </div>
           )}
 
-          {/* Acciones de cierre */}
+          {/* Acciones */}
           {!cerrado && (
             <div className="space-y-2 pt-2 border-t border-border">
-              <Button
-                fullWidth
-                onClick={handleEntregar}
-                loading={entregarPedido.isPending}
-              >
-                ✅ Marcar como entregado (descuenta stock)
-              </Button>
+              {proxima && (
+                <Button
+                  fullWidth
+                  onClick={() => handleAvanzarEtapa(proxima)}
+                  loading={actualizarPedido.isPending || entregarPedido.isPending}
+                >
+                  <ArrowRight className="h-4 w-4" />
+                  {proxima === 'entregado'
+                    ? '✅ Marcar como entregado (descuenta stock)'
+                    : `Pasar a "${ETAPAS_PEDIDO.find(e => e.id === proxima)?.label}"`}
+                </Button>
+              )}
 
               {!confirmandoCancel ? (
                 <Button
