@@ -18,8 +18,21 @@ interface OpConSaldo {
   sucursal: string
   saldo_cliente: number
   saldo_pagado: boolean
+  banco_saldo_cancelado: boolean | null
   estado_actual: string
   pagos_saldo: { monto: number }[]
+}
+
+/** Una operación cuenta como saldada si:
+ *   - tiene saldo_pagado=true (marca explícita desde DetalleOperacion), o
+ *   - tiene banco_saldo_cancelado=true (banco cubrió el saldo), o
+ *   - los pagos parciales suman >= saldo_cliente.
+ * Cualquiera de los tres → no aparece en "Deben saldo". */
+function estaSaldada(o: OpConSaldo): boolean {
+  if (o.saldo_pagado) return true
+  if (o.banco_saldo_cancelado) return true
+  const pagado = o.pagos_saldo?.reduce((s, p) => s + Number(p.monto), 0) ?? 0
+  return pagado >= o.saldo_cliente
 }
 
 export function SaldosPendientes() {
@@ -32,7 +45,7 @@ export function SaldosPendientes() {
         .from('operaciones')
         .select(`
           id, numero_operacion, cliente_nombre, cliente_telefono,
-          tipo_operacion, sucursal, saldo_cliente, saldo_pagado, estado_actual,
+          tipo_operacion, sucursal, saldo_cliente, saldo_pagado, banco_saldo_cancelado, estado_actual,
           pagos_saldo ( monto )
         `)
         .gt('saldo_cliente', 0)
@@ -45,14 +58,8 @@ export function SaldosPendientes() {
   })
 
   const ops = operaciones ?? []
-  const conDeuda = ops.filter(o => {
-    const pagado = o.pagos_saldo?.reduce((s, p) => s + Number(p.monto), 0) ?? 0
-    return pagado < o.saldo_cliente
-  })
-  const saldados = ops.filter(o => {
-    const pagado = o.pagos_saldo?.reduce((s, p) => s + Number(p.monto), 0) ?? 0
-    return pagado >= o.saldo_cliente
-  })
+  const conDeuda = ops.filter(o => !estaSaldada(o))
+  const saldados = ops.filter(estaSaldada)
 
   const totalPendiente = conDeuda.reduce((sum, o) => {
     const pagado = o.pagos_saldo?.reduce((s, p) => s + Number(p.monto), 0) ?? 0
