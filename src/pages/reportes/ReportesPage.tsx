@@ -29,15 +29,23 @@ const TABS: { id: Reporte; label: string; icon: any }[] = [
   { id: 'cuenta', label: 'Estado de cuenta', icon: FileText },
 ]
 
+const NOMBRES_MES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+
 export function ReportesPage() {
   const [tab, setTab] = useState<Reporte>('boletos')
   const [filtroSucursal, setFiltroSucursal] = useState<string>('todas')
   const [opSeleccionada, setOpSeleccionada] = useState<string>('')
 
   const ahora = new Date()
-  const mesActual = ahora.getMonth()
-  const anioActual = ahora.getFullYear()
-  const nombreMes = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mesActual]
+  // Período seleccionado para Boletos mensuales — default: mes actual.
+  // input type="month" devuelve "YYYY-MM".
+  const [periodo, setPeriodo] = useState<string>(
+    `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`,
+  )
+  const [anioSel, mesSelStr] = periodo.split('-')
+  const anioSeleccionado = Number(anioSel)
+  const mesSeleccionado = Number(mesSelStr) - 1   // 0..11
+  const nombreMes = NOMBRES_MES[mesSeleccionado]
 
   const { data: ops } = useQuery({
     queryKey: ['reportes-ops', filtroSucursal],
@@ -60,7 +68,7 @@ export function ReportesPage() {
   const operaciones = ops || []
   const estesMes = (o: any) => {
     const d = new Date(o.created_at)
-    return d.getMonth() === mesActual && d.getFullYear() === anioActual
+    return d.getMonth() === mesSeleccionado && d.getFullYear() === anioSeleccionado
   }
 
   function imprimir() {
@@ -78,6 +86,16 @@ export function ReportesPage() {
           <p className="text-sm text-text-secondary">Seleccioná un reporte y hacé click en Imprimir</p>
         </div>
         <div className="flex items-center gap-3">
+          {tab === 'boletos' && (
+            <input
+              type="month"
+              value={periodo}
+              onChange={e => setPeriodo(e.target.value)}
+              max={`${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}`}
+              className="text-sm border border-border rounded-lg px-3 py-1.5 bg-bg-secondary text-text-secondary"
+              title="Período del reporte"
+            />
+          )}
           <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}
             className="text-sm border border-border rounded-lg px-3 py-1.5 bg-bg-secondary text-text-secondary">
             <option value="todas">Ambas sucursales</option>
@@ -110,7 +128,7 @@ export function ReportesPage() {
           <div className="space-y-4">
             <div className="text-center mb-6 print:mb-4">
               <h2 className="text-lg font-bold">LIENDO AUTOMOTORES S.A. — FIAT</h2>
-              <p className="text-sm text-text-muted">Boletos vendidos — {nombreMes} {anioActual}</p>
+              <p className="text-sm text-text-muted">Boletos vendidos — {nombreMes} {anioSeleccionado}</p>
               {filtroSucursal !== 'todas' && <p className="text-sm text-text-muted">Sucursal: {filtroSucursal}</p>}
               <p className="text-xs text-text-muted mt-1">Generado: {ahora.toLocaleDateString('es-AR')} {ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' })}</p>
             </div>
