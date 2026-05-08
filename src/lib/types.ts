@@ -669,6 +669,8 @@ export interface StockVehiculo {
   patente: string | null
   // Incidente / daño
   incidente: string | null
+  // Marca de oferta — destaca visualmente la unidad en el listado
+  en_oferta: boolean
   // Link a operación
   operacion_id: string | null
   observaciones: string | null

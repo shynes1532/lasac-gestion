@@ -9,6 +9,8 @@ interface FiltrosStock {
   sucursal?: Sucursal | 'todas'
   estado?: EstadoStock | ''
   excluirBatea?: boolean
+  /** Si true, devuelve solo unidades marcadas como en oferta. */
+  soloOfertas?: boolean
 }
 
 export function useStock(filtros: FiltrosStock = {}) {
@@ -31,6 +33,9 @@ export function useStock(filtros: FiltrosStock = {}) {
       }
       if (filtros.excluirBatea) {
         q = q.neq('estado', 'batea')
+      }
+      if (filtros.soloOfertas) {
+        q = q.eq('en_oferta', true)
       }
       if (filtros.busqueda) {
         const b = filtros.busqueda
@@ -76,6 +81,7 @@ interface CrearStockData {
   titular_plan?: string
   patente?: string
   observaciones?: string
+  en_oferta?: boolean
 }
 
 export function useCrearStock() {

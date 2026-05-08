@@ -67,6 +67,7 @@ export function StockPage() {
   const [tipoFiltro, setTipoFiltro] = useState<TipoStock | ''>('')
   const [sucursalFiltro, setSucursalFiltro] = useState<Sucursal | 'todas'>('todas')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoStock | ''>('disponible')
+  const [soloOfertas, setSoloOfertas] = useState(false)
   const [showBateaForm, setShowBateaForm] = useState(false)
   const [showStockForm, setShowStockForm] = useState(false)
   const [editando, setEditando] = useState<StockVehiculo | null>(null)
@@ -88,6 +89,7 @@ export function StockPage() {
     sucursal: sucursalFiltro,
     estado: estadoFiltro || undefined,
     excluirBatea: true,
+    soloOfertas,
   })
 
   // KPIs del stock (sin batea)
@@ -325,6 +327,18 @@ export function StockPage() {
             <option value="en_transito">En tránsito</option>
             <option value="vendido">Vendido</option>
           </select>
+
+          <button
+            onClick={() => setSoloOfertas(!soloOfertas)}
+            className={`w-full py-2 px-3 rounded-xl text-sm font-medium border transition-colors cursor-pointer ${
+              soloOfertas
+                ? 'bg-red-500/20 border-red-500/60 text-red-300'
+                : 'bg-bg-primary border-border text-text-secondary hover:border-red-500/40'
+            }`}
+            title="Mostrar solo unidades destacadas como oferta"
+          >
+            🔥 {soloOfertas ? 'Solo ofertas' : 'Mostrar todas'}
+          </button>
         </div>
 
         {/* Lista stock */}
@@ -347,12 +361,17 @@ export function StockPage() {
               const dias = diasEntre(v.created_at)
               const colorDias = getColorAntiguedad(dias)
               const tieneIncidente = !!v.incidente
+              const enOferta = !!v.en_oferta
 
               return (
                 <Card
                   key={v.id}
                   className={`overflow-hidden border-l-4 ${
-                    tieneIncidente ? 'border-l-red-500 bg-red-500/5' : BORDER_ANTIGUEDAD[colorDias]
+                    tieneIncidente
+                      ? 'border-l-red-500 bg-red-500/5'
+                      : enOferta
+                        ? 'border-l-orange-500 bg-gradient-to-r from-orange-500/10 to-transparent ring-1 ring-orange-500/30'
+                        : BORDER_ANTIGUEDAD[colorDias]
                   }`}
                 >
                   <button
@@ -362,6 +381,11 @@ export function StockPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          {enOferta && (
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-500 text-white shadow-sm">
+                              🔥 OFERTA
+                            </span>
+                          )}
                           <span
                             className="px-2 py-0.5 rounded-full text-[10px] font-semibold"
                             style={{ backgroundColor: tipoCfg.bg, color: tipoCfg.text }}
@@ -710,6 +734,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
     patente: vehiculo?.patente || '',
     incidente: vehiculo?.incidente || '',
     observaciones: vehiculo?.observaciones || '',
+    en_oferta: vehiculo?.en_oferta || false,
   })
 
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }))
@@ -737,6 +762,7 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
       patente: form.patente.trim() || undefined,
       incidente: form.incidente.trim() || null,
       observaciones: form.observaciones.trim() || undefined,
+      en_oferta: form.en_oferta,
     }
     if (isEdit) {
       actualizar.mutate({ id: vehiculo!.id, ...payload } as any, {
@@ -829,6 +855,18 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
           <div className="col-span-2">
             <label className="text-xs text-text-muted">Incidente / Daño</label>
             <input value={form.incidente} onChange={e => set('incidente', e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" placeholder="Ej: rayón puerta trasera..." />
+          </div>
+          <div className="col-span-2">
+            <label className="flex items-center gap-2 cursor-pointer text-sm text-text-secondary">
+              <input
+                type="checkbox"
+                checked={form.en_oferta}
+                onChange={e => setForm(p => ({ ...p, en_oferta: e.target.checked }))}
+                className="w-4 h-4 cursor-pointer"
+              />
+              <span className="font-medium">🔥 En oferta</span>
+              <span className="text-[10px] text-text-muted">— se destaca en el listado de stock</span>
+            </label>
           </div>
           <div className="col-span-2">
             <label className="text-xs text-text-muted">Observaciones</label>
