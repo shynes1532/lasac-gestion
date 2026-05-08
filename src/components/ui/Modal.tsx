@@ -44,14 +44,14 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === overlayRef.current) onClose() }}
     >
-      <div className={`w-full ${sizeStyles[size]} bg-bg-secondary rounded-xl border border-border shadow-2xl`}>
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+      <div className={`w-full ${sizeStyles[size]} bg-bg-secondary rounded-xl border border-border shadow-2xl flex flex-col max-h-[90vh]`}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <h3 className="text-lg font-semibold text-text-primary">{title}</h3>
           <button onClick={onClose} className="text-text-muted hover:text-text-primary cursor-pointer">
             <X className="h-5 w-5" />
           </button>
         </div>
-        <div className="px-5 py-4">{children}</div>
+        <div className="px-5 py-4 overflow-y-auto flex-1">{children}</div>
       </div>
     </div>
   )
