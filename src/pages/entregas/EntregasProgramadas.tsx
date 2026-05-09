@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Truck, ExternalLink, MessageCircle, CheckCircle2, Pencil, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
-import { COLORES_TIPO, TIPO_LABEL, SUCURSALES_SELECT, waConfirmacion2dRG, waConfirmacion2dUSH } from '../../lib/constants'
+import { COLORES_TIPO, TIPO_LABEL, waConfirmacion2dRG, waConfirmacion2dUSH } from '../../lib/constants'
 import type { TipoOperacion } from '../../lib/types'
 import { EmptyState } from '../../components/ui/EmptyState'
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton'
 import { notify } from '../../components/ui/Toast'
 import { Button } from '../../components/ui/Button'
+import { Tabs } from '../../components/ui'
 
 interface EditableOp {
   id: string
@@ -24,10 +25,12 @@ export function EntregasProgramadas() {
   const [editingOp, setEditingOp] = useState<EditableOp | null>(null)
   const [confirmEntregada, setConfirmEntregada] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['entregas-programadas', filtroSucursal],
+  // Traemos todas — el filtro por sucursal se aplica en cliente
+  // así podemos mostrar conteos en cada tab.
+  const { data: todas, isLoading } = useQuery({
+    queryKey: ['entregas-programadas'],
     queryFn: async () => {
-      let q = supabase
+      const { data, error } = await supabase
         .from('operaciones')
         .select(`
           id, numero_operacion, cliente_nombre, cliente_telefono,
@@ -38,13 +41,20 @@ export function EntregasProgramadas() {
         .in('estado_actual', ['calidad', 'entrega'])
         .order('created_at', { ascending: false })
 
-      if (filtroSucursal !== 'todas') q = q.eq('sucursal', filtroSucursal)
-
-      const { data, error } = await q
       if (error) throw error
       return data || []
     },
   })
+
+  const data = (todas || []).filter(o =>
+    filtroSucursal === 'todas' || o.sucursal === filtroSucursal,
+  )
+
+  const conteos = {
+    todas:        todas?.length ?? 0,
+    Ushuaia:      todas?.filter(o => o.sucursal === 'Ushuaia').length ?? 0,
+    'Rio Grande': todas?.filter(o => o.sucursal === 'Rio Grande').length ?? 0,
+  }
 
   // Marcar como entregada (sin mandar WhatsApp)
   const marcarEntregada = useMutation({
@@ -96,21 +106,23 @@ export function EntregasProgramadas() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
-            <Truck className="h-5 w-5" /> Entregas pendientes
-          </h1>
-          <p className="text-sm text-text-secondary">Operaciones con PDI aprobado, listas para coordinar la entrega al cliente</p>
-        </div>
-        <div className="flex gap-2">
-          <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}
-            className="text-sm border border-border rounded-lg px-3 py-1.5 bg-bg-secondary text-text-secondary focus:outline-none">
-            <option value="todas">Todas las sucursales</option>
-            {SUCURSALES_SELECT.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
-        </div>
+      <div className="mb-4">
+        <h1 className="text-xl font-bold text-text-primary flex items-center gap-2">
+          <Truck className="h-5 w-5" /> Entregas pendientes
+        </h1>
+        <p className="text-sm text-text-secondary">Operaciones con PDI aprobado, listas para coordinar la entrega al cliente</p>
       </div>
+
+      <Tabs
+        tabs={[
+          { id: 'Rio Grande', label: `Río Grande (${conteos['Rio Grande']})` },
+          { id: 'Ushuaia',    label: `Ushuaia (${conteos.Ushuaia})` },
+          { id: 'todas',      label: `Todas (${conteos.todas})` },
+        ]}
+        activeTab={filtroSucursal}
+        onChange={setFiltroSucursal}
+        className="mb-6"
+      />
 
       {isLoading ? (
         <div className="space-y-3">{[...Array(4)].map((_, i) => <LoadingSkeleton key={i} className="h-24 rounded-xl" />)}</div>
