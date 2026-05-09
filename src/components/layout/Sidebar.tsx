@@ -23,7 +23,7 @@ const navItems = [
   { path: '/garantias',             label: 'Garantias',    icon: Wrench },
   { path: '/siniestros',            label: 'Siniestros',   icon: AlertTriangle },
   { path: '/calibre',              label: 'Calibre',      icon: Shield },
-  { path: '/unidades-entregadas', label: 'Archivo entregadas', icon: Archive },
+  { path: '/unidades-entregadas', label: 'Entregados',   icon: Archive },
   { path: '/reportes',            label: 'Reportes',     icon: Printer },
 ]
 
