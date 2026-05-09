@@ -22,6 +22,7 @@ export function AhorristasPage() {
   const { perfil } = useAuth()
   const [busqueda, setBusqueda] = useState('')
   const [filtroEstado, setFiltroEstado] = useState<EstadoAhorrista | ''>('')
+  const [filtroMes, setFiltroMes] = useState<string>('') // formato "YYYY-MM" — vacío = todos
   const [showAlta, setShowAlta] = useState(false)
   const [expandido, setExpandido] = useState<string | null>(null)
   const [eliminando, setEliminando] = useState<string | null>(null)
@@ -217,6 +218,13 @@ export function AhorristasPage() {
   }
 
   const filtered = (ahorristas ?? []).filter(a => {
+    // Filtro por mes de ingreso (fecha_arranque)
+    if (filtroMes) {
+      if (!a.fecha_arranque) return false
+      // fecha_arranque es 'YYYY-MM-DD' → comparar los primeros 7 chars con 'YYYY-MM'
+      if (a.fecha_arranque.slice(0, 7) !== filtroMes) return false
+    }
+
     if (!busqueda) return true
     const t = busqueda.toLowerCase()
     return a.nombre_apellido.toLowerCase().includes(t)
@@ -330,7 +338,32 @@ export function AhorristasPage() {
             <option key={v} value={v}>{label}</option>
           ))}
         </select>
+        <input
+          type="month"
+          value={filtroMes}
+          onChange={e => setFiltroMes(e.target.value)}
+          className="px-3 py-2 bg-bg-secondary border border-border rounded-lg text-sm text-text-primary cursor-pointer"
+          title="Filtrar por mes de ingreso (fecha de arranque)"
+        />
+        {filtroMes && (
+          <button
+            onClick={() => setFiltroMes('')}
+            className="px-3 py-2 text-xs text-text-muted hover:text-text-primary border border-border rounded-lg cursor-pointer"
+            title="Limpiar filtro de mes"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
+
+      {filtroMes && (
+        <p className="text-xs text-text-muted mb-3">
+          Mostrando {filtered.length} ahorrista{filtered.length !== 1 ? 's' : ''} ingresados en{' '}
+          <span className="text-text-secondary font-medium">
+            {new Date(filtroMes + '-01T12:00:00').toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+          </span>
+        </p>
+      )}
 
       {/* Lista */}
       {filtered.length === 0 ? (
