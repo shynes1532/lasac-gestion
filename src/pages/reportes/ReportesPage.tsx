@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { Printer, FileText, DollarSign, Building2, Car, ClipboardList } from 'lucide-react'
+import { Printer, FileText, DollarSign, Building2, Car, ClipboardList, Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { TIPO_LABEL, SUCURSALES_SELECT } from '../../lib/constants'
 import { Button } from '../../components/ui/Button'
+import { BusquedaCliente } from './BusquedaCliente'
 
 function fmt(n: number): string {
   return n.toLocaleString('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 })
@@ -19,9 +20,10 @@ function diasDesde(fecha: string): number {
   return Math.floor((Date.now() - new Date(fecha).getTime()) / 86_400_000)
 }
 
-type Reporte = 'cuenta' | 'operacion' | 'boletos' | 'saldos' | 'registro'
+type Reporte = 'cuenta' | 'operacion' | 'boletos' | 'saldos' | 'registro' | 'busqueda'
 
 const TABS: { id: Reporte; label: string; icon: any }[] = [
+  { id: 'busqueda', label: 'Buscar cliente', icon: Search },
   { id: 'boletos', label: 'Boletos mensuales', icon: Car },
   { id: 'saldos', label: 'Saldos pendientes', icon: DollarSign },
   { id: 'registro', label: 'Estado de registro', icon: Building2 },
@@ -96,11 +98,13 @@ export function ReportesPage() {
               title="Período del reporte"
             />
           )}
-          <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}
-            className="text-sm border border-border rounded-lg px-3 py-1.5 bg-bg-secondary text-text-secondary">
-            <option value="todas">Ambas sucursales</option>
-            {SUCURSALES_SELECT.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
-          </select>
+          {tab !== 'busqueda' && (
+            <select value={filtroSucursal} onChange={e => setFiltroSucursal(e.target.value)}
+              className="text-sm border border-border rounded-lg px-3 py-1.5 bg-bg-secondary text-text-secondary">
+              <option value="todas">Ambas sucursales</option>
+              {SUCURSALES_SELECT.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+            </select>
+          )}
           <Button onClick={imprimir} size="sm">
             <Printer className="h-4 w-4 mr-1" /> Imprimir
           </Button>
@@ -122,6 +126,9 @@ export function ReportesPage() {
 
       {/* ═══════════ CONTENIDO IMPRIMIBLE ═══════════ */}
       <div className="print:p-0" id="reporte-contenido">
+
+        {/* ─── BUSCAR CLIENTE ─── */}
+        {tab === 'busqueda' && <BusquedaCliente />}
 
         {/* ─── BOLETOS MENSUALES ─── */}
         {tab === 'boletos' && (
