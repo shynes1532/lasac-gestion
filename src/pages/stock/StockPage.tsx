@@ -73,6 +73,12 @@ export function StockPage() {
   const [sucursalFiltro, setSucursalFiltro] = useState<Sucursal | 'todas'>('todas')
   const [estadoFiltro, setEstadoFiltro] = useState<EstadoStock | ''>('disponible')
   const [soloOfertas, setSoloOfertas] = useState(false)
+  const [seccion, setSeccion] = useState<'stock' | 'transferencias'>('stock')
+
+  // Conteo de transferencias activas para badge en la tab
+  const { data: transferenciasActivas = [] } = useTransferenciasPendientes({
+    sucursal: sucursalFiltro, estado: 'activas',
+  })
   const [showBateaForm, setShowBateaForm] = useState(false)
   const [showStockForm, setShowStockForm] = useState(false)
   const [editando, setEditando] = useState<StockVehiculo | null>(null)
@@ -111,6 +117,41 @@ export function StockPage() {
 
   return (
     <div className="space-y-8">
+
+      {/* Tabs principales: Stock | Transferencias */}
+      <div className="flex gap-1 border-b border-border">
+        {([
+          { id: 'stock',          label: 'Stock' },
+          { id: 'transferencias', label: `🚚 Transferencias${transferenciasActivas.length > 0 ? ` (${transferenciasActivas.length})` : ''}` },
+        ] as const).map(t => (
+          <button
+            key={t.id}
+            onClick={() => setSeccion(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px cursor-pointer transition-colors
+              ${seccion === t.id ? 'border-action text-action' : 'border-transparent text-text-muted hover:text-text-primary'}`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* === SECCIÓN TRANSFERENCIAS === */}
+      {seccion === 'transferencias' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-bold text-text-primary">Pedidos de transferencia</h2>
+              <p className="text-sm text-text-secondary mt-1">
+                Unidades solicitadas para mover entre sucursales. Las nuevas se crean desde el panel de cada vehículo en Stock.
+              </p>
+            </div>
+          </div>
+          <TransferenciasView sucursalFiltro={sucursalFiltro} />
+        </div>
+      )}
+
+      {/* === SECCIÓN STOCK (BATEA + STOCK) — se oculta cuando estás en Transferencias === */}
+      {seccion === 'stock' && <>
 
       {/* ════════════════════════════════════════════════════════════
           SECCIÓN 1: BATEA — Descarga de unidades
@@ -346,9 +387,6 @@ export function StockPage() {
           </button>
         </div>
 
-        {/* Pedidos de transferencia (logística) */}
-        <PedidosTransferenciaSection sucursalFiltro={sucursalFiltro} />
-
         {/* Lista stock */}
         {loadingStock ? (
           <div className="space-y-3">
@@ -481,6 +519,9 @@ export function StockPage() {
           </div>
         )}
       </div>
+
+      </>}
+      {/* === FIN SECCIÓN STOCK === */}
 
       {/* ─── Modales ─── */}
 
@@ -943,43 +984,71 @@ function TransferirModal({ vehiculo, onClose }: { vehiculo: StockVehiculo; onClo
   )
 }
 
-// ─── Sección "Pedidos de transferencia" ───────────────────────
-function PedidosTransferenciaSection({ sucursalFiltro }: { sucursalFiltro: Sucursal | 'todas' }) {
-  const { data: pendientes = [] } = useTransferenciasPendientes({ sucursal: sucursalFiltro })
+// ─── Vista completa de transferencias (sección "Transferencias") ─────
+function TransferenciasView({ sucursalFiltro }: { sucursalFiltro: Sucursal | 'todas' }) {
+  const [estado, setEstado] = useState<'activas' | 'pendiente' | 'en_transito' | 'completada' | 'todas'>('activas')
+  const { data: lista = [], isLoading } = useTransferenciasPendientes({
+    sucursal: sucursalFiltro,
+    estado,
+  })
+
   const marcarEnTransito = useMarcarEnTransito()
   const completar = useCompletarTransferencia()
   const cancelar = useCancelarTransferencia()
-  const [expandido, setExpandido] = useState(false)
 
-  if (pendientes.length === 0) return null
+  // Conteos rápidos (sobre la sucursal filtrada, sin filtro de estado)
+  const { data: todasSuc = [] } = useTransferenciasPendientes({
+    sucursal: sucursalFiltro,
+    estado: 'todas',
+  })
+  const conteos = {
+    activas: todasSuc.filter(t => t.estado === 'pendiente' || t.estado === 'en_transito').length,
+    pendiente: todasSuc.filter(t => t.estado === 'pendiente').length,
+    en_transito: todasSuc.filter(t => t.estado === 'en_transito').length,
+    completada: todasSuc.filter(t => t.estado === 'completada').length,
+    todas: todasSuc.length,
+  }
 
   return (
-    <Card className="border-l-4 border-l-blue-500 bg-blue-500/5">
-      <button
-        type="button"
-        onClick={() => setExpandido(!expandido)}
-        className="w-full p-4 text-left cursor-pointer"
-      >
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ArrowRightLeft className="h-4 w-4 text-blue-400" />
-            <span className="text-sm font-bold text-text-primary">
-              📋 Pedidos de transferencia
-            </span>
-            <Badge color="blue" size="sm">{pendientes.length}</Badge>
-          </div>
-          <span className="text-xs text-text-muted">
-            {expandido ? '▲ Ocultar' : '▼ Ver lista'}
-          </span>
-        </div>
-        <p className="text-[11px] text-text-muted mt-1">
-          Unidades solicitadas para mover entre sucursales (logística confirma cuando llega)
-        </p>
-      </button>
+    <div className="space-y-3">
+      {/* Filtros de estado */}
+      <div className="flex flex-wrap gap-1.5">
+        {([
+          { id: 'activas',     label: 'Activas',     count: conteos.activas },
+          { id: 'pendiente',   label: '⏳ Pendientes', count: conteos.pendiente },
+          { id: 'en_transito', label: '🚛 En tránsito', count: conteos.en_transito },
+          { id: 'completada',  label: '✅ Completadas', count: conteos.completada },
+          { id: 'todas',       label: 'Todas',       count: conteos.todas },
+        ] as const).map(opt => (
+          <button
+            key={opt.id}
+            onClick={() => setEstado(opt.id)}
+            className={`text-[11px] px-2.5 py-1 rounded border cursor-pointer transition-colors
+              ${estado === opt.id
+                ? 'bg-action text-white border-action'
+                : 'bg-bg-tertiary text-text-secondary border-border hover:border-action/40'}`}
+          >
+            {opt.label} ({opt.count})
+          </button>
+        ))}
+      </div>
 
-      {expandido && (
-        <div className="px-4 pb-4 space-y-2 border-t border-border pt-3">
-          {pendientes.map(t => (
+      {/* Lista */}
+      {isLoading ? (
+        <div className="space-y-2">
+          {[1, 2, 3].map(i => <CardSkeleton key={i} />)}
+        </div>
+      ) : lista.length === 0 ? (
+        <EmptyState
+          icon={<ArrowRightLeft className="h-10 w-10" />}
+          title="Sin transferencias"
+          description={estado === 'activas'
+            ? 'No hay pedidos de transferencia pendientes. Las solicitudes nuevas se hacen desde el panel de cada vehículo en el tab Stock.'
+            : 'Ningún registro coincide con el filtro.'}
+        />
+      ) : (
+        <div className="space-y-2">
+          {lista.map(t => (
             <PedidoTransferenciaItem
               key={t.id}
               transferencia={t}
@@ -1002,7 +1071,7 @@ function PedidosTransferenciaSection({ sucursalFiltro }: { sucursalFiltro: Sucur
           ))}
         </div>
       )}
-    </Card>
+    </div>
   )
 }
 
@@ -1019,19 +1088,31 @@ function PedidoTransferenciaItem({
 }) {
   const v = t.stock_vehiculos
   const diasEspera = Math.floor((Date.now() - new Date(t.created_at).getTime()) / 86_400_000)
+  const activa = t.estado === 'pendiente' || t.estado === 'en_transito'
+
+  const estadoBadge = {
+    pendiente:   { color: 'blue' as const,   label: '⏳ Pendiente' },
+    en_transito: { color: 'yellow' as const, label: '🚛 En tránsito' },
+    completada:  { color: 'green' as const,  label: '✅ Completada' },
+    cancelada:   { color: 'gray' as const,   label: '❌ Cancelada' },
+  }[t.estado]
+
+  const borderColor =
+    t.estado === 'completada' ? 'border-l-green-500' :
+    t.estado === 'cancelada'  ? 'border-l-gray-500' :
+    t.estado === 'en_transito' ? 'border-l-yellow-500' :
+    'border-l-blue-500'
 
   return (
-    <div className="bg-bg-secondary border border-border rounded-lg p-3">
+    <div className={`bg-bg-secondary border border-border border-l-4 ${borderColor} rounded-lg p-3`}>
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1">
             <span className="text-xs font-bold text-blue-300">
               {t.sucursal_origen} → {t.sucursal_destino}
             </span>
-            <Badge color={t.estado === 'en_transito' ? 'yellow' : 'blue'} size="sm">
-              {t.estado === 'en_transito' ? '🚛 En tránsito' : '⏳ Pendiente'}
-            </Badge>
-            {diasEspera > 7 && (
+            <Badge color={estadoBadge.color} size="sm">{estadoBadge.label}</Badge>
+            {activa && diasEspera > 7 && (
               <Badge color="red" size="sm">+{diasEspera}d esperando</Badge>
             )}
           </div>
@@ -1045,29 +1126,36 @@ function PedidoTransferenciaItem({
             {v?.titular_plan ? ` · ${v.titular_plan}` : ''}
           </p>
           {t.motivo && <p className="text-[11px] text-text-secondary mt-1 italic">"{t.motivo}"</p>}
-        </div>
-        <div className="flex flex-col gap-1 shrink-0">
-          {t.estado === 'pendiente' && (
-            <button
-              onClick={onMarcarTransito}
-              className="text-[10px] px-2 py-1 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded cursor-pointer hover:bg-yellow-500/30"
-            >
-              🚛 En tránsito
-            </button>
+          {t.fecha_completada && (
+            <p className="text-[10px] text-text-muted mt-1">
+              Completada el {new Date(t.fecha_completada).toLocaleDateString('es-AR')}
+            </p>
           )}
-          <button
-            onClick={onCompletar}
-            className="text-[10px] px-2 py-1 bg-green-500/20 text-green-300 border border-green-500/40 rounded cursor-pointer hover:bg-green-500/30"
-          >
-            ✅ Recibido
-          </button>
-          <button
-            onClick={onCancelar}
-            className="text-[10px] px-2 py-1 text-text-muted hover:text-red-400 cursor-pointer"
-          >
-            Cancelar
-          </button>
         </div>
+        {activa && (
+          <div className="flex flex-col gap-1 shrink-0">
+            {t.estado === 'pendiente' && (
+              <button
+                onClick={onMarcarTransito}
+                className="text-[10px] px-2 py-1 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded cursor-pointer hover:bg-yellow-500/30"
+              >
+                🚛 En tránsito
+              </button>
+            )}
+            <button
+              onClick={onCompletar}
+              className="text-[10px] px-2 py-1 bg-green-500/20 text-green-300 border border-green-500/40 rounded cursor-pointer hover:bg-green-500/30"
+            >
+              ✅ Recibido
+            </button>
+            <button
+              onClick={onCancelar}
+              className="text-[10px] px-2 py-1 text-text-muted hover:text-red-400 cursor-pointer"
+            >
+              Cancelar
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

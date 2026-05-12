@@ -253,8 +253,9 @@ interface TransferenciaPendiente {
   sucursal_origen: Sucursal
   sucursal_destino: Sucursal
   motivo: string | null
-  estado: 'pendiente' | 'en_transito'
+  estado: 'pendiente' | 'en_transito' | 'completada' | 'cancelada'
   created_at: string
+  fecha_completada: string | null
   stock_vehiculos: {
     vin: string
     marca: string
@@ -268,11 +269,15 @@ interface TransferenciaPendiente {
 
 /**
  * Lista de transferencias activas (pendientes + en_transito).
- * Filtrable por sucursal de origen, destino, o ambas.
+ * Filtrable por sucursal y por estado.
  */
 export function useTransferenciasPendientes(filtro: {
   sucursal?: Sucursal | 'todas'
+  /** 'activas' (default) = pendiente+en_transito · 'pendiente' · 'en_transito' · 'completada' · 'todas' */
+  estado?: 'activas' | 'pendiente' | 'en_transito' | 'completada' | 'todas'
 } = {}) {
+  const estado = filtro.estado ?? 'activas'
+
   return useQuery({
     queryKey: ['stock-transferencias-pendientes', filtro],
     queryFn: async () => {
@@ -282,11 +287,15 @@ export function useTransferenciasPendientes(filtro: {
           *,
           stock_vehiculos ( vin, marca, modelo, version, color, patente, titular_plan )
         `)
-        .in('estado', ['pendiente', 'en_transito'])
         .order('created_at', { ascending: false })
 
+      if (estado === 'activas') {
+        q = q.in('estado', ['pendiente', 'en_transito'])
+      } else if (estado !== 'todas') {
+        q = q.eq('estado', estado)
+      }
+
       if (filtro.sucursal && filtro.sucursal !== 'todas') {
-        // Muestra las que involucran a esa sucursal (origen o destino)
         q = q.or(`sucursal_origen.eq.${filtro.sucursal},sucursal_destino.eq.${filtro.sucursal}`)
       }
 
