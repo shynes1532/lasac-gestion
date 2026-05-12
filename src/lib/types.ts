@@ -681,12 +681,21 @@ export interface StockVehiculo {
   operacion?: Operacion | null
 }
 
+export type EstadoTransferenciaStock =
+  | 'pendiente'
+  | 'en_transito'
+  | 'completada'
+  | 'cancelada'
+
 export interface TransferenciaStock {
   id: string
   stock_id: string
   sucursal_origen: Sucursal
   sucursal_destino: Sucursal
   motivo: string | null
+  estado: EstadoTransferenciaStock
+  fecha_completada: string | null
+  solicitado_por: string | null
   realizado_por: string | null
   created_at: string
   // Join

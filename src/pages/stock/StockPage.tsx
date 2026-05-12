@@ -1,6 +1,11 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Car, Plus, Search, X, ArrowRightLeft, Pencil, Trash2, ChevronDown, ChevronUp, AlertTriangle, Clock, CheckCircle, ArrowRight } from 'lucide-react'
-import { useStock, useCrearStock, useActualizarStock, useTransferirStock, useEliminarStock } from '../../hooks/useStock'
+import {
+  useStock, useCrearStock, useActualizarStock, useEliminarStock,
+  useSolicitarTransferencia, useCompletarTransferencia, useCancelarTransferencia,
+  useMarcarEnTransito, useTransferenciasPendientes,
+  type TransferenciaPendiente,
+} from '../../hooks/useStock'
 import { supabase } from '../../lib/supabase'
 import { Button, Card, EmptyState, CardSkeleton, Badge, Modal, ConfirmDialog, notify } from '../../components/ui'
 import { diasEntre } from '../../utils/formatters'
@@ -340,6 +345,9 @@ export function StockPage() {
             🔥 {soloOfertas ? 'Solo ofertas' : 'Mostrar todas'}
           </button>
         </div>
+
+        {/* Pedidos de transferencia (logística) */}
+        <PedidosTransferenciaSection sucursalFiltro={sucursalFiltro} />
 
         {/* Lista stock */}
         {loadingStock ? (
@@ -887,25 +895,32 @@ function StockForm({ vehiculo, onClose }: { vehiculo: StockVehiculo | null; onCl
 // ─── Modal transferir ────────────────────────────────────────
 
 function TransferirModal({ vehiculo, onClose }: { vehiculo: StockVehiculo; onClose: () => void }) {
-  const transferir = useTransferirStock()
+  const solicitar = useSolicitarTransferencia()
   const [destino, setDestino] = useState<Sucursal>(vehiculo.sucursal === 'Ushuaia' ? 'Rio Grande' : 'Ushuaia')
   const [motivo, setMotivo] = useState('')
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (destino === vehiculo.sucursal) { notify.error('Destino debe ser distinto'); return }
-    transferir.mutate(
+    solicitar.mutate(
       { stockId: vehiculo.id, sucursalDestino: destino, motivo: motivo.trim() || undefined },
       {
-        onSuccess: () => { notify.success(`Transferido a ${destino}`); onClose() },
+        onSuccess: () => {
+          notify.success(`Pedido de transferencia creado — destino ${destino}. La unidad sigue en ${vehiculo.sucursal} hasta que logística confirme.`)
+          onClose()
+        },
         onError: (e: any) => notify.error(e.message),
       },
     )
   }
 
   return (
-    <Modal open onClose={onClose} title="Transferir vehículo">
+    <Modal open onClose={onClose} title="Solicitar transferencia">
       <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-2 text-xs text-blue-300">
+          📋 Esto crea un <strong>pedido de transferencia</strong> para logística.
+          La unidad permanece en {vehiculo.sucursal} hasta que se marque como recibida.
+        </div>
         <div className="bg-bg-secondary rounded-lg p-3 text-sm">
           <p className="font-bold text-text-primary">{vehiculo.marca} {vehiculo.modelo}</p>
           <p className="text-xs text-text-muted">VIN: {vehiculo.vin} · Actualmente en: <strong>{vehiculo.sucursal}</strong></p>
@@ -918,13 +933,143 @@ function TransferirModal({ vehiculo, onClose }: { vehiculo: StockVehiculo; onClo
         </div>
         <div>
           <label className="text-xs text-text-muted">Motivo (opcional)</label>
-          <input value={motivo} onChange={e => setMotivo(e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" />
+          <input value={motivo} onChange={e => setMotivo(e.target.value)} className="w-full mt-1 px-3 py-2 bg-bg-primary border border-border rounded-lg text-sm text-text-primary focus:ring-2 focus:ring-action/30 focus:outline-none" placeholder="Ej: pedido de cliente, rebalancear stock..." />
         </div>
-        <Button type="submit" fullWidth loading={transferir.isPending}>
-          <ArrowRightLeft className="h-4 w-4 mr-1" /> Transferir
+        <Button type="submit" fullWidth loading={solicitar.isPending}>
+          <ArrowRightLeft className="h-4 w-4 mr-1" /> Solicitar transferencia
         </Button>
       </form>
     </Modal>
+  )
+}
+
+// ─── Sección "Pedidos de transferencia" ───────────────────────
+function PedidosTransferenciaSection({ sucursalFiltro }: { sucursalFiltro: Sucursal | 'todas' }) {
+  const { data: pendientes = [] } = useTransferenciasPendientes({ sucursal: sucursalFiltro })
+  const marcarEnTransito = useMarcarEnTransito()
+  const completar = useCompletarTransferencia()
+  const cancelar = useCancelarTransferencia()
+  const [expandido, setExpandido] = useState(false)
+
+  if (pendientes.length === 0) return null
+
+  return (
+    <Card className="border-l-4 border-l-blue-500 bg-blue-500/5">
+      <button
+        type="button"
+        onClick={() => setExpandido(!expandido)}
+        className="w-full p-4 text-left cursor-pointer"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ArrowRightLeft className="h-4 w-4 text-blue-400" />
+            <span className="text-sm font-bold text-text-primary">
+              📋 Pedidos de transferencia
+            </span>
+            <Badge color="blue" size="sm">{pendientes.length}</Badge>
+          </div>
+          <span className="text-xs text-text-muted">
+            {expandido ? '▲ Ocultar' : '▼ Ver lista'}
+          </span>
+        </div>
+        <p className="text-[11px] text-text-muted mt-1">
+          Unidades solicitadas para mover entre sucursales (logística confirma cuando llega)
+        </p>
+      </button>
+
+      {expandido && (
+        <div className="px-4 pb-4 space-y-2 border-t border-border pt-3">
+          {pendientes.map(t => (
+            <PedidoTransferenciaItem
+              key={t.id}
+              transferencia={t}
+              onMarcarTransito={() => marcarEnTransito.mutate(t.id, {
+                onSuccess: () => notify.success('Marcada como en tránsito'),
+                onError: e => notify.error((e as any).message),
+              })}
+              onCompletar={() => completar.mutate(t.id, {
+                onSuccess: () => notify.success(`Unidad ahora en ${t.sucursal_destino}`),
+                onError: e => notify.error((e as any).message),
+              })}
+              onCancelar={() => {
+                if (!confirm('¿Cancelar este pedido de transferencia?')) return
+                cancelar.mutate(t.id, {
+                  onSuccess: () => notify.success('Pedido cancelado'),
+                  onError: e => notify.error((e as any).message),
+                })
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  )
+}
+
+function PedidoTransferenciaItem({
+  transferencia: t,
+  onMarcarTransito,
+  onCompletar,
+  onCancelar,
+}: {
+  transferencia: TransferenciaPendiente
+  onMarcarTransito: () => void
+  onCompletar: () => void
+  onCancelar: () => void
+}) {
+  const v = t.stock_vehiculos
+  const diasEspera = Math.floor((Date.now() - new Date(t.created_at).getTime()) / 86_400_000)
+
+  return (
+    <div className="bg-bg-secondary border border-border rounded-lg p-3">
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap mb-1">
+            <span className="text-xs font-bold text-blue-300">
+              {t.sucursal_origen} → {t.sucursal_destino}
+            </span>
+            <Badge color={t.estado === 'en_transito' ? 'yellow' : 'blue'} size="sm">
+              {t.estado === 'en_transito' ? '🚛 En tránsito' : '⏳ Pendiente'}
+            </Badge>
+            {diasEspera > 7 && (
+              <Badge color="red" size="sm">+{diasEspera}d esperando</Badge>
+            )}
+          </div>
+          <p className="text-sm font-medium text-text-primary">
+            {v?.marca} {v?.modelo} {v?.version ?? ''}
+          </p>
+          <p className="text-[11px] text-text-muted">
+            VIN ...{v?.vin?.slice(-6) ?? '—'}
+            {v?.color ? ` · ${v.color}` : ''}
+            {v?.patente ? ` · ${v.patente}` : ''}
+            {v?.titular_plan ? ` · ${v.titular_plan}` : ''}
+          </p>
+          {t.motivo && <p className="text-[11px] text-text-secondary mt-1 italic">"{t.motivo}"</p>}
+        </div>
+        <div className="flex flex-col gap-1 shrink-0">
+          {t.estado === 'pendiente' && (
+            <button
+              onClick={onMarcarTransito}
+              className="text-[10px] px-2 py-1 bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 rounded cursor-pointer hover:bg-yellow-500/30"
+            >
+              🚛 En tránsito
+            </button>
+          )}
+          <button
+            onClick={onCompletar}
+            className="text-[10px] px-2 py-1 bg-green-500/20 text-green-300 border border-green-500/40 rounded cursor-pointer hover:bg-green-500/30"
+          >
+            ✅ Recibido
+          </button>
+          <button
+            onClick={onCancelar}
+            className="text-[10px] px-2 py-1 text-text-muted hover:text-red-400 cursor-pointer"
+          >
+            Cancelar
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

@@ -127,7 +127,12 @@ export function useActualizarStock() {
   })
 }
 
-export function useTransferirStock() {
+/**
+ * Solicitar transferencia: crea una fila en stock_transferencias con
+ * estado='pendiente'. NO mueve el vehículo todavía — se mueve cuando
+ * logística marca la transferencia como completada.
+ */
+export function useSolicitarTransferencia() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
 
@@ -137,16 +142,17 @@ export function useTransferirStock() {
       sucursalDestino: Sucursal
       motivo?: string
     }) => {
-      // Get current sucursal
       const { data: vehiculo, error: getErr } = await supabase
         .from('stock_vehiculos')
         .select('sucursal')
         .eq('id', stockId)
         .single()
-
       if (getErr) throw getErr
 
-      // Insert transferencia
+      if (vehiculo.sucursal === sucursalDestino) {
+        throw new Error('La sucursal de destino es la misma que la actual')
+      }
+
       const { error: trErr } = await supabase
         .from('stock_transferencias')
         .insert({
@@ -154,25 +160,144 @@ export function useTransferirStock() {
           sucursal_origen: vehiculo.sucursal,
           sucursal_destino: sucursalDestino,
           motivo: motivo || null,
-          realizado_por: user!.id,
+          estado: 'pendiente',
+          solicitado_por: user!.id,
         })
-
       if (trErr) throw trErr
-
-      // Update sucursal
-      const { error: upErr } = await supabase
-        .from('stock_vehiculos')
-        .update({ sucursal: sucursalDestino })
-        .eq('id', stockId)
-
-      if (upErr) throw upErr
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['stock'] })
+      queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
       queryClient.invalidateQueries({ queryKey: ['stock-transferencias'] })
     },
   })
 }
+
+/**
+ * Completar transferencia: marca como 'completada' y mueve el vehículo
+ * a la sucursal destino. Es lo que ejecuta logística cuando el auto llega.
+ */
+export function useCompletarTransferencia() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transferenciaId: string) => {
+      const { data: t, error: getErr } = await supabase
+        .from('stock_transferencias')
+        .select('stock_id, sucursal_destino, estado')
+        .eq('id', transferenciaId)
+        .single()
+      if (getErr) throw getErr
+      if (t.estado === 'completada') throw new Error('Esta transferencia ya está completada')
+      if (t.estado === 'cancelada')  throw new Error('Esta transferencia fue cancelada')
+
+      const { error: upTrErr } = await supabase
+        .from('stock_transferencias')
+        .update({ estado: 'completada', fecha_completada: new Date().toISOString() })
+        .eq('id', transferenciaId)
+      if (upTrErr) throw upTrErr
+
+      const { error: upVehErr } = await supabase
+        .from('stock_vehiculos')
+        .update({ sucursal: t.sucursal_destino })
+        .eq('id', t.stock_id)
+      if (upVehErr) throw upVehErr
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock'] })
+      queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
+      queryClient.invalidateQueries({ queryKey: ['stock-transferencias'] })
+    },
+  })
+}
+
+/**
+ * Marcar la transferencia como 'en_transito' (salió de origen, no llegó aún).
+ */
+export function useMarcarEnTransito() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transferenciaId: string) => {
+      const { error } = await supabase
+        .from('stock_transferencias')
+        .update({ estado: 'en_transito' })
+        .eq('id', transferenciaId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
+    },
+  })
+}
+
+export function useCancelarTransferencia() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (transferenciaId: string) => {
+      const { error } = await supabase
+        .from('stock_transferencias')
+        .update({ estado: 'cancelada' })
+        .eq('id', transferenciaId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
+    },
+  })
+}
+
+interface TransferenciaPendiente {
+  id: string
+  stock_id: string
+  sucursal_origen: Sucursal
+  sucursal_destino: Sucursal
+  motivo: string | null
+  estado: 'pendiente' | 'en_transito'
+  created_at: string
+  stock_vehiculos: {
+    vin: string
+    marca: string
+    modelo: string
+    version: string | null
+    color: string | null
+    patente: string | null
+    titular_plan: string | null
+  } | null
+}
+
+/**
+ * Lista de transferencias activas (pendientes + en_transito).
+ * Filtrable por sucursal de origen, destino, o ambas.
+ */
+export function useTransferenciasPendientes(filtro: {
+  sucursal?: Sucursal | 'todas'
+} = {}) {
+  return useQuery({
+    queryKey: ['stock-transferencias-pendientes', filtro],
+    queryFn: async () => {
+      let q = supabase
+        .from('stock_transferencias')
+        .select(`
+          *,
+          stock_vehiculos ( vin, marca, modelo, version, color, patente, titular_plan )
+        `)
+        .in('estado', ['pendiente', 'en_transito'])
+        .order('created_at', { ascending: false })
+
+      if (filtro.sucursal && filtro.sucursal !== 'todas') {
+        // Muestra las que involucran a esa sucursal (origen o destino)
+        q = q.or(`sucursal_origen.eq.${filtro.sucursal},sucursal_destino.eq.${filtro.sucursal}`)
+      }
+
+      const { data, error } = await q
+      if (error) throw error
+      return (data ?? []) as TransferenciaPendiente[]
+    },
+  })
+}
+
+export type { TransferenciaPendiente }
 
 export function useEliminarStock() {
   const queryClient = useQueryClient()
