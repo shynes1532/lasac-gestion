@@ -6,8 +6,10 @@
 // ============================================================
 
 import { useState, useMemo } from 'react'
-import { Plus, X, Search, Trash2, Check, AlertTriangle, ArrowRight } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
+import { Plus, X, Search, Trash2, Check, AlertTriangle, ArrowRight, UserPlus } from 'lucide-react'
 import { Button, EmptyState, notify } from '../../components/ui'
+import { supabase } from '../../lib/supabase'
 import {
   usePedidos,
   useCrearPedido,
@@ -259,6 +261,7 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onCli
 // Modal: Nuevo pedido
 // ============================================================
 function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; onClose: () => void }) {
+  const queryClient = useQueryClient()
   const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
   const [tipo, setTipo] = useState<TipoPedido>('mostrador')
   const [etapa, setEtapa] = useState<EtapaPedido>('comprado')
@@ -269,9 +272,52 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
   const [reciboEmitido, setReciboEmitido] = useState(false)
   const [observaciones, setObservaciones] = useState('')
 
+  // Mini-form para crear cliente nuevo inline
+  const [showAltaCli, setShowAltaCli] = useState(false)
+  const [creandoCli, setCreandoCli] = useState(false)
+  const [nuevoCli, setNuevoCli] = useState({
+    nombre: '',
+    cuit: '',
+    condicion_iva: 'CF' as 'CF' | 'RI' | 'MT' | 'EX' | 'RNI',
+    provincia: 'TDF',
+    telefono: '',
+    email: '',
+  })
+
   const { data: clientes = [] } = useClientes()
   const { data: repuestos = [] } = useRepuestos(busquedaRep, sucursal)
   const crearPedido = useCrearPedido()
+
+  const handleCrearCliente = async () => {
+    if (!nuevoCli.nombre.trim()) return notify.error('El nombre es obligatorio')
+    setCreandoCli(true)
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .insert({
+          nombre: nuevoCli.nombre.trim(),
+          cuit: nuevoCli.cuit.trim() || null,
+          condicion_iva: nuevoCli.condicion_iva,
+          provincia: nuevoCli.provincia.trim() || 'TDF',
+          telefono: nuevoCli.telefono.trim() || null,
+          email: nuevoCli.email.trim() || null,
+          activo: true,
+        })
+        .select('id')
+        .single()
+      if (error) throw error
+
+      await queryClient.invalidateQueries({ queryKey: ['clientes'] })
+      setClienteId((data as { id: string }).id)
+      setShowAltaCli(false)
+      setNuevoCli({ nombre: '', cuit: '', condicion_iva: 'CF', provincia: 'TDF', telefono: '', email: '' })
+      notify.success('Cliente creado')
+    } catch (err: any) {
+      notify.error(err?.message || 'Error al crear cliente')
+    } finally {
+      setCreandoCli(false)
+    }
+  }
 
   const agregarItem = (rep: Repuesto) => {
     if (items.find(i => i.producto_id === rep.id)) {
@@ -355,21 +401,106 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
 
           {/* Cliente */}
           <div>
-            <label className="block text-xs text-text-muted mb-1">Cliente</label>
-            <select
-              value={clienteId}
-              onChange={e => setClienteId(e.target.value)}
-              className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
-            >
-              {clientes.length === 0 && (
-                <option value={CLIENTE_MOSTRADOR_ID}>MOSTRADOR — Consumidor Final</option>
-              )}
-              {clientes.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.nombre} {c.cuit ? `· ${c.cuit}` : ''}
-                </option>
-              ))}
-            </select>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-text-muted">Cliente</label>
+              <button
+                type="button"
+                onClick={() => setShowAltaCli(!showAltaCli)}
+                className="text-[11px] text-action hover:text-action/80 flex items-center gap-1 cursor-pointer"
+              >
+                <UserPlus className="h-3 w-3" />
+                {showAltaCli ? 'Cancelar' : 'Nuevo cliente'}
+              </button>
+            </div>
+
+            {!showAltaCli ? (
+              <select
+                value={clienteId}
+                onChange={e => setClienteId(e.target.value)}
+                className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
+              >
+                {clientes.length === 0 && (
+                  <option value={CLIENTE_MOSTRADOR_ID}>MOSTRADOR — Consumidor Final</option>
+                )}
+                {clientes.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.nombre} {c.cuit ? `· ${c.cuit}` : ''}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <div className="bg-bg-primary border border-action/30 rounded-lg p-3 space-y-2">
+                <div>
+                  <label className="block text-[10px] text-text-muted mb-1">Nombre o razón social *</label>
+                  <input
+                    type="text"
+                    value={nuevoCli.nombre}
+                    onChange={e => setNuevoCli({ ...nuevoCli, nombre: e.target.value })}
+                    placeholder="Ej: García Juan / Taller Mecánico SRL"
+                    className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:ring-1 focus:ring-action/40"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-text-muted mb-1">CUIT / DNI</label>
+                    <input
+                      type="text"
+                      value={nuevoCli.cuit}
+                      onChange={e => setNuevoCli({ ...nuevoCli, cuit: e.target.value })}
+                      placeholder="20-12345678-3"
+                      className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-text-muted mb-1">Condición IVA</label>
+                    <select
+                      value={nuevoCli.condicion_iva}
+                      onChange={e => setNuevoCli({ ...nuevoCli, condicion_iva: e.target.value as typeof nuevoCli.condicion_iva })}
+                      className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                    >
+                      <option value="CF">CF — Consumidor Final</option>
+                      <option value="RI">RI — Resp. Inscripto</option>
+                      <option value="MT">MT — Monotributo</option>
+                      <option value="EX">EX — Exento</option>
+                      <option value="RNI">RNI — Resp. No Inscripto</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[10px] text-text-muted mb-1">Provincia</label>
+                    <input
+                      type="text"
+                      value={nuevoCli.provincia}
+                      onChange={e => setNuevoCli({ ...nuevoCli, provincia: e.target.value })}
+                      className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-text-muted mb-1">Teléfono</label>
+                    <input
+                      type="text"
+                      value={nuevoCli.telefono}
+                      onChange={e => setNuevoCli({ ...nuevoCli, telefono: e.target.value })}
+                      className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] text-text-muted mb-1">Email</label>
+                  <input
+                    type="email"
+                    value={nuevoCli.email}
+                    onChange={e => setNuevoCli({ ...nuevoCli, email: e.target.value })}
+                    className="w-full bg-bg-secondary border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none"
+                  />
+                </div>
+                <Button size="sm" fullWidth onClick={handleCrearCliente} loading={creandoCli}>
+                  <UserPlus className="h-3.5 w-3.5" />
+                  Crear y usar
+                </Button>
+              </div>
+            )}
           </div>
 
           {/* Items */}
