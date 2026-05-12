@@ -218,11 +218,15 @@ export function useMarcarEnTransito() {
 
   return useMutation({
     mutationFn: async (transferenciaId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('stock_transferencias')
         .update({ estado: 'en_transito' })
         .eq('id', transferenciaId)
+        .select('id')
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo actualizar (sin permisos o ID inválido)')
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
@@ -235,11 +239,15 @@ export function useCancelarTransferencia() {
 
   return useMutation({
     mutationFn: async (transferenciaId: string) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('stock_transferencias')
         .update({ estado: 'cancelada' })
         .eq('id', transferenciaId)
+        .select('id')
       if (error) throw error
+      if (!data || data.length === 0) {
+        throw new Error('No se pudo cancelar (sin permisos o ID inválido)')
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['stock-transferencias-pendientes'] })
