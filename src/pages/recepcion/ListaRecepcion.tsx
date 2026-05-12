@@ -69,8 +69,12 @@ function getWhatsAppFollowUp(rec: Recepcion): string {
   const nombre = rec.nombre.split(' ')[0]
   const phone = cleanPhone(rec.telefono)
   const link = 'https://lasac-pwa.vercel.app/'
+
+  // Identificación institucional según sucursal (sin nombres personales).
+  const sucursalLabel = rec.sucursal === 'Rio Grande' ? 'Río Grande' : 'Ushuaia'
+  const presentacion = `Nos comunicamos de LASAC, concesionario oficial FIAT — Sucursal ${sucursalLabel}`
+
   const cierre = `\n\nTe dejamos nuestra plataforma donde podés consultar nuestros precios o comunicarte con nosotros: ${link}`
-  const presentacion = 'Te escribe Daniela, responsable de Calidad de Liendo Automotores'
 
   let mensaje = ''
 
