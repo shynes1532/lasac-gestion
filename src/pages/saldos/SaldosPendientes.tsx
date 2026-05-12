@@ -1,8 +1,9 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, CheckCircle2, DollarSign, Phone } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, DollarSign, Phone, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { COLORES_TIPO, TIPO_LABEL } from '../../lib/constants'
-import { Skeleton } from '../../components/ui'
+import { Skeleton, Tabs } from '../../components/ui'
 import { useNavigate } from 'react-router-dom'
 
 function formatMoney(n: number): string {
@@ -20,6 +21,7 @@ interface OpConSaldo {
   saldo_pagado: boolean
   banco_saldo_cancelado: boolean | null
   estado_actual: string
+  created_at: string
   pagos_saldo: { monto: number }[]
 }
 
@@ -37,6 +39,8 @@ function estaSaldada(o: OpConSaldo): boolean {
 
 export function SaldosPendientes() {
   const navigate = useNavigate()
+  const [sucursalTab, setSucursalTab] = useState<'Rio Grande' | 'Ushuaia' | 'todas'>('Rio Grande')
+  const [filtroMes, setFiltroMes] = useState<string>('') // 'YYYY-MM' o '' = todos
 
   const { data: operaciones, isLoading } = useQuery({
     queryKey: ['saldos-pendientes'],
@@ -45,7 +49,7 @@ export function SaldosPendientes() {
         .from('operaciones')
         .select(`
           id, numero_operacion, cliente_nombre, cliente_telefono,
-          tipo_operacion, sucursal, saldo_cliente, saldo_pagado, banco_saldo_cancelado, estado_actual,
+          tipo_operacion, sucursal, saldo_cliente, saldo_pagado, banco_saldo_cancelado, estado_actual, created_at,
           pagos_saldo ( monto )
         `)
         .gt('saldo_cliente', 0)
@@ -57,7 +61,25 @@ export function SaldosPendientes() {
     },
   })
 
-  const ops = operaciones ?? []
+  const todasOps = operaciones ?? []
+
+  // Filtros aplicados en cliente (sucursal + mes)
+  const ops = todasOps.filter(o => {
+    if (sucursalTab !== 'todas' && o.sucursal !== sucursalTab) return false
+    if (filtroMes && o.created_at?.slice(0, 7) !== filtroMes) return false
+    return true
+  })
+
+  // Conteos por sucursal (sobre el universo con filtro de mes aplicado, sin sucursal)
+  const baseConteos = todasOps.filter(o =>
+    !filtroMes || o.created_at?.slice(0, 7) === filtroMes,
+  )
+  const conteosSucursal = {
+    'Rio Grande': baseConteos.filter(o => o.sucursal === 'Rio Grande').length,
+    'Ushuaia':    baseConteos.filter(o => o.sucursal === 'Ushuaia').length,
+    'todas':      baseConteos.length,
+  }
+
   const conDeuda = ops.filter(o => !estaSaldada(o))
   const saldados = ops.filter(estaSaldada)
 
@@ -70,7 +92,7 @@ export function SaldosPendientes() {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mb-6">
+      <div className="flex items-center gap-3 mb-4">
         <DollarSign className="h-6 w-6 text-action" />
         <div>
           <h1 className="text-xl font-bold text-text-primary">Saldos pendientes</h1>
@@ -79,6 +101,38 @@ export function SaldosPendientes() {
             {totalPendiente > 0 && ` — Total: ${formatMoney(totalPendiente)}`}
           </p>
         </div>
+      </div>
+
+      <Tabs
+        tabs={[
+          { id: 'Rio Grande', label: `Río Grande (${conteosSucursal['Rio Grande']})` },
+          { id: 'Ushuaia',    label: `Ushuaia (${conteosSucursal.Ushuaia})` },
+          { id: 'todas',      label: `Todas (${conteosSucursal.todas})` },
+        ]}
+        activeTab={sucursalTab}
+        onChange={(id) => setSucursalTab(id as 'Rio Grande' | 'Ushuaia' | 'todas')}
+        className="mb-4"
+      />
+
+      <div className="flex items-center gap-2 mb-6">
+        <label className="text-xs text-text-muted">Mes de carga:</label>
+        <input
+          type="month"
+          value={filtroMes}
+          onChange={e => setFiltroMes(e.target.value)}
+          max={new Date().toISOString().slice(0, 7)}
+          className="px-3 py-1.5 bg-bg-secondary border border-border rounded-lg text-sm text-text-primary"
+          title="Filtrar por mes de creación de la operación"
+        />
+        {filtroMes && (
+          <button
+            onClick={() => setFiltroMes('')}
+            className="p-1.5 text-text-muted hover:text-text-primary border border-border rounded-lg cursor-pointer"
+            title="Limpiar filtro"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
 
       {/* Clientes que deben */}
