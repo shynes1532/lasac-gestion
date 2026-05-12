@@ -100,6 +100,8 @@ interface CrearPedidoInput {
   cliente_id: string | null
   tipo: TipoPedido
   etapa?: EtapaPedido
+  /** Solo aplica si tipo='transferencia_sucursal'. */
+  sucursal_origen?: SucursalRepuestos | null
   garantia_id?: string | null
   siniestro_id?: string | null
   numero_recibo?: string | null
@@ -127,17 +129,18 @@ export function useCrearPedido() {
       const { data: pedido, error: pedErr } = await supabase
         .from('pedidos_repuestos')
         .insert({
-          sucursal:      input.sucursal,
-          cliente_id:    input.cliente_id,
-          tipo:          input.tipo,
-          etapa:         input.etapa ?? 'comprado',
-          garantia_id:   input.garantia_id ?? null,
-          siniestro_id:  input.siniestro_id ?? null,
-          numero_recibo: input.numero_recibo ?? null,
-          monto_pagado:  input.monto_pagado ?? null,
-          recibo_emitido: input.recibo_emitido ?? false,
-          observaciones: input.observaciones ?? null,
-          created_by:    user?.id ?? null,
+          sucursal:        input.sucursal,
+          sucursal_origen: input.sucursal_origen ?? null,
+          cliente_id:      input.cliente_id,
+          tipo:            input.tipo,
+          etapa:           input.etapa ?? 'comprado',
+          garantia_id:     input.garantia_id ?? null,
+          siniestro_id:    input.siniestro_id ?? null,
+          numero_recibo:   input.numero_recibo ?? null,
+          monto_pagado:    input.monto_pagado ?? null,
+          recibo_emitido:  input.recibo_emitido ?? false,
+          observaciones:   input.observaciones ?? null,
+          created_by:      user?.id ?? null,
         })
         .select()
         .single()

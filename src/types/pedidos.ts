@@ -7,7 +7,12 @@
 
 import type { SucursalRepuestos } from './pricing'
 
-export type TipoPedido = 'garantia' | 'mostrador' | 'siniestro'
+export type TipoPedido =
+  | 'garantia'
+  | 'mostrador'
+  | 'siniestro'
+  | 'transferencia_sucursal'
+  | 'fiat_faltante'
 
 export type EtapaPedido =
   | 'comprado'
@@ -16,10 +21,12 @@ export type EtapaPedido =
   | 'entregado'
   | 'cancelado'
 
-export const TIPOS_PEDIDO: { id: TipoPedido; label: string; emoji: string; color: 'green' | 'gray' | 'orange' }[] = [
-  { id: 'garantia',  label: 'Garantía',  emoji: '🟢', color: 'green' },
-  { id: 'mostrador', label: 'Mostrador', emoji: '🛒', color: 'gray' },
-  { id: 'siniestro', label: 'Siniestro', emoji: '🟠', color: 'orange' },
+export const TIPOS_PEDIDO: { id: TipoPedido; label: string; emoji: string; color: 'green' | 'gray' | 'orange' | 'blue' | 'purple' }[] = [
+  { id: 'garantia',               label: 'Garantía',     emoji: '🟢', color: 'green' },
+  { id: 'mostrador',              label: 'Mostrador',    emoji: '🛒', color: 'gray' },
+  { id: 'siniestro',              label: 'Siniestro',    emoji: '🟠', color: 'orange' },
+  { id: 'transferencia_sucursal', label: 'Transferencia',emoji: '🚚', color: 'blue' },
+  { id: 'fiat_faltante',          label: 'Pedido a FIAT',emoji: '🏭', color: 'purple' },
 ]
 
 export const ETAPAS_PEDIDO: { id: EtapaPedido; label: string; emoji: string; color: 'yellow' | 'blue' | 'purple' | 'green' | 'red' }[] = [
@@ -53,6 +60,10 @@ export interface PedidoRepuesto {
 
   tipo: TipoPedido
   etapa: EtapaPedido
+
+  /** Para transferencia_sucursal: sucursal de origen (sucursal = destino).
+   *  En el resto de los tipos queda NULL. */
+  sucursal_origen: SucursalRepuestos | null
 
   garantia_id: string | null
   siniestro_id: string | null

@@ -37,6 +37,8 @@ const TIPO_BADGE_COLOR: Record<string, string> = {
   green:  'bg-green-500/20 text-green-300 border-green-500/40',
   gray:   'bg-bg-tertiary text-text-secondary border-border',
   orange: 'bg-orange-500/20 text-orange-300 border-orange-500/40',
+  blue:   'bg-blue-500/20 text-blue-300 border-blue-500/40',
+  purple: 'bg-purple-500/20 text-purple-300 border-purple-500/40',
 }
 const ETAPA_BADGE_COLOR: Record<string, string> = {
   yellow: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
@@ -74,6 +76,7 @@ export function PedidosSection({ sucursal }: PedidosSectionProps) {
     const acc: Record<TipoPedido | 'Todos', number> = {
       Todos: pedidosTodos.length,
       garantia: 0, mostrador: 0, siniestro: 0,
+      transferencia_sucursal: 0, fiat_faltante: 0,
     }
     pedidosTodos.forEach(p => { acc[p.tipo]++ })
     return acc
@@ -228,9 +231,19 @@ function PedidoCard({ pedido, onClick }: { pedido: PedidoRepuestoConItems; onCli
             <span className={`text-[10px] px-1.5 py-0.5 rounded border ${ETAPA_BADGE_COLOR[etapa.color]}`}>
               {etapa.emoji} {etapa.label}
             </span>
-            <span className="text-[10px] text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded">{pedido.sucursal}</span>
+            <span className="text-[10px] text-text-muted bg-bg-tertiary px-1.5 py-0.5 rounded">
+              {pedido.sucursal_origen
+                ? `${pedido.sucursal_origen} → ${pedido.sucursal}`
+                : pedido.sucursal}
+            </span>
           </div>
-          <p className="text-sm text-text-primary mt-1 truncate">{cliente}</p>
+          <p className="text-sm text-text-primary mt-1 truncate">
+            {pedido.tipo === 'transferencia_sucursal'
+              ? `🚚 Transferencia desde ${pedido.sucursal_origen}`
+              : pedido.tipo === 'fiat_faltante'
+                ? '🏭 Pedido interno a FIAT (faltante)'
+                : cliente}
+          </p>
           <p className="text-[11px] text-text-muted mt-0.5">
             {totalItems} item{totalItems !== 1 ? 's' : ''}
             {recibidos > 0 && ` · ${recibidos}/${totalItems} recibidos`}
@@ -265,6 +278,10 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
   const [clienteId, setClienteId] = useState<string>(CLIENTE_MOSTRADOR_ID)
   const [tipo, setTipo] = useState<TipoPedido>('mostrador')
   const [etapa, setEtapa] = useState<EtapaPedido>('comprado')
+  // Sucursal de origen para transferencias. Default = la otra sucursal disponible.
+  const [sucursalOrigen, setSucursalOrigen] = useState<SucursalRepuestos>(
+    sucursal === 'Rio Grande' ? 'Ushuaia' : 'Rio Grande',
+  )
   const [busquedaRep, setBusquedaRep] = useState('')
   const [items, setItems] = useState<Array<{ producto_id: string; codigo: string; descripcion: string; cantidad: number }>>([])
   const [numeroRecibo, setNumeroRecibo] = useState('')
@@ -328,12 +345,19 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
     setBusquedaRep('')
   }
 
+  // Los pedidos internos (transferencia y FIAT) no tienen cliente.
+  const esInterno = tipo === 'transferencia_sucursal' || tipo === 'fiat_faltante'
+
   const handleSubmit = async () => {
     if (items.length === 0) return notify.error('Agregá al menos un repuesto')
+    if (tipo === 'transferencia_sucursal' && sucursalOrigen === sucursal) {
+      return notify.error('La sucursal de origen debe ser distinta a la de destino')
+    }
     try {
       await crearPedido.mutateAsync({
         sucursal,
-        cliente_id: clienteId,
+        cliente_id: esInterno ? null : clienteId,
+        sucursal_origen: tipo === 'transferencia_sucursal' ? sucursalOrigen : null,
         tipo,
         etapa,
         numero_recibo: numeroRecibo.trim() || null,
@@ -382,6 +406,36 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
             </div>
           </div>
 
+          {/* Sucursal origen — solo para transferencias */}
+          {tipo === 'transferencia_sucursal' && (
+            <div>
+              <label className="block text-xs text-text-muted mb-1.5">
+                Sucursal de origen *
+                <span className="text-[10px] ml-1 text-text-muted">(de dónde sale el repuesto)</span>
+              </label>
+              <select
+                value={sucursalOrigen}
+                onChange={e => setSucursalOrigen(e.target.value as SucursalRepuestos)}
+                className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:ring-2 focus:ring-action/30"
+              >
+                {(['Ushuaia','Rio Grande','Deposito Central'] as SucursalRepuestos[])
+                  .filter(s => s !== sucursal)
+                  .map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+              <p className="text-[10px] text-text-muted mt-0.5">
+                Destino: <span className="text-action font-medium">{sucursal}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Aviso para FIAT */}
+          {tipo === 'fiat_faltante' && (
+            <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-2 text-xs text-purple-200">
+              🏭 Pedido interno a la terminal FIAT. Este pedido NO tiene cliente
+              (es una lista de faltantes / recordatorio de lo que hay que comprar).
+            </div>
+          )}
+
           {/* Etapa inicial */}
           <div>
             <label className="block text-xs text-text-muted mb-1.5">Etapa inicial</label>
@@ -399,7 +453,8 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
             </p>
           </div>
 
-          {/* Cliente */}
+          {/* Cliente — oculto en pedidos internos (transferencia y FIAT) */}
+          {!esInterno && (
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="text-xs text-text-muted">Cliente</label>
@@ -502,6 +557,7 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
               </div>
             )}
           </div>
+          )}
 
           {/* Items */}
           <div>
@@ -560,40 +616,44 @@ function NuevoPedidoModal({ sucursal, onClose }: { sucursal: SucursalRepuestos; 
             )}
           </div>
 
-          {/* Recibo / monto */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="block text-xs text-text-muted mb-1">N° recibo</label>
-              <input
-                type="text"
-                value={numeroRecibo}
-                onChange={e => setNumeroRecibo(e.target.value)}
-                placeholder="REC-001"
-                className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="block text-xs text-text-muted mb-1">Monto pagado</label>
-              <input
-                type="number"
-                step="0.01"
-                value={montoPagado}
-                onChange={e => setMontoPagado(e.target.value)}
-                placeholder="0"
-                className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none"
-              />
-            </div>
-          </div>
+          {/* Recibo / monto — oculto en pedidos internos */}
+          {!esInterno && (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">N° recibo</label>
+                  <input
+                    type="text"
+                    value={numeroRecibo}
+                    onChange={e => setNumeroRecibo(e.target.value)}
+                    placeholder="REC-001"
+                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-text-muted mb-1">Monto pagado</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={montoPagado}
+                    onChange={e => setMontoPagado(e.target.value)}
+                    placeholder="0"
+                    className="w-full bg-bg-primary border border-border rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none"
+                  />
+                </div>
+              </div>
 
-          <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
-            <input
-              type="checkbox"
-              checked={reciboEmitido}
-              onChange={e => setReciboEmitido(e.target.checked)}
-              className="w-4 h-4"
-            />
-            🧾 Recibo emitido (cliente ya pagó)
-          </label>
+              <label className="flex items-center gap-2 text-sm text-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={reciboEmitido}
+                  onChange={e => setReciboEmitido(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                🧾 Recibo emitido (cliente ya pagó)
+              </label>
+            </>
+          )}
 
           {/* Observaciones */}
           <div>
