@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowLeft, Save } from 'lucide-react'
 import { useCrearRecepcion } from '../../hooks/useRecepciones'
+import { useAuth } from '../../context/AuthContext'
 import { Button, Input, Select, Textarea, Card, notify } from '../../components/ui'
 
 const SUBAREAS: Record<string, { label: string; value: string }[]> = {
@@ -48,6 +49,13 @@ const MODELOS_FIAT = [
 export function NuevaRecepcion() {
   const navigate = useNavigate()
   const crearRecepcion = useCrearRecepcion()
+  const { perfil } = useAuth()
+
+  // Si el director tiene 'Ambas', tiene que elegir sucursal explícitamente.
+  // Si está atado a una sola sucursal, esa se usa por default.
+  const sucursalAtada = perfil?.sucursal && perfil.sucursal !== 'Ambas'
+    ? (perfil.sucursal as 'Ushuaia' | 'Rio Grande')
+    : null
 
   const [form, setForm] = useState({
     nombre: '',
@@ -57,6 +65,7 @@ export function NuevaRecepcion() {
     origen: '',
     modelo_interes: '',
     notas: '',
+    sucursal: (sucursalAtada ?? 'Ushuaia') as 'Ushuaia' | 'Rio Grande',
   })
 
   const update = (field: string, value: string) =>
@@ -83,6 +92,7 @@ export function NuevaRecepcion() {
         origen: form.origen || undefined,
         modelo_interes: form.area === 'ventas' && form.modelo_interes ? form.modelo_interes : undefined,
         notas: form.notas || undefined,
+        sucursal: form.sucursal,
       })
       notify.success('Cliente registrado')
       navigate('/recepcion')
@@ -109,6 +119,28 @@ export function NuevaRecepcion() {
 
       <form onSubmit={handleSubmit}>
         <Card className="space-y-4 p-5">
+          {!sucursalAtada ? (
+            // Director con sucursal 'Ambas' → tiene que elegir
+            <Select
+              label="Sucursal *"
+              value={form.sucursal}
+              onChange={(e) => update('sucursal', e.target.value)}
+              options={[
+                { label: 'Ushuaia', value: 'Ushuaia' },
+                { label: 'Río Grande', value: 'Rio Grande' },
+              ]}
+              required
+            />
+          ) : (
+            // Usuario con sucursal fija → solo mostrar (no editable)
+            <div>
+              <label className="block text-xs text-text-muted mb-1">Sucursal</label>
+              <p className="px-3 py-2 bg-bg-tertiary border border-border rounded-lg text-sm text-text-primary">
+                📍 {sucursalAtada}
+              </p>
+            </div>
+          )}
+
           <Input
             label="Nombre"
             value={form.nombre}

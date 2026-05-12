@@ -85,6 +85,8 @@ interface NuevaRecepcionData {
   origen?: string
   modelo_interes?: string
   notas?: string
+  /** Sucursal explícita. Si no se pasa, usa la del perfil (default 'Ushuaia' para director con 'Ambas'). */
+  sucursal?: 'Ushuaia' | 'Rio Grande'
 }
 
 export function useCrearRecepcion() {
@@ -93,12 +95,19 @@ export function useCrearRecepcion() {
 
   return useMutation({
     mutationFn: async (data: NuevaRecepcionData) => {
+      const sucursal: 'Ushuaia' | 'Rio Grande' =
+        data.sucursal
+          ?? (perfil?.sucursal && perfil.sucursal !== 'Ambas'
+              ? (perfil.sucursal as 'Ushuaia' | 'Rio Grande')
+              : 'Ushuaia')
+
+      const { sucursal: _ignore, ...rest } = data
       const { data: rec, error } = await supabase
         .from('recepciones')
         .insert({
-          ...data,
+          ...rest,
+          sucursal,
           created_by: user!.id,
-          sucursal: perfil?.sucursal === 'Ambas' ? 'Ushuaia' : perfil?.sucursal,
           estado: 'en_espera',
         })
         .select()
