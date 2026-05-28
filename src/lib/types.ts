@@ -55,7 +55,7 @@ export type EstadoGestoria = 'ingresado' | 'en_tramite' | 'listo' | 'egresado' |
 export type EstadoAlistamiento = 'pendiente' | 'en_proceso' | 'observado' | 'aprobado' | 'rechazado'
 export type EstadoEntrega = 'pendiente' | 'programada' | 'entregada' | 'cerrada'
 
-export type RolUsuario = 'director' | 'asesor_ush' | 'asesor_rg' | 'gestor' | 'preparador' | 'calidad'
+export type RolUsuario = 'director' | 'asesor_ush' | 'asesor_rg' | 'gestor' | 'preparador' | 'calidad' | 'vendedor'
 export type SeveridadNC = 'critica' | 'mayor' | 'menor'
 export type EstadoNC = 'abierta' | 'en_proceso' | 'cerrada'
 export type PrioridadNotificacion = 'baja' | 'normal' | 'alta' | 'critica'

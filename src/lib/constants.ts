@@ -150,6 +150,7 @@ export const ROLES: { value: RolUsuario; label: string }[] = [
   { value: 'gestor', label: 'Gestor' },
   { value: 'preparador', label: 'Preparador' },
   { value: 'calidad', label: 'Calidad' },
+  { value: 'vendedor', label: 'Vendedor' },
 ]
 
 // ============================================================
