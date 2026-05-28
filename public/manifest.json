@@ -1,6 +1,6 @@
 {
-  "name": "LASAC - Liendo Automotores",
-  "short_name": "LASAC",
+  "name": "LASAC aplicación móvil",
+  "short_name": "LASAC móvil",
   "description": "Sistema de Gestión Operativa - Liendo Automotores FIAT",
   "start_url": "/",
   "display": "standalone",
